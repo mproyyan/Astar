@@ -17,9 +17,9 @@ struct ContentView: View {
       if let store = store.scope(state: \.onboarding, action: \.onboarding) {
         OnboardingView(store: store)
       }
-    case .loggedIn:
-      if let store = store.scope(state: \.loggedIn, action: \.loggedIn) {
-        EmptyMapView(store: store)
+    case .main:
+      if let store = store.scope(state: \.main, action: \.main) {
+        MainScreenMapView(store: store)
       }
     }
   }
