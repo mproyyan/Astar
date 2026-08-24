@@ -1,0 +1,88 @@
+//
+//  OnboardingFeature.swift
+//  Astar
+//
+//  Created by Muhammad Pandu Royyan on 24/08/26.
+//
+
+import ComposableArchitecture
+import Foundation
+
+struct OnboardingContent: Equatable, Identifiable {
+  let id = UUID()
+  let title: String
+  let description: String
+  let imageName: String
+}
+
+@Reducer
+struct OnboardingFeature {
+  @ObservableState
+  struct State: Equatable {
+    var currentIndex = 0
+    var contents: [OnboardingContent] = [
+      OnboardingContent(
+        title: "WalkGuard",
+        description: "Lorem ipsum dolor sit amet, aliqua sint ea consectetur. Consequat proident ea esse enim commodo adipiscing dolor. Adipiscing ut veniam in et dolor enim ad nostrud exercitation.",
+        imageName: "figure.walk.motion"
+      ),
+      OnboardingContent(
+        title: "Walker & Guardian",
+        description: "Lorem ipsum dolor sit amet, aliqua sint ea consectetur. Consequat proident ea esse enim commodo adipiscing dolor. Adipiscing ut veniam in et dolor enim ad nostrud exercitation.",
+        imageName: "person.3.fill"
+      ),
+      OnboardingContent(
+        title: "Setup",
+        description: "Lorem ipsum dolor sit amet, aliqua sint ea consectetur. Consequat proident ea esse enim commodo adipiscing dolor. Adipiscing ut veniam in et dolor enim ad nostrud exercitation.",
+        imageName: "person.crop.circle.fill.badge.plus"
+      )
+    ]
+  }
+
+  enum Action: Equatable {
+    case onAppear
+    case onDisappear
+    case timerTicked
+    case setIndex(Int)
+    case appleSignInCompleted
+  }
+
+  @Dependency(\.continuousClock) var clock
+
+  var body: some Reducer<State, Action> {
+    Reduce { state, action in
+      switch action {
+      case .onAppear:
+        return .run { send in
+          for await _ in await self.clock.timer(interval: .seconds(3)) {
+            await send(.timerTicked)
+          }
+        }
+        .cancellable(id: "cancel_timer", cancelInFlight: true)
+
+      case .onDisappear:
+        return .cancel(id: "cancel_timer")
+
+      case .timerTicked:
+        state.currentIndex = (state.currentIndex + 1) % state.contents.count
+        return .none
+
+      case let .setIndex(index):
+        state.currentIndex = index
+        return .concatenate(
+          .cancel(id: "cancel_timer"),
+          .run { send in
+            for await _ in await self.clock.timer(interval: .seconds(3)) {
+              await send(.timerTicked)
+            }
+          }
+          .cancellable(id: "cancel_timer", cancelInFlight: true)
+        )
+
+      case .appleSignInCompleted:
+        // Handle successful sign in logic here later
+        return .none
+      }
+    }
+  }
+}
