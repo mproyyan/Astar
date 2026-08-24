@@ -6,70 +6,73 @@
 //
 
 import SwiftUI
+import ComposableArchitecture
 
 struct ProfileView: View {
+  let store: StoreOf<ProfileFeature>
+
   var body: some View {
-    NavigationStack {
-      ZStack {
-        // Background
-        Color(red: 0.95, green: 0.95, blue: 0.97)
-          .ignoresSafeArea()
-        
-        VStack(spacing: 0) {
-          // 2. Profile Header
-          ProfileHeader()
-            .padding(.top, 24)
-            .padding(.bottom, 16)
-          
-          // 4 & 5. Profile Options List
-          List {
-            Section {
-              NavigationLink {
-                Text("Trusted Person")
-              } label: {
-                Text("Trusted Person")
-                  .font(.body)
-                  .padding(.vertical, 8)
-              }
-              
-              NavigationLink {
-                Text("Set Default Locations")
-              } label: {
-                Text("Set Default Locations")
-                  .font(.body)
-                  .padding(.vertical, 8)
-              }
-              
-              NavigationLink {
-                Text("History")
-              } label: {
-                Text("History")
-                  .font(.body)
-                  .padding(.vertical, 8)
-              }
+    ZStack {
+      // Background
+      Color(red: 0.95, green: 0.95, blue: 0.97)
+        .ignoresSafeArea()
+
+      VStack(spacing: 0) {
+        // 2. Profile Header
+        ProfileHeader(store: store)
+          .padding(.top, 24)
+          .padding(.bottom, 16)
+
+        // 4 & 5. Profile Options List
+        List {
+          Section {
+            NavigationLink {
+              Text("Trusted Person")
+            } label: {
+              Text("Trusted Person")
+                .font(.body)
+                .padding(.vertical, 8)
             }
-            .listRowBackground(Color.white)
-            // Note: Native list section corner radius is managed by iOS.
+
+            NavigationLink {
+              Text("Set Default Locations")
+            } label: {
+              Text("Set Default Locations")
+                .font(.body)
+                .padding(.vertical, 8)
+            }
+
+            NavigationLink {
+              Text("History")
+            } label: {
+              Text("History")
+                .font(.body)
+                .padding(.vertical, 8)
+            }
           }
-          .listStyle(.insetGrouped)
-          .scrollContentBackground(.hidden)
-          
-          // 6. Sign Out Button
-          SignOutButton()
-            .padding(.horizontal, 20)
-            .padding(.bottom, 32)
+          .listRowBackground(Color.white)
+          // Note: Native list section corner radius is managed by iOS.
         }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+
+        // 6. Sign Out Button
+        SignOutButton(store: store)
+          .padding(.horizontal, 20)
+          .padding(.bottom, 32)
       }
-      // 1. Navigation
-      .navigationTitle("Profile")
-      .navigationBarTitleDisplayMode(.inline)
     }
+    // 1. Navigation
+    .navigationTitle("Profile")
+    .navigationBarTitleDisplayMode(.inline)
   }
 }
 
 // MARK: - Components
 
 struct ProfileHeader: View {
+  let store: StoreOf<ProfileFeature>
+
   var body: some View {
     VStack(spacing: 8) {
       // Avatar Placeholder
@@ -77,7 +80,7 @@ struct ProfileHeader: View {
         Circle()
           .fill(Color(red: 0.88, green: 0.88, blue: 0.90))
           .frame(width: 96, height: 96)
-        
+
         Image(systemName: "person.fill")
           .resizable()
           .scaledToFit()
@@ -86,24 +89,27 @@ struct ProfileHeader: View {
           .offset(y: 4) // adjust visual center of the person icon
       }
       .padding(.bottom, 8)
-      
+
       // 3. Profile Information
-      Text("Muhammad Royyan")
+      Text(store.userProfile?.name ?? "Unknown User")
         .font(.title2.bold())
         .foregroundColor(.primary)
         .multilineTextAlignment(.center)
-      
-      Text("mproyyan@gmail.com")
+
+      Text(store.userProfile?.email ?? "unknown@apple.com")
         .font(.footnote)
         .tint(Color.gray)
-      .multilineTextAlignment(.center)    }
+        .multilineTextAlignment(.center)
+    }
   }
 }
 
 struct SignOutButton: View {
+  let store: StoreOf<ProfileFeature>
+
   var body: some View {
     Button(action: {
-      print("Sign out tapped")
+      store.send(.signOutButtonTapped)
     }) {
       Text("Sign Out")
         .font(.system(size: 18, weight: .semibold))
@@ -117,5 +123,7 @@ struct SignOutButton: View {
 }
 
 #Preview {
-  ProfileView()
+  NavigationStack {
+    ProfileView(store: Store(initialState: ProfileFeature.State()) { ProfileFeature() })
+  }
 }

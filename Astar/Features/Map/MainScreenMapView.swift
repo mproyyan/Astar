@@ -18,36 +18,52 @@ struct MainScreenMapView: View {
   @State private var isSheetExpanded = false
 
   var body: some View {
-    ZStack(alignment: .bottom) {
-      Map(position: $cameraPosition, interactionModes: [.pan, .zoom, .rotate]) {
-        UserAnnotation()
-      }
-      .mapStyle(.standard(elevation: .realistic))
-      .ignoresSafeArea()
-
-      BottomSheetView(store: store, isExpanded: $isSheetExpanded)
-    }
-    .task {
-      store.send(.map(.onAppear))
-    }
-    .onChange(of: store.map.currentLocation) { _, newLocation in
-      guard let coordinate = newLocation, !hasCenteredOnUserLocation else { return }
-      hasCenteredOnUserLocation = true
-
-      withAnimation(.easeInOut(duration: 0.8)) {
-        cameraPosition = .region(MKCoordinateRegion(
-          center: coordinate,
-          span: MKCoordinateSpan(latitudeDelta: 0.012, longitudeDelta: 0.012)
-        ))
-      }
-    }
-    .onChange(of: store.map.authorizationStatus) { _, newStatus in
-        if newStatus == .notDetermined {
-           store.send(.map(.requestLocation))
+    NavigationStack(path: $store.scope(state: \.path, action: \.path)) {
+      ZStack(alignment: .bottom) {
+        Map(position: $cameraPosition, interactionModes: [.pan, .zoom, .rotate]) {
+          UserAnnotation()
         }
+        .mapStyle(.standard(elevation: .realistic))
+        .ignoresSafeArea()
+
+        BottomSheetView(store: store, isExpanded: $isSheetExpanded)
+      }
+      .task {
+        store.send(.map(.onAppear))
+      }
+      .onChange(of: store.map.currentLocation) { _, newLocation in
+        guard let coordinate = newLocation, !hasCenteredOnUserLocation else { return }
+        hasCenteredOnUserLocation = true
+
+        withAnimation(.easeInOut(duration: 0.8)) {
+          cameraPosition = .region(MKCoordinateRegion(
+            center: coordinate,
+            span: MKCoordinateSpan(latitudeDelta: 0.012, longitudeDelta: 0.012)
+          ))
+        }
+      }
+      .onChange(of: store.map.authorizationStatus) { _, newStatus in
+          if newStatus == .notDetermined {
+             store.send(.map(.requestLocation))
+          }
+      }
+    } destination: { store in
+      NavigationDestination(store: store)
     }
   }
 }
+
+private struct NavigationDestination: View {
+    let store: StoreOf<MainFeature.Path>
+
+    var body: some View {
+        switch store.case {
+        case let .profile(profileStore):
+            ProfileView(store: profileStore)
+        }
+    }
+}
+
 
 private struct BottomSheetView: View {
   let store: StoreOf<MainFeature>
@@ -207,11 +223,10 @@ private struct SearchBarView: View {
 
 private struct ProfileButton: View {
   let store: StoreOf<MainFeature>
-  @State private var showingSignOut = false
-    
+
   var body: some View {
     Button {
-        showingSignOut = true
+        store.send(.profileButtonTapped)
     } label: {
       Text(initials)
         .font(.system(size: 16, weight: .semibold))
@@ -224,16 +239,8 @@ private struct ProfileButton: View {
         }
     }
     .buttonStyle(.plain)
-    .confirmationDialog("Profile", isPresented: $showingSignOut, titleVisibility: .visible) {
-        Button("Sign Out", role: .destructive) {
-            store.send(.login(.signOutButtonTapped))
-        }
-        Button("Cancel", role: .cancel) {}
-    } message: {
-        Text("Logged in as \(emailAddress)")
-    }
   }
-    
+
   private var initials: String {
       if let name = store.login.userProfile?.name, !name.isEmpty {
           let parts = name.split(separator: " ")
@@ -244,10 +251,6 @@ private struct ProfileButton: View {
           }
       }
       return "NL"
-  }
-    
-  private var emailAddress: String {
-      store.login.userProfile?.email ?? "Unknown"
   }
 }
 
