@@ -9,6 +9,13 @@ import SwiftUI
 import ComposableArchitecture
 import AuthenticationServices
 
+private extension String {
+  var nilIfBlank: String? {
+    let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? nil : trimmed
+  }
+}
+
 struct OnboardingView: View {
   @Bindable var store: StoreOf<OnboardingFeature>
 
@@ -62,8 +69,16 @@ struct OnboardingView: View {
         },
         onCompletion: { result in
           switch result {
-          case .success(_):
-            store.send(.appleSignInCompleted)
+          case .success(let authorization):
+            if let credential = authorization.credential as? ASAuthorizationAppleIDCredential {
+              let formatter = PersonNameComponentsFormatter()
+              let payload = AppleSignInCredential(
+                appleUserId: credential.user,
+                name: credential.fullName.map(formatter.string(from:))?.nilIfBlank,
+                email: credential.email?.nilIfBlank
+              )
+              store.send(.appleSignInCompleted(payload))
+            }
           case .failure(let error):
             print("Sign in with Apple failed: \(error.localizedDescription)")
           }
