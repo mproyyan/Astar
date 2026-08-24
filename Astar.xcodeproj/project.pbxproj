@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		A640BB71303BDF850064EB80 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = A640BB70303BDF850064EB80 /* ComposableArchitecture */; };
+		A640BB74303BDF8E0064EB80 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = A640BB73303BDF8E0064EB80 /* ComposableArchitecture */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		A6DE5308303BDE3000940469 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +57,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A640BB71303BDF850064EB80 /* ComposableArchitecture in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -59,6 +65,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A640BB74303BDF8E0064EB80 /* ComposableArchitecture in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -72,12 +79,20 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		A640BB72303BDF8E0064EB80 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		A6DE52F1303BDE2F00940469 = {
 			isa = PBXGroup;
 			children = (
 				A6DE52FC303BDE2F00940469 /* Astar */,
 				A6DE530A303BDE3000940469 /* AstarTests */,
 				A6DE5314303BDE3000940469 /* AstarUITests */,
+				A640BB72303BDF8E0064EB80 /* Frameworks */,
 				A6DE52FB303BDE2F00940469 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -112,6 +127,7 @@
 			);
 			name = Astar;
 			packageProductDependencies = (
+				A640BB70303BDF850064EB80 /* ComposableArchitecture */,
 			);
 			productName = Astar;
 			productReference = A6DE52FA303BDE2F00940469 /* Astar.app */;
@@ -135,6 +151,7 @@
 			);
 			name = AstarTests;
 			packageProductDependencies = (
+				A640BB73303BDF8E0064EB80 /* ComposableArchitecture */,
 			);
 			productName = AstarTests;
 			productReference = A6DE5307303BDE3000940469 /* AstarTests.xctest */;
@@ -195,6 +212,9 @@
 			);
 			mainGroup = A6DE52F1303BDE2F00940469;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				A640BB6F303BDF850064EB80 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A6DE52FB303BDE2F00940469 /* Products */;
 			projectDirPath = "";
@@ -578,6 +598,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A640BB6F303BDF850064EB80 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pointfreeco/swift-composable-architecture";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.26.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A640BB70303BDF850064EB80 /* ComposableArchitecture */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A640BB6F303BDF850064EB80 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */;
+			productName = ComposableArchitecture;
+		};
+		A640BB73303BDF8E0064EB80 /* ComposableArchitecture */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A640BB6F303BDF850064EB80 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */;
+			productName = ComposableArchitecture;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A6DE52F2303BDE2F00940469 /* Project object */;
 }
