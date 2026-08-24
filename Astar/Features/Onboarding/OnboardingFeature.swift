@@ -44,7 +44,12 @@ struct OnboardingFeature {
     case onDisappear
     case timerTicked
     case setIndex(Int)
-    case appleSignInCompleted
+    case appleSignInCompleted(AppleSignInCredential)
+    case delegate(Delegate)
+
+    enum Delegate: Equatable {
+      case appleSignInCompleted(AppleSignInCredential)
+    }
   }
 
   @Dependency(\.continuousClock) var clock
@@ -79,8 +84,10 @@ struct OnboardingFeature {
           .cancellable(id: "cancel_timer", cancelInFlight: true)
         )
 
-      case .appleSignInCompleted:
-        // Handle successful sign in logic here later
+      case let .appleSignInCompleted(credential):
+        return .send(.delegate(.appleSignInCompleted(credential)))
+
+      case .delegate:
         return .none
       }
     }
