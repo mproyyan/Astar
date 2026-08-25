@@ -1,0 +1,74 @@
+//
+//  MapPlaceModels.swift
+//  Astar
+//
+//  Created by Dimas Prihady Setyawan on 25/08/26.
+//
+
+import Foundation
+
+struct Person: Identifiable, Equatable, Sendable {
+    let id: UUID
+    let name: String
+    let status: String
+
+    init(id: UUID = UUID(), name: String, status: String) {
+        self.id = id
+        self.name = name
+        self.status = status
+    }
+}
+
+struct SavedPlace: Identifiable, Equatable, Sendable {
+    let id: UUID
+    let name: String
+    let subtitle: String
+    let iconName: String
+    let distance: String?
+
+    init(id: UUID = UUID(), name: String, subtitle: String, iconName: String, distance: String? = nil) {
+        self.id = id
+        self.name = name
+        self.subtitle = subtitle
+        self.iconName = iconName
+        self.distance = distance
+    }
+}
+
+enum MapSampleData {
+    static let people: [Person] = [
+        Person(name: "Awan", status: "Walking"),
+        Person(name: "Royyan", status: "Idle"),
+        Person(name: "Safa", status: "Idle"),
+        Person(name: "Nadia", status: "Idle")
+    ]
+
+    static let savedPlaces: [SavedPlace] = [
+        SavedPlace(name: "Home", subtitle: "Bendungan Hilir, South Jakarta", iconName: "house.fill"),
+        SavedPlace(name: "Gym", subtitle: "Agora Mall, Central Jakarta", iconName: "figure.strengthtraining.traditional"),
+        SavedPlace(name: "Office", subtitle: "Bendungan Hilir, South Jakarta", iconName: "building.2.fill")
+    ]
+
+    static let allSearchablePlaces: [SavedPlace] = [
+        SavedPlace(name: "Home", subtitle: "Bendungan Hilir, South Jakarta", iconName: "house.fill", distance: "350 m"),
+        SavedPlace(name: "Gym", subtitle: "Agora Mall, Central Jakarta", iconName: "figure.strengthtraining.traditional", distance: "450 m"),
+        SavedPlace(name: "Office", subtitle: "Bendungan Hilir, South Jakarta", iconName: "building.2.fill", distance: "500 m"),
+        SavedPlace(name: "Autograph Tower", subtitle: "Thamrin Nine, Jl. M.H. Thamrin No. 10, Central Jakarta", iconName: "building.2.fill", distance: "250 m"),
+        SavedPlace(name: "Agora Mall", subtitle: "Jl. M.H. Thamrin No. 10, Central Jakarta", iconName: "bag.fill", distance: "450 m"),
+        SavedPlace(name: "Grand Indonesia", subtitle: "Jl. M.H. Thamrin No. 1, Central Jakarta", iconName: "bag.fill", distance: "850 m"),
+        SavedPlace(name: "Plaza Indonesia", subtitle: "Jl. M.H. Thamrin No. 28-30, Central Jakarta", iconName: "bag.fill", distance: "1.1 km"),
+        SavedPlace(name: "Starbucks Reserve Sudirman", subtitle: "Menara Astra, Jl. Jend. Sudirman Kav 5-6", iconName: "cup.and.saucer.fill", distance: "600 m"),
+        SavedPlace(name: "MRT Bundaran HI", subtitle: "Jl. M.H. Thamrin, Central Jakarta", iconName: "tram.fill", distance: "950 m"),
+        SavedPlace(name: "Stasiun Sudirman", subtitle: "Jl. Kendal No. 1, Central Jakarta", iconName: "train.side.front.car", distance: "1.3 km"),
+        SavedPlace(name: "Kopi Kenangan Bendungan Hilir", subtitle: "Jl. Bendungan Hilir No. 15, Central Jakarta", iconName: "cup.and.saucer.fill", distance: "400 m"),
+        SavedPlace(name: "Gelora Bung Karno", subtitle: "Jl. Pintu Satu Senayan, Central Jakarta", iconName: "figure.run", distance: "2.4 km"),
+        SavedPlace(name: "Hutan Kota GBK", subtitle: "Pintu Tujuh Senayan, Central Jakarta", iconName: "tree.fill", distance: "2.6 km"),
+        SavedPlace(name: "Pacific Place", subtitle: "SCBD, Jl. Jend. Sudirman, South Jakarta", iconName: "building.fill", distance: "3.1 km"),
+        SavedPlace(name: "Senayan City", subtitle: "Jl. Asia Afrika No. 19, South Jakarta", iconName: "bag.fill", distance: "3.8 km"),
+        SavedPlace(name: "McDonald's Sarinah", subtitle: "Jl. M.H. Thamrin No. 11, Central Jakarta", iconName: "fork.knife", distance: "1.8 km"),
+        SavedPlace(name: "Monumen Nasional", subtitle: "Gambir, Central Jakarta", iconName: "landmark.fill", distance: "4.2 km"),
+        SavedPlace(name: "Blok M Hub", subtitle: "Jl. Panglima Polim, South Jakarta", iconName: "tram.fill", distance: "5.6 km"),
+        SavedPlace(name: "Central Park Mall", subtitle: "Jl. Letjen S. Parman No. 28, West Jakarta", iconName: "bag.fill", distance: "6.8 km"),
+        SavedPlace(name: "Celebrity Fitness FX Sudirman", subtitle: "FX Sudirman Fl. 6, Central Jakarta", iconName: "figure.strengthtraining.traditional", distance: "3.2 km")
+    ]
+}
