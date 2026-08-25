@@ -15,22 +15,27 @@ struct MainScreenMapView: View {
   @Bindable var store: StoreOf<MainFeature>
   @State private var cameraPosition: MapCameraPosition = .region(.initialJakartaRegion)
   @State private var hasCenteredOnUserLocation = false
-  @State private var isSheetPresented = true
-  @State private var selectedDetent: PresentationDetent = .fraction(0.45)
+  @State private var selectedDetent: PresentationDetent = .fraction(0.42)
+
+  private var isSheetPresented: Binding<Bool> {
+    Binding(
+      get: { store.path.isEmpty },
+      set: { _ in }
+    )
+  }
 
   var body: some View {
     NavigationStack(path: $store.scope(state: \.path, action: \.path)) {
       Map(position: $cameraPosition, interactionModes: [.pan, .zoom, .rotate]) {
         UserAnnotation()
       }
-      .sheet(isPresented: $isSheetPresented) {
+      .sheet(isPresented: isSheetPresented) {
         MapSheet(store: store, selectedDetent: $selectedDetent)
-              .presentationDetents([.fraction(0.1),.fraction(0.45), .large], selection: $selectedDetent)
+          .presentationDetents([.fraction(0.1), .fraction(0.42), .fraction(0.52), .fraction(0.6), .large], selection: $selectedDetent)
           .presentationDragIndicator(.visible)
           .presentationBackgroundInteraction(.enabled(upThrough: .large))
           .presentationCornerRadius(34)
           .interactiveDismissDisabled(true)
-          
       }
       .task {
         store.send(.map(.onAppear))
