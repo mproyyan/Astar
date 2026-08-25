@@ -29,6 +29,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		7D64EA68303D68BA00390737 /* RULES.md */ = {isa = PBXFileReference; lastKnownFileType = text.markdown; path = RULES.md; sourceTree = "<group>"; };
 		A640BB81303BE77F0064EB80 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 		A6DE52FA303BDE2F00940469 /* Astar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Astar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A6DE5307303BDE3000940469 /* AstarTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AstarTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -90,6 +91,7 @@
 		A6DE52F1303BDE2F00940469 = {
 			isa = PBXGroup;
 			children = (
+				7D64EA68303D68BA00390737 /* RULES.md */,
 				A640BB81303BE77F0064EB80 /* .gitignore */,
 				A6DE52FC303BDE2F00940469 /* Astar */,
 				A6DE530A303BDE3000940469 /* AstarTests */,
@@ -435,7 +437,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = project.astar;
+				PRODUCT_BUNDLE_IDENTIFIER = awan.astar;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -471,7 +473,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = project.astar;
+				PRODUCT_BUNDLE_IDENTIFIER = awan.astar;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
