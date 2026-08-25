@@ -9,6 +9,7 @@ import SwiftUI
 
 struct PeopleSection: View {
     let people: [Person]
+    var onSelectPerson: ((Person) -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -19,8 +20,13 @@ struct PeopleSection: View {
 
             HStack(alignment: .top, spacing: 10) {
                 ForEach(people) { person in
-                    PersonView(person: person)
-                        .frame(maxWidth: .infinity)
+                    PersonView(
+                        person: person,
+                        onSelect: {
+                            onSelectPerson?(person)
+                        }
+                    )
+                    .frame(maxWidth: .infinity)
                 }
             }
         }

@@ -13,6 +13,7 @@ struct MapSheetMainContent: View {
     let isExpanded: Bool
     let onSearchTapped: () -> Void
     var onSelectPlace: ((SavedPlace) -> Void)? = nil
+    var onSelectPerson: ((Person) -> Void)? = nil
 
     private let people = MapSampleData.people
     private let savedPlaces = MapSampleData.savedPlaces
@@ -30,7 +31,7 @@ struct MapSheetMainContent: View {
             .padding(.top, 8)
 
             VStack(spacing: 32) {
-                PeopleSection(people: people)
+                PeopleSection(people: people, onSelectPerson: onSelectPerson)
 
                 SavedSection(savedPlaces: savedPlaces, onSelectPlace: onSelectPlace)
                     .transition(.asymmetric(
