@@ -31,7 +31,7 @@ struct MainScreenMapView: View {
       }
       .sheet(isPresented: isSheetPresented) {
         MapSheet(store: store, selectedDetent: $selectedDetent)
-          .presentationDetents([.fraction(0.1), .fraction(0.42), .fraction(0.52), .fraction(0.6), .large], selection: $selectedDetent)
+          .presentationDetents([.fraction(0.1), .fraction(0.35), .fraction(0.42), .fraction(0.52), .fraction(0.6), .large], selection: $selectedDetent)
           .presentationDragIndicator(.visible)
           .presentationBackgroundInteraction(.enabled(upThrough: .large))
           .presentationCornerRadius(34)

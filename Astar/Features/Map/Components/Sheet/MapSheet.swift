@@ -22,6 +22,10 @@ struct MapSheet: View {
     @State private var selectedDestination: SavedPlace? = nil
     @State private var directionMode: DirectionSheetMode = .directions
     @State private var isJourneyDone = false
+    @State private var selectedWalker: Person? = nil
+    @State private var isWalkerDestinationReached = false
+    @State private var isViewingHistoryList = false
+    @State private var selectedHistoryTrip: WalkerHistoryTrip? = nil
 
     private var isExpanded: Bool {
         selectedDetent == .large
@@ -102,6 +106,116 @@ struct MapSheet: View {
                         .padding(.top, 12)
                         .transition(.opacity)
                     }
+                } else if let walker = selectedWalker {
+                    if walker.status == "Idle" {
+                        if let trip = selectedHistoryTrip {
+                            WalkerCardHistoryDetail(
+                                trip: trip,
+                                onDismiss: {
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        selectedHistoryTrip = nil
+                                    }
+                                }
+                            )
+                            .padding(.horizontal, 16)
+                            .padding(.top, 12)
+                            .transition(.opacity)
+                        } else if isViewingHistoryList {
+                            WalkerCardHistoryList(
+                                onDismiss: {
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        isViewingHistoryList = false
+                                    }
+                                },
+                                onSelectTrip: { trip in
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        selectedHistoryTrip = trip
+                                    }
+                                }
+                            )
+                            .padding(.horizontal, 16)
+                            .padding(.top, 12)
+                            .transition(.opacity)
+                        } else {
+                            WalkerCardIdle(
+                                name: walker.name,
+                                email: "awanmendung@icloud.com",
+                                onDismiss: {
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        selectedWalker = nil
+                                        isViewingHistoryList = false
+                                        selectedHistoryTrip = nil
+                                        selectedDetent = .fraction(0.42)
+                                    }
+                                },
+                                onViewAllHistory: {
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        isViewingHistoryList = true
+                                    }
+                                },
+                                onSelectTrip: { trip in
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        selectedHistoryTrip = trip
+                                    }
+                                }
+                            )
+                            .padding(.horizontal, 16)
+                            .padding(.top, 12)
+                            .transition(.opacity)
+                        }
+                    } else {
+                        if isWalkerDestinationReached {
+                            WalkerCardReachDestination(
+                                walkerName: "\(walker.name) Mendung",
+                                avatarImageName: "AwanAvatar",
+                                onDismiss: {
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        selectedWalker = nil
+                                        isWalkerDestinationReached = false
+                                        selectedDetent = .fraction(0.42)
+                                    }
+                                }
+                            )
+                            .padding(.horizontal, 16)
+                            .padding(.top, 12)
+                            .transition(.opacity)
+                        } else {
+                            WalkerCardWalking(
+                                walker: WalkerProfile(
+                                    name: walker.name,
+                                    locationSubtitle: "Central Jakarta, Jakarta",
+                                    timeAgo: "1 Min Ago",
+                                    originPlaceName: "Autograph Tower",
+                                    originIconName: "briefcase.fill",
+                                    destinationPlaceName: "Home",
+                                    destinationIconName: "house.fill",
+                                    recentLocations: WalkerSampleData.awanLocations
+                                ),
+                                onDismiss: {
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        selectedWalker = nil
+                                        isWalkerDestinationReached = false
+                                        selectedDetent = .fraction(0.42)
+                                    }
+                                },
+                                onExitTrack: {
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        isWalkerDestinationReached = true
+                                        selectedDetent = .fraction(0.35)
+                                    }
+                                },
+                                onReachDestination: {
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        isWalkerDestinationReached = true
+                                        selectedDetent = .fraction(0.35)
+                                    }
+                                }
+                            )
+                            .padding(.horizontal, 16)
+                            .padding(.top, 12)
+                            .transition(.opacity)
+                        }
+                    }
                 } else if isSearching {
                     MapSheetSearchContent(
                         isSearching: $isSearching,
@@ -136,6 +250,15 @@ struct MapSheet: View {
                                 isJourneyDone = false
                                 directionMode = .directions
                                 selectedDetent = .fraction(0.52)
+                            }
+                        },
+                        onSelectPerson: { person in
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                selectedWalker = person
+                                isWalkerDestinationReached = false
+                                isViewingHistoryList = false
+                                selectedHistoryTrip = nil
+                                selectedDetent = .large
                             }
                         }
                     )
