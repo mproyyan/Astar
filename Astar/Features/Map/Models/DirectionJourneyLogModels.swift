@@ -24,7 +24,7 @@ struct JourneyLogEntry: Identifiable, Equatable, Sendable {
     let entryType: JourneyLogEntryType
     var coordinate: CLLocationCoordinate2D?
 
-    init(
+    nonisolated init(
         id: UUID = UUID(),
         landmarkName: String,
         address: String,

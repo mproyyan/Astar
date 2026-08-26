@@ -105,6 +105,7 @@ struct MapSheet: View {
                             .transition(.opacity)
                         } else if store.map.isViewingHistoryList {
                             WalkerCardHistoryList(
+                                sections: store.map.selectedWalkerHistorySections.isEmpty ? WalkerSampleData.defaultHistorySections : store.map.selectedWalkerHistorySections,
                                 onDismiss: {
                                     store.send(.map(.dismissHistoryList))
                                 },
@@ -118,7 +119,9 @@ struct MapSheet: View {
                         } else {
                             WalkerCardIdle(
                                 name: walker.name,
-                                email: "awanmendung@icloud.com",
+                                email: walker.email.isEmpty ? "\(walker.name.lowercased().replacingOccurrences(of: " ", with: ""))@icloud.com" : walker.email,
+                                avatarImageName: walker.avatarImageName,
+                                trips: store.map.selectedWalkerTrips.isEmpty ? WalkerSampleData.defaultTrips : store.map.selectedWalkerTrips,
                                 onDismiss: {
                                     store.send(.map(.dismissWalker))
                                     withAnimation(.easeInOut(duration: 0.25)) {
@@ -139,8 +142,8 @@ struct MapSheet: View {
                     } else {
                         if store.map.isWalkerDestinationReached {
                             WalkerCardReachDestination(
-                                walkerName: "\(walker.name) Mendung",
-                                avatarImageName: "AwanAvatar",
+                                walkerName: walker.name,
+                                avatarImageName: walker.avatarImageName,
                                 onDismiss: {
                                     store.send(.map(.dismissWalker))
                                     withAnimation(.easeInOut(duration: 0.25)) {
@@ -156,11 +159,11 @@ struct MapSheet: View {
                                 walker: WalkerProfile(
                                     name: walker.name,
                                     locationSubtitle: "Central Jakarta, Jakarta",
-                                    timeAgo: "1 Min Ago",
-                                    originPlaceName: "Autograph Tower",
-                                    originIconName: "briefcase.fill",
-                                    destinationPlaceName: "Home",
-                                    destinationIconName: "house.fill",
+                                    timeAgo: "Live",
+                                    originPlaceName: walker.activeOriginName ?? "Current Location",
+                                    originIconName: "location.fill",
+                                    destinationPlaceName: walker.activeDestinationName ?? "Destination",
+                                    destinationIconName: walker.activeDestinationIcon ?? "house.fill",
                                     recentLocations: WalkerSampleData.awanLocations
                                 ),
                                 onDismiss: {
@@ -175,10 +178,10 @@ struct MapSheet: View {
                                     }
                                 },
                                 onExitTrack: {
-                                    store.send(.map(.stopCompanionTapped))
                                     store.send(.map(.exitTrackTapped))
+                                    store.send(.map(.dismissWalker))
                                     withAnimation(.easeInOut(duration: 0.25)) {
-                                        selectedDetent = .fraction(0.35)
+                                        selectedDetent = .fraction(0.42)
                                     }
                                 },
                                 onReachDestination: {

@@ -31,9 +31,12 @@ struct MapSheetMainContent: View {
 
             VStack(spacing: 32) {
                 PeopleSection(
-                    people: store.map.people.isEmpty ? MapSampleData.people : store.map.people,
+                    people: store.map.people,
                     isLoading: store.map.isPeopleLoading,
-                    onSelectPerson: onSelectPerson
+                    onSelectPerson: onSelectPerson,
+                    onSimulateWalk: { person in
+                        store.send(.map(.simulatePersonWalking(name: person.name)))
+                    }
                 )
 
                 SavedSection(savedPlaces: savedPlaces, onSelectPlace: onSelectPlace)

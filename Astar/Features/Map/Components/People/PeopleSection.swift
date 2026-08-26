@@ -11,6 +11,7 @@ struct PeopleSection: View {
     let people: [Person]
     var isLoading: Bool = false
     var onSelectPerson: ((Person) -> Void)? = nil
+    var onSimulateWalk: ((Person) -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -36,6 +37,13 @@ struct PeopleSection: View {
                         }
                     )
                     .frame(maxWidth: .infinity)
+                    .contextMenu {
+                        Button {
+                            onSimulateWalk?(person)
+                        } label: {
+                            Label("Simulate Walking", systemImage: "figure.walk")
+                        }
+                    }
                 }
             }
         }

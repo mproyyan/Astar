@@ -13,21 +13,36 @@ import SwiftUI
 struct Person: Identifiable, Equatable, Sendable {
     let id: UUID
     let name: String
+    let email: String
+    let avatarImageName: String
     /// Raw status string, matches `PersonStatus.rawValue`
     let status: String
     /// CloudKit record ID in the public DB — nil for sample/preview data
     let recordID: CKRecord.ID?
+    var activeOriginName: String?
+    var activeDestinationName: String?
+    var activeDestinationIcon: String?
 
     init(
         id: UUID = UUID(),
         name: String,
+        email: String = "",
+        avatarImageName: String = "",
         status: String,
-        recordID: CKRecord.ID? = nil
+        recordID: CKRecord.ID? = nil,
+        activeOriginName: String? = nil,
+        activeDestinationName: String? = nil,
+        activeDestinationIcon: String? = nil
     ) {
         self.id = id
         self.name = name
+        self.email = email
+        self.avatarImageName = avatarImageName.isEmpty ? "\(name)Avatar" : avatarImageName
         self.status = status
         self.recordID = recordID
+        self.activeOriginName = activeOriginName
+        self.activeDestinationName = activeDestinationName
+        self.activeDestinationIcon = activeDestinationIcon
     }
 
     /// Typed status derived from the raw `status` string.

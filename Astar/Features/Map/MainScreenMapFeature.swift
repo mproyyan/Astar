@@ -55,6 +55,8 @@ struct MainScreenMapFeature {
     var isWalkerDestinationReached: Bool = false
     var isViewingHistoryList: Bool = false
     var selectedHistoryTrip: WalkerHistoryTrip?
+    var selectedWalkerTrips: [WalkerHistoryTrip] = []
+    var selectedWalkerHistorySections: [WalkerHistorySection] = []
 
     // People (CloudKit public DB)
     var people: [Person] = []
@@ -104,6 +106,8 @@ struct MainScreenMapFeature {
     case dismissHistoryList
     case exitTrackTapped
     case reachDestinationTapped
+    case walkerHistoryLoaded([WalkerHistoryTrip])
+    case activeJourneyResolved(origin: String, destination: String, icon: String)
 
     // People CloudKit Actions
     case loadPeople
@@ -112,6 +116,7 @@ struct MainScreenMapFeature {
     case companionsLoaded([Person])
     case becomeCompanionTapped(walkerRecordID: CKRecord.ID)
     case stopCompanionTapped
+    case simulatePersonWalking(name: String)
     case peopleError(String)
 
     enum Delegate: Equatable {
@@ -472,6 +477,45 @@ struct MainScreenMapFeature {
         state.isWalkerDestinationReached = false
         state.isViewingHistoryList = false
         state.selectedHistoryTrip = nil
+        state.selectedWalkerTrips = []
+        state.selectedWalkerHistorySections = []
+
+        let recordID = person.recordID
+        let isWalking = person.personStatus == .walking
+
+        return .run { send in
+          let trips = await cloudKitPeople.fetchHistoryTrips(recordID)
+          await send(.walkerHistoryLoaded(trips))
+
+          if isWalking, let recordID {
+            if let activeDetails = await cloudKitPeople.fetchActiveJourneyDetails(recordID) {
+              await send(.activeJourneyResolved(
+                origin: activeDetails.origin,
+                destination: activeDetails.destination,
+                icon: activeDetails.icon
+              ))
+            }
+          }
+        }
+
+      case let .walkerHistoryLoaded(trips):
+        state.selectedWalkerTrips = trips
+        if trips.isEmpty {
+          state.selectedWalkerHistorySections = WalkerSampleData.defaultHistorySections
+        } else {
+          state.selectedWalkerHistorySections = [
+            WalkerHistorySection(title: "Recent Trips", trips: trips)
+          ]
+        }
+        return .none
+
+      case let .activeJourneyResolved(origin, destination, icon):
+        if var walker = state.selectedWalker {
+          walker.activeOriginName = origin
+          walker.activeDestinationName = destination
+          walker.activeDestinationIcon = icon
+          state.selectedWalker = walker
+        }
         return .none
 
       case .dismissWalker:
@@ -479,6 +523,8 @@ struct MainScreenMapFeature {
         state.isWalkerDestinationReached = false
         state.isViewingHistoryList = false
         state.selectedHistoryTrip = nil
+        state.selectedWalkerTrips = []
+        state.selectedWalkerHistorySections = []
         return .none
 
       case .viewAllHistoryTapped:
@@ -497,8 +543,40 @@ struct MainScreenMapFeature {
         state.isViewingHistoryList = false
         return .none
 
-      case .exitTrackTapped, .reachDestinationTapped:
+      case .exitTrackTapped:
+        return .send(.stopCompanionTapped)
+
+      case .reachDestinationTapped:
         state.isWalkerDestinationReached = true
+        if let walker = state.selectedWalker {
+          let walkerName = walker.name
+          let walkerRecordID = walker.recordID
+
+          // Update local people list so walker is Idle
+          state.people = state.people.map { person in
+            if person.name == walkerName || (walkerRecordID != nil && person.recordID == walkerRecordID) {
+              return Person(
+                id: person.id,
+                name: person.name,
+                email: person.email,
+                avatarImageName: person.avatarImageName,
+                status: PersonStatus.idle.rawValue,
+                recordID: person.recordID,
+                activeOriginName: nil,
+                activeDestinationName: nil,
+                activeDestinationIcon: nil
+              )
+            }
+            return person
+          }
+
+          return .run { [walkerRecordID] send in
+            if let walkerRecordID {
+              try? await cloudKitPeople.endJourney(walkerRecordID)
+            }
+            await send(.stopCompanionTapped)
+          }
+        }
         return .none
 
       // MARK: - People CloudKit Logic
@@ -507,6 +585,10 @@ struct MainScreenMapFeature {
         state.isPeopleLoading = true
         return .run { send in
           do {
+            let storedName = UserProfileStorage.load()?.name ?? "User"
+            let user = try await cloudKitPeople.findOrCreateCurrentUser(storedName)
+            await send(.currentUserLoaded(user))
+
             let people = try await cloudKitPeople.fetchAllPeople()
             await send(.peopleLoaded(people))
           } catch {
@@ -516,11 +598,29 @@ struct MainScreenMapFeature {
 
       case let .peopleLoaded(people):
         state.isPeopleLoading = false
-        state.people = people
+        let currentRecordID = state.currentUser?.recordID
+        let currentName = state.currentUser?.name ?? UserProfileStorage.load()?.name
+        state.people = people.filter { person in
+          if let currentRecordID, let personRecordID = person.recordID {
+            return personRecordID != currentRecordID
+          }
+          if let currentName, !currentName.isEmpty {
+            return person.name.localizedCaseInsensitiveCompare(currentName) != .orderedSame
+          }
+          return true
+        }
         return .none
 
       case let .currentUserLoaded(user):
         state.currentUser = user
+        // Filter out current user from already loaded people list
+        state.people.removeAll { person in
+          if let userRecordID = user.recordID, let personRecordID = person.recordID {
+            return personRecordID == userRecordID
+          }
+          return person.name.localizedCaseInsensitiveCompare(user.name) == .orderedSame
+        }
+
         // Refresh companions if user is already walking
         guard let recordID = user.recordID,
               user.personStatus == .walking
@@ -562,6 +662,32 @@ struct MainScreenMapFeature {
             await send(.companionsLoaded([]))
           } catch {
             await send(.peopleError(error.localizedDescription))
+          }
+        }
+
+      case let .simulatePersonWalking(name):
+        state.people = state.people.map { person in
+          if person.name.localizedCaseInsensitiveContains(name) {
+            return Person(
+              id: person.id,
+              name: person.name,
+              email: person.email,
+              avatarImageName: person.avatarImageName,
+              status: PersonStatus.walking.rawValue,
+              recordID: person.recordID,
+              activeOriginName: "Autograph Tower",
+              activeDestinationName: "Plaza Indonesia",
+              activeDestinationIcon: "bag.fill"
+            )
+          }
+          return person
+        }
+
+        return .run { send in
+          do {
+            try await CloudKitPeopleEngine.simulatePersonWalking(namePrefix: name)
+          } catch {
+            print("[Simulation] CloudKit background notice: \(error.localizedDescription)")
           }
         }
 
@@ -1171,6 +1297,9 @@ extension CLLocationCoordinate2D: @retroactive Equatable {
 @DependencyClient
 struct CloudKitPeopleClient: Sendable {
   var fetchAllPeople: @Sendable () async throws -> [Person] = { [] }
+  var findOrCreateCurrentUser: @Sendable (_ name: String) async throws -> Person = { _ in
+    Person(name: "", status: "Idle")
+  }
   var startJourney: @Sendable (
     _ personRecordID: CKRecord.ID,
     _ destination: SavedPlace
@@ -1188,12 +1317,21 @@ struct CloudKitPeopleClient: Sendable {
   var fetchCompanions: @Sendable (
     _ walkerRecordID: CKRecord.ID
   ) async throws -> [Person] = { _ in [] }
+  var fetchHistoryTrips: @Sendable (
+    _ walkerRecordID: CKRecord.ID?
+  ) async -> [WalkerHistoryTrip] = { _ in [] }
+  var fetchActiveJourneyDetails: @Sendable (
+    _ walkerRecordID: CKRecord.ID
+  ) async -> (origin: String, destination: String, icon: String)? = { _ in nil }
 }
 
 extension CloudKitPeopleClient: DependencyKey {
   static let liveValue = Self(
     fetchAllPeople: {
       try await CloudKitPeopleEngine.fetchAllPeople()
+    },
+    findOrCreateCurrentUser: { name in
+      try await CloudKitPeopleEngine.findOrCreateCurrentUser(name: name)
     },
     startJourney: { personRecordID, destination in
       try await CloudKitPeopleEngine.startJourney(
@@ -1217,6 +1355,12 @@ extension CloudKitPeopleClient: DependencyKey {
     },
     fetchCompanions: { walkerRecordID in
       try await CloudKitPeopleEngine.fetchCompanions(walkerRecordID: walkerRecordID)
+    },
+    fetchHistoryTrips: { walkerRecordID in
+      await CloudKitPeopleEngine.fetchHistoryTrips(for: walkerRecordID)
+    },
+    fetchActiveJourneyDetails: { walkerRecordID in
+      await CloudKitPeopleEngine.fetchActiveJourneyDetails(for: walkerRecordID)
     }
   )
 
