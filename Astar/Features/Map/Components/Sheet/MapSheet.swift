@@ -168,6 +168,9 @@ struct MapSheet: View {
                                         selectedDetent = .fraction(0.42)
                                     }
                                 },
+                                onTrack: {
+                                    store.send(.map(.trackWalkerTapped))
+                                },
                                 onExitTrack: {
                                     store.send(.map(.exitTrackTapped))
                                     withAnimation(.easeInOut(duration: 0.25)) {

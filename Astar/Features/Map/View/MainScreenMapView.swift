@@ -102,6 +102,21 @@ struct MainScreenMapView: View {
         .padding(.trailing, 16)
         .padding(.top, 60)
       }
+      .overlay(alignment: .top) {
+        if store.map.isCompanionActive, let progress = store.map.companionProgressState {
+          FloatingDynamicIslandOverlay(
+            walkerName: store.map.companionTrackingWalker?.name ?? "Safa Auliya",
+            originTitle: "Autograph Tower",
+            destinationTitle: "Plaza Indonesia",
+            progressState: progress,
+            onExitTrack: {
+              store.send(.map(.exitTrackTapped))
+            }
+          )
+          .padding(.top, 54)
+          .transition(.move(edge: .top).combined(with: .opacity))
+        }
+      }
       .sheet(isPresented: isSheetPresented) {
         MapSheet(
           store: store,

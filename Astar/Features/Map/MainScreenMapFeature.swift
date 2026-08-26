@@ -55,6 +55,11 @@ struct MainScreenMapFeature {
     var isViewingHistoryList: Bool = false
     var selectedHistoryTrip: WalkerHistoryTrip?
 
+    // Live Activity / Dynamic Island Companion Tracking
+    var isCompanionActive: Bool = false
+    var companionTrackingWalker: Person?
+    var companionProgressState: SafeWalkAttributes.ContentState?
+
     var isLocationAuthorized: Bool {
       authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways
     }
@@ -95,6 +100,8 @@ struct MainScreenMapFeature {
     case selectHistoryTrip(WalkerHistoryTrip)
     case dismissHistoryDetail
     case dismissHistoryList
+    case trackWalkerTapped
+    case companionProgressUpdated(SafeWalkAttributes.ContentState)
     case exitTrackTapped
     case reachDestinationTapped
 
@@ -109,10 +116,16 @@ struct MainScreenMapFeature {
     }
   }
 
+  private nonisolated enum CancelID: Hashable, Sendable {
+    case liveTracking
+    case companionTracking
+  }
+
   @Dependency(\.locationManager) var locationManager
   @Dependency(\.placeSearch) var placeSearch
   @Dependency(\.directionRoute) var directionRoute
   @Dependency(\.continuousClock) var clock
+  @Dependency(\.liveActivity) var liveActivity
 
   var body: some Reducer<State, Action> {
     Reduce { state, action in
@@ -453,9 +466,103 @@ struct MainScreenMapFeature {
         state.isViewingHistoryList = false
         return .none
 
-      case .exitTrackTapped, .reachDestinationTapped:
-        state.isWalkerDestinationReached = true
+      case .trackWalkerTapped:
+        state.isCompanionActive = true
+        let walker = state.selectedWalker ?? Person(name: "Safa Auliya", status: "Walking")
+        state.companionTrackingWalker = walker
+
+        let initialContent = SafeWalkAttributes.ContentState(
+          step: "Walking",
+          progressPercentage: 0.08,
+          remainingDistanceMeters: 420,
+          currentLandmark: "Autograph Tower Lobby",
+          estimatedArrivalDate: Date().addingTimeInterval(420),
+          isApproaching: false
+        )
+        state.companionProgressState = initialContent
+
+        let attributes = SafeWalkAttributes(
+          sessionID: UUID().uuidString,
+          walkerName: walker.name,
+          originTitle: "Autograph Tower",
+          destinationTitle: "Plaza Indonesia",
+          destinationIcon: "bag.fill"
+        )
+
+        return .merge(
+          .run { send in
+            _ = await liveActivity.start(attributes, initialContent)
+          },
+          .run { send in
+            let checkpoints: [(Double, Double, String, Bool)] = [
+              (0.25, 340.0, "Thamrin Nine Corridor", false),
+              (0.55, 210.0, "Jl. M.H. Thamrin Sidewalk", false),
+              (0.85, 75.0, "Grand Indonesia Crosswalk", true),
+              (0.98, 15.0, "Plaza Indonesia Entrance", true),
+              (1.0, 0.0, "Plaza Indonesia Lobby", true)
+            ]
+            for (progress, distance, landmark, isNear) in checkpoints {
+              try await clock.sleep(for: .seconds(6))
+              let updated = SafeWalkAttributes.ContentState(
+                step: isNear ? (progress >= 1.0 ? "Arrived" : "Approaching") : "Walking",
+                progressPercentage: progress,
+                remainingDistanceMeters: distance,
+                currentLandmark: landmark,
+                estimatedArrivalDate: Date().addingTimeInterval(distance / 1.2),
+                isApproaching: isNear
+              )
+              await send(.companionProgressUpdated(updated))
+            }
+          }
+          .cancellable(id: CancelID.companionTracking, cancelInFlight: true)
+        )
+
+      case let .companionProgressUpdated(updatedState):
+        state.companionProgressState = updatedState
+        return .run { send in
+          await liveActivity.update(updatedState)
+        }
+
+      case .exitTrackTapped:
+        let wasActive = state.isCompanionActive
+        state.isCompanionActive = false
+        state.companionTrackingWalker = nil
+        state.companionProgressState = nil
+        if wasActive {
+          let finalContent = SafeWalkAttributes.ContentState(
+            step: "Ended",
+            progressPercentage: 1.0,
+            remainingDistanceMeters: 0,
+            currentLandmark: "Tracking Ended",
+            isApproaching: true
+          )
+          return .merge(
+            .cancel(id: CancelID.companionTracking),
+            .run { send in
+              await liveActivity.end(finalContent)
+            }
+          )
+        }
         return .none
+
+      case .reachDestinationTapped:
+        state.isWalkerDestinationReached = true
+        state.isCompanionActive = false
+        state.companionTrackingWalker = nil
+        state.companionProgressState = nil
+        let finalContent = SafeWalkAttributes.ContentState(
+          step: "Arrived",
+          progressPercentage: 1.0,
+          remainingDistanceMeters: 0,
+          currentLandmark: "Destination Reached",
+          isApproaching: true
+        )
+        return .merge(
+          .cancel(id: CancelID.companionTracking),
+          .run { send in
+            await liveActivity.end(finalContent)
+          }
+        )
 
       case .delegate:
         return .none
