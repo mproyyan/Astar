@@ -32,6 +32,7 @@ struct RootFeature {
     
     Scope(state: \.main, action: \.main) {
       MainFeature()
+        ._printChanges()
     }
 
     Reduce { state, action in
