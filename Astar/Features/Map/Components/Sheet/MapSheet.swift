@@ -44,6 +44,7 @@ struct MapSheet: View {
                             estimatedTime: store.map.walkingRouteInfo?.travelTimeString ?? "12 min",
                             eta: store.map.walkingRouteInfo?.etaString ?? "11.00 ETA",
                             totalDistance: store.map.walkingRouteInfo?.distanceString ?? destination.distance ?? "850 m",
+                            watchingPeople: store.map.companions,
                             isDone: store.map.isDestinationReached,
                             onJourneyLog: {
                                 store.send(.map(.journeyLogTapped))
@@ -168,7 +169,13 @@ struct MapSheet: View {
                                         selectedDetent = .fraction(0.42)
                                     }
                                 },
+                                onTrack: {
+                                    if let walkerRecordID = walker.recordID {
+                                        store.send(.map(.becomeCompanionTapped(walkerRecordID: walkerRecordID)))
+                                    }
+                                },
                                 onExitTrack: {
+                                    store.send(.map(.stopCompanionTapped))
                                     store.send(.map(.exitTrackTapped))
                                     withAnimation(.easeInOut(duration: 0.25)) {
                                         selectedDetent = .fraction(0.35)

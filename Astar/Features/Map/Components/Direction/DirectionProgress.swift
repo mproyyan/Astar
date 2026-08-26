@@ -17,9 +17,7 @@ struct DirectionProgress: View {
     var estimatedTime: String = "8 hrs 22 min"
     var eta: String = "08.16 ETA"
     var totalDistance: String = "28 km"
-    var watchingPeople: [Person] = [
-        Person(name: "Awan", status: "Walking")
-    ]
+    var watchingPeople: [Person] = []
 
     var isDone: Bool = false
 

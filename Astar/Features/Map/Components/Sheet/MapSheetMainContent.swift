@@ -15,7 +15,6 @@ struct MapSheetMainContent: View {
     var onSelectPlace: ((SavedPlace) -> Void)? = nil
     var onSelectPerson: ((Person) -> Void)? = nil
 
-    private let people = MapSampleData.people
     private let savedPlaces = MapSampleData.savedPlaces
 
     var body: some View {
@@ -31,7 +30,11 @@ struct MapSheetMainContent: View {
             .padding(.top, 8)
 
             VStack(spacing: 32) {
-                PeopleSection(people: people, onSelectPerson: onSelectPerson)
+                PeopleSection(
+                    people: store.map.people.isEmpty ? MapSampleData.people : store.map.people,
+                    isLoading: store.map.isPeopleLoading,
+                    onSelectPerson: onSelectPerson
+                )
 
                 SavedSection(savedPlaces: savedPlaces, onSelectPlace: onSelectPlace)
                     .transition(.asymmetric(

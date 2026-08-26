@@ -5,6 +5,7 @@
 //  Created by Dimas Prihady Setyawan on 25/08/26.
 //
 
+import CloudKit
 import CoreLocation
 import Foundation
 import SwiftUI
@@ -12,12 +13,26 @@ import SwiftUI
 struct Person: Identifiable, Equatable, Sendable {
     let id: UUID
     let name: String
+    /// Raw status string, matches `PersonStatus.rawValue`
     let status: String
+    /// CloudKit record ID in the public DB — nil for sample/preview data
+    let recordID: CKRecord.ID?
 
-    init(id: UUID = UUID(), name: String, status: String) {
+    init(
+        id: UUID = UUID(),
+        name: String,
+        status: String,
+        recordID: CKRecord.ID? = nil
+    ) {
         self.id = id
         self.name = name
         self.status = status
+        self.recordID = recordID
+    }
+
+    /// Typed status derived from the raw `status` string.
+    var personStatus: PersonStatus {
+        PersonStatus(rawValue: status) ?? .idle
     }
 }
 

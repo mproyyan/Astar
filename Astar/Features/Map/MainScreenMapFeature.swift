@@ -5,6 +5,7 @@
 //  Created by Muhammad Pandu Royyan on 24/08/26.
 //
 
+import CloudKit
 import Combine
 import ComposableArchitecture
 import CoreLocation
@@ -55,6 +56,12 @@ struct MainScreenMapFeature {
     var isViewingHistoryList: Bool = false
     var selectedHistoryTrip: WalkerHistoryTrip?
 
+    // People (CloudKit public DB)
+    var people: [Person] = []
+    var companions: [Person] = []
+    var currentUser: Person?
+    var isPeopleLoading: Bool = false
+
     var isLocationAuthorized: Bool {
       authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways
     }
@@ -98,6 +105,15 @@ struct MainScreenMapFeature {
     case exitTrackTapped
     case reachDestinationTapped
 
+    // People CloudKit Actions
+    case loadPeople
+    case peopleLoaded([Person])
+    case currentUserLoaded(Person)
+    case companionsLoaded([Person])
+    case becomeCompanionTapped(walkerRecordID: CKRecord.ID)
+    case stopCompanionTapped
+    case peopleError(String)
+
     enum Delegate: Equatable {
       case locationUpdated(CLLocationCoordinate2D)
     }
@@ -112,6 +128,7 @@ struct MainScreenMapFeature {
   @Dependency(\.locationManager) var locationManager
   @Dependency(\.placeSearch) var placeSearch
   @Dependency(\.directionRoute) var directionRoute
+  @Dependency(\.cloudKitPeople) var cloudKitPeople
   @Dependency(\.continuousClock) var clock
 
   var body: some Reducer<State, Action> {
@@ -120,6 +137,7 @@ struct MainScreenMapFeature {
       case .onAppear:
         return .merge(
           .send(.requestLocation),
+          .send(.loadPeople),
           .run { send in
             for await status in await locationManager.authorizationStatus() {
               await send(.locationManager(.didChangeAuthorization(status)))
@@ -306,9 +324,24 @@ struct MainScreenMapFeature {
         state.lastLoggedCoordinate = originCoord
         state.lastLoggedStreet = streetName
         state.lastLoggedIcon = "figure.walk"
-        return .none
+
+        // Sync status to CloudKit public DB
+        guard let userRecordID = state.currentUser?.recordID,
+              let destination = state.selectedDestination
+        else { return .none }
+
+        return .run { [userRecordID, destination] send in
+          do {
+            try await cloudKitPeople.startJourney(userRecordID, destination)
+            let updatedPeople = try await cloudKitPeople.fetchAllPeople()
+            await send(.peopleLoaded(updatedPeople))
+          } catch {
+            await send(.peopleError(error.localizedDescription))
+          }
+        }
 
       case .endJourneyTapped, .cancelDirectionsTapped:
+        let userRecordID = state.currentUser?.recordID
         state.selectedDestination = nil
         state.activeRoute = nil
         state.walkingRouteInfo = nil
@@ -320,7 +353,18 @@ struct MainScreenMapFeature {
         state.lastLoggedCoordinate = nil
         state.lastLoggedStreet = ""
         state.lastLoggedIcon = "figure.walk"
-        return .none
+
+        guard let recordID = userRecordID else { return .none }
+        return .run { [recordID] send in
+          do {
+            try await cloudKitPeople.endJourney(recordID)
+            let updatedPeople = try await cloudKitPeople.fetchAllPeople()
+            await send(.peopleLoaded(updatedPeople))
+            await send(.companionsLoaded([]))
+          } catch {
+            await send(.peopleError(error.localizedDescription))
+          }
+        }
 
       case .journeyLogTapped:
         state.directionMode = .journeyLog
@@ -455,6 +499,76 @@ struct MainScreenMapFeature {
 
       case .exitTrackTapped, .reachDestinationTapped:
         state.isWalkerDestinationReached = true
+        return .none
+
+      // MARK: - People CloudKit Logic
+
+      case .loadPeople:
+        state.isPeopleLoading = true
+        return .run { send in
+          do {
+            let people = try await cloudKitPeople.fetchAllPeople()
+            await send(.peopleLoaded(people))
+          } catch {
+            await send(.peopleError(error.localizedDescription))
+          }
+        }
+
+      case let .peopleLoaded(people):
+        state.isPeopleLoading = false
+        state.people = people
+        return .none
+
+      case let .currentUserLoaded(user):
+        state.currentUser = user
+        // Refresh companions if user is already walking
+        guard let recordID = user.recordID,
+              user.personStatus == .walking
+        else { return .none }
+        return .run { [recordID] send in
+          do {
+            let companions = try await cloudKitPeople.fetchCompanions(recordID)
+            await send(.companionsLoaded(companions))
+          } catch {
+            await send(.peopleError(error.localizedDescription))
+          }
+        }
+
+      case let .companionsLoaded(companions):
+        state.companions = companions
+        return .none
+
+      case let .becomeCompanionTapped(walkerRecordID):
+        guard let myRecordID = state.currentUser?.recordID else { return .none }
+        return .run { [myRecordID, walkerRecordID] send in
+          do {
+            try await cloudKitPeople.becomeCompanion(myRecordID, walkerRecordID)
+            let updatedPeople = try await cloudKitPeople.fetchAllPeople()
+            await send(.peopleLoaded(updatedPeople))
+            let companions = try await cloudKitPeople.fetchCompanions(walkerRecordID)
+            await send(.companionsLoaded(companions))
+          } catch {
+            await send(.peopleError(error.localizedDescription))
+          }
+        }
+
+      case .stopCompanionTapped:
+        guard let myRecordID = state.currentUser?.recordID else { return .none }
+        return .run { [myRecordID] send in
+          do {
+            try await cloudKitPeople.stopCompanion(myRecordID)
+            let updatedPeople = try await cloudKitPeople.fetchAllPeople()
+            await send(.peopleLoaded(updatedPeople))
+            await send(.companionsLoaded([]))
+          } catch {
+            await send(.peopleError(error.localizedDescription))
+          }
+        }
+
+      case let .peopleError(message):
+        state.isPeopleLoading = false
+        // Log error; in production, surface to user if needed
+        print("[CloudKitPeople] Error: \(message)")
         return .none
 
       case .delegate:
@@ -1049,5 +1163,69 @@ private enum DirectionRouteEngine {
 extension CLLocationCoordinate2D: @retroactive Equatable {
   public static func == (lhs: CLLocationCoordinate2D, rhs: CLLocationCoordinate2D) -> Bool {
     lhs.latitude == rhs.latitude && lhs.longitude == rhs.longitude
+  }
+}
+
+// MARK: - CloudKitPeople Client
+
+@DependencyClient
+struct CloudKitPeopleClient: Sendable {
+  var fetchAllPeople: @Sendable () async throws -> [Person] = { [] }
+  var startJourney: @Sendable (
+    _ personRecordID: CKRecord.ID,
+    _ destination: SavedPlace
+  ) async throws -> Void = { _, _ in }
+  var endJourney: @Sendable (
+    _ personRecordID: CKRecord.ID
+  ) async throws -> Void = { _ in }
+  var becomeCompanion: @Sendable (
+    _ companionRecordID: CKRecord.ID,
+    _ walkerRecordID: CKRecord.ID
+  ) async throws -> Void = { _, _ in }
+  var stopCompanion: @Sendable (
+    _ companionRecordID: CKRecord.ID
+  ) async throws -> Void = { _ in }
+  var fetchCompanions: @Sendable (
+    _ walkerRecordID: CKRecord.ID
+  ) async throws -> [Person] = { _ in [] }
+}
+
+extension CloudKitPeopleClient: DependencyKey {
+  static let liveValue = Self(
+    fetchAllPeople: {
+      try await CloudKitPeopleEngine.fetchAllPeople()
+    },
+    startJourney: { personRecordID, destination in
+      try await CloudKitPeopleEngine.startJourney(
+        personRecordID: personRecordID,
+        destination: destination
+      )
+    },
+    endJourney: { personRecordID in
+      try await CloudKitPeopleEngine.endJourney(personRecordID: personRecordID)
+    },
+    becomeCompanion: { companionRecordID, walkerRecordID in
+      try await CloudKitPeopleEngine.becomeCompanion(
+        companionRecordID: companionRecordID,
+        walkerRecordID: walkerRecordID
+      )
+    },
+    stopCompanion: { companionRecordID in
+      try await CloudKitPeopleEngine.stopCompanion(
+        companionRecordID: companionRecordID
+      )
+    },
+    fetchCompanions: { walkerRecordID in
+      try await CloudKitPeopleEngine.fetchCompanions(walkerRecordID: walkerRecordID)
+    }
+  )
+
+  static let testValue = Self()
+}
+
+extension DependencyValues {
+  var cloudKitPeople: CloudKitPeopleClient {
+    get { self[CloudKitPeopleClient.self] }
+    set { self[CloudKitPeopleClient.self] = newValue }
   }
 }
