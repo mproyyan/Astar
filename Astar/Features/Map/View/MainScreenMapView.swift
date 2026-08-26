@@ -17,8 +17,6 @@ struct MainScreenMapView: View {
   @State private var hasCenteredOnUserLocation = false
   @State private var isFarFromUser = false
   @State private var selectedDetent: PresentationDetent = .fraction(0.42)
-  @State private var activeRoute: MKRoute? = nil
-  @State private var previewDestination: SavedPlace? = nil
   @Namespace private var mapScope
 
   private var isSheetPresented: Binding<Bool> {
@@ -50,13 +48,13 @@ struct MainScreenMapView: View {
         }
 
         // Point B: Destination Marker
-        if let destination = previewDestination, let coord = destination.coordinate {
+        if let destination = store.map.selectedDestination, let coord = destination.coordinate {
           Marker(destination.name, coordinate: coord)
             .tint(.red)
         }
 
         // Route Polyline from Point A to Point B
-        if let route = activeRoute {
+        if let route = store.map.activeRoute {
           MapPolyline(route.polyline)
             .stroke(Color.blue, lineWidth: 5)
         }
@@ -107,29 +105,7 @@ struct MainScreenMapView: View {
       .sheet(isPresented: isSheetPresented) {
         MapSheet(
           store: store,
-          selectedDetent: $selectedDetent,
-          onRouteReady: { route, dest in
-            previewDestination = dest
-            activeRoute = route
-            if let route = route {
-              fitRoute(route: route)
-            } else if let coord = dest.coordinate {
-              fitPoints(origin: store.map.currentLocation, destination: coord)
-            }
-          },
-          onStartNavigation: { dest in
-            activeRoute = nil
-            if let userCoord = store.map.currentLocation {
-              zoomToRoadLevel(coordinate: userCoord)
-            }
-          },
-          onCancelDirections: {
-            activeRoute = nil
-            previewDestination = nil
-            if let userCoord = store.map.currentLocation {
-              centerCamera(on: userCoord)
-            }
-          }
+          selectedDetent: $selectedDetent
         )
         .presentationDetents([.fraction(0.1), .fraction(0.35), .fraction(0.42), .fraction(0.52), .fraction(0.6), .large], selection: $selectedDetent)
         .presentationDragIndicator(.visible)
@@ -148,6 +124,16 @@ struct MainScreenMapView: View {
       .onChange(of: store.map.authorizationStatus) { _, newStatus in
         if newStatus == .notDetermined {
           store.send(.map(.requestLocation))
+        }
+      }
+      .onChange(of: store.map.activeRoute) { _, newRoute in
+        if let route = newRoute {
+          fitRoute(route: route)
+        }
+      }
+      .onChange(of: store.map.isNavigating) { _, isNavigating in
+        if isNavigating, let userCoord = store.map.currentLocation {
+          zoomToRoadLevel(coordinate: userCoord)
         }
       }
     } destination: { store in
@@ -179,27 +165,6 @@ struct MainScreenMapView: View {
   private func fitRoute(route: MKRoute) {
     withAnimation(.easeInOut(duration: 0.8)) {
       cameraPosition = .rect(route.polyline.boundingMapRect)
-    }
-  }
-
-  private func fitPoints(origin: CLLocationCoordinate2D?, destination: CLLocationCoordinate2D) {
-    let p1 = origin ?? CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
-    let minLat = min(p1.latitude, destination.latitude)
-    let maxLat = max(p1.latitude, destination.latitude)
-    let minLon = min(p1.longitude, destination.longitude)
-    let maxLon = max(p1.longitude, destination.longitude)
-
-    let center = CLLocationCoordinate2D(
-      latitude: (minLat + maxLat) / 2.0 - 0.002,
-      longitude: (minLon + maxLon) / 2.0
-    )
-    let span = MKCoordinateSpan(
-      latitudeDelta: max(0.015, (maxLat - minLat) * 1.5),
-      longitudeDelta: max(0.015, (maxLon - minLon) * 1.5)
-    )
-
-    withAnimation(.easeInOut(duration: 0.8)) {
-      cameraPosition = .region(MKCoordinateRegion(center: center, span: span))
     }
   }
 

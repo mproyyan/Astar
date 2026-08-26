@@ -10,29 +10,8 @@ import MapKit
 import SwiftUI
 
 struct MapSheet: View {
-    enum DirectionSheetMode {
-        case directions
-        case progress
-        case journeyLog
-    }
-
-    let store: StoreOf<MainFeature>
+    @Bindable var store: StoreOf<MainFeature>
     @Binding var selectedDetent: PresentationDetent
-    var onRouteReady: ((MKRoute?, SavedPlace) -> Void)? = nil
-    var onStartNavigation: ((SavedPlace) -> Void)? = nil
-    var onCancelDirections: (() -> Void)? = nil
-
-    @State private var isSearching = false
-    @State private var searchText = ""
-    @State private var selectedDestination: SavedPlace? = nil
-    @State private var directionMode: DirectionSheetMode = .directions
-    @State private var isJourneyDone = false
-    @State private var currentRouteInfo: WalkingRouteInfo? = nil
-    @State private var journeyTracker = JourneyTrackingManager()
-    @State private var selectedWalker: Person? = nil
-    @State private var isWalkerDestinationReached = false
-    @State private var isViewingHistoryList = false
-    @State private var selectedHistoryTrip: WalkerHistoryTrip? = nil
 
     private var isExpanded: Bool {
         selectedDetent == .large
@@ -41,49 +20,18 @@ struct MapSheet: View {
     var body: some View {
         ScrollView(.vertical) {
             Group {
-                if let destination = selectedDestination {
-                    switch directionMode {
+                if let destination = store.map.selectedDestination {
+                    switch store.map.directionMode {
                     case .directions:
                         MapSheetDirectionContent(
-                            userLocation: store.map.currentLocation,
-                            destination: destination,
+                            store: store,
                             onCancel: {
-                                onCancelDirections?()
-                                journeyTracker.reset()
                                 withAnimation(.easeInOut(duration: 0.25)) {
-                                    selectedDestination = nil
-                                    isJourneyDone = false
-                                    currentRouteInfo = nil
-                                    directionMode = .directions
                                     selectedDetent = .fraction(0.42)
                                 }
                             },
-                            onRouteReady: { route, updatedDest in
-                                onRouteReady?(route, updatedDest)
-                            },
-                            onStartNavigation: { routeInfo in
-                                currentRouteInfo = routeInfo
-                                onStartNavigation?(destination)
-
-                                let originCoord = store.map.currentLocation ?? CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
-                                let originPlace = SavedPlace(
-                                    name: "Start Position",
-                                    subtitle: "Current Area",
-                                    iconName: "location.fill",
-                                    coordinate: originCoord
-                                )
-
-                                Task {
-                                    await journeyTracker.startTracking(
-                                        origin: originPlace,
-                                        destination: destination,
-                                        userLocation: store.map.currentLocation
-                                    )
-                                }
-
+                            onStartNavigation: {
                                 withAnimation(.easeInOut(duration: 0.25)) {
-                                    isJourneyDone = false
-                                    directionMode = .progress
                                     selectedDetent = .fraction(0.6)
                                 }
                             }
@@ -93,35 +41,25 @@ struct MapSheet: View {
                     case .progress:
                         DirectionProgress(
                             destination: destination,
-                            estimatedTime: currentRouteInfo?.travelTimeString ?? "12 min",
-                            eta: currentRouteInfo?.etaString ?? "11.00 ETA",
-                            totalDistance: currentRouteInfo?.distanceString ?? destination.distance ?? "850 m",
-                            isDone: journeyTracker.isDestinationReached || isJourneyDone,
+                            estimatedTime: store.map.walkingRouteInfo?.travelTimeString ?? "12 min",
+                            eta: store.map.walkingRouteInfo?.etaString ?? "11.00 ETA",
+                            totalDistance: store.map.walkingRouteInfo?.distanceString ?? destination.distance ?? "850 m",
+                            isDone: store.map.isDestinationReached,
                             onJourneyLog: {
+                                store.send(.map(.journeyLogTapped))
                                 withAnimation(.easeInOut(duration: 0.25)) {
-                                    directionMode = .journeyLog
                                     selectedDetent = .large
                                 }
                             },
                             onEndJourney: {
-                                onCancelDirections?()
-                                journeyTracker.reset()
+                                store.send(.map(.endJourneyTapped))
                                 withAnimation(.easeInOut(duration: 0.25)) {
-                                    selectedDestination = nil
-                                    isJourneyDone = false
-                                    currentRouteInfo = nil
-                                    directionMode = .directions
                                     selectedDetent = .fraction(0.42)
                                 }
                             },
                             onDone: {
-                                onCancelDirections?()
-                                journeyTracker.reset()
+                                store.send(.map(.endJourneyTapped))
                                 withAnimation(.easeInOut(duration: 0.25)) {
-                                    selectedDestination = nil
-                                    isJourneyDone = false
-                                    currentRouteInfo = nil
-                                    directionMode = .directions
                                     selectedDetent = .fraction(0.42)
                                 }
                             }
@@ -133,17 +71,17 @@ struct MapSheet: View {
                     case .journeyLog:
                         DirectionJourneyLog(
                             destinationName: destination.name,
-                            isDone: journeyTracker.isDestinationReached || isJourneyDone,
-                            entries: journeyTracker.currentEntries.isEmpty ? nil : journeyTracker.currentEntries,
+                            isDone: store.map.isDestinationReached,
+                            entries: store.map.journeyLogEntries.isEmpty ? nil : store.map.journeyLogEntries,
                             onDismiss: {
+                                store.send(.map(.dismissJourneyLogTapped))
                                 withAnimation(.easeInOut(duration: 0.25)) {
-                                    directionMode = .progress
                                     selectedDetent = .fraction(0.6)
                                 }
                             },
                             onChecklistTapped: {
+                                store.send(.map(.dismissJourneyLogTapped))
                                 withAnimation(.easeInOut(duration: 0.25)) {
-                                    directionMode = .progress
                                     selectedDetent = .fraction(0.6)
                                 }
                             }
@@ -152,31 +90,25 @@ struct MapSheet: View {
                         .padding(.top, 12)
                         .transition(.opacity)
                     }
-                } else if let walker = selectedWalker {
+                } else if let walker = store.map.selectedWalker {
                     if walker.status == "Idle" {
-                        if let trip = selectedHistoryTrip {
+                        if let trip = store.map.selectedHistoryTrip {
                             WalkerCardHistoryDetail(
                                 trip: trip,
                                 onDismiss: {
-                                    withAnimation(.easeInOut(duration: 0.25)) {
-                                        selectedHistoryTrip = nil
-                                    }
+                                    store.send(.map(.dismissHistoryDetail))
                                 }
                             )
                             .padding(.horizontal, 16)
                             .padding(.top, 12)
                             .transition(.opacity)
-                        } else if isViewingHistoryList {
+                        } else if store.map.isViewingHistoryList {
                             WalkerCardHistoryList(
                                 onDismiss: {
-                                    withAnimation(.easeInOut(duration: 0.25)) {
-                                        isViewingHistoryList = false
-                                    }
+                                    store.send(.map(.dismissHistoryList))
                                 },
                                 onSelectTrip: { trip in
-                                    withAnimation(.easeInOut(duration: 0.25)) {
-                                        selectedHistoryTrip = trip
-                                    }
+                                    store.send(.map(.selectHistoryTrip(trip)))
                                 }
                             )
                             .padding(.horizontal, 16)
@@ -187,22 +119,16 @@ struct MapSheet: View {
                                 name: walker.name,
                                 email: "awanmendung@icloud.com",
                                 onDismiss: {
+                                    store.send(.map(.dismissWalker))
                                     withAnimation(.easeInOut(duration: 0.25)) {
-                                        selectedWalker = nil
-                                        isViewingHistoryList = false
-                                        selectedHistoryTrip = nil
                                         selectedDetent = .fraction(0.42)
                                     }
                                 },
                                 onViewAllHistory: {
-                                    withAnimation(.easeInOut(duration: 0.25)) {
-                                        isViewingHistoryList = true
-                                    }
+                                    store.send(.map(.viewAllHistoryTapped))
                                 },
                                 onSelectTrip: { trip in
-                                    withAnimation(.easeInOut(duration: 0.25)) {
-                                        selectedHistoryTrip = trip
-                                    }
+                                    store.send(.map(.selectHistoryTrip(trip)))
                                 }
                             )
                             .padding(.horizontal, 16)
@@ -210,14 +136,13 @@ struct MapSheet: View {
                             .transition(.opacity)
                         }
                     } else {
-                        if isWalkerDestinationReached {
+                        if store.map.isWalkerDestinationReached {
                             WalkerCardReachDestination(
                                 walkerName: "\(walker.name) Mendung",
                                 avatarImageName: "AwanAvatar",
                                 onDismiss: {
+                                    store.send(.map(.dismissWalker))
                                     withAnimation(.easeInOut(duration: 0.25)) {
-                                        selectedWalker = nil
-                                        isWalkerDestinationReached = false
                                         selectedDetent = .fraction(0.42)
                                     }
                                 }
@@ -238,21 +163,20 @@ struct MapSheet: View {
                                     recentLocations: WalkerSampleData.awanLocations
                                 ),
                                 onDismiss: {
+                                    store.send(.map(.dismissWalker))
                                     withAnimation(.easeInOut(duration: 0.25)) {
-                                        selectedWalker = nil
-                                        isWalkerDestinationReached = false
                                         selectedDetent = .fraction(0.42)
                                     }
                                 },
                                 onExitTrack: {
+                                    store.send(.map(.exitTrackTapped))
                                     withAnimation(.easeInOut(duration: 0.25)) {
-                                        isWalkerDestinationReached = true
                                         selectedDetent = .fraction(0.35)
                                     }
                                 },
                                 onReachDestination: {
+                                    store.send(.map(.reachDestinationTapped))
                                     withAnimation(.easeInOut(duration: 0.25)) {
-                                        isWalkerDestinationReached = true
                                         selectedDetent = .fraction(0.35)
                                     }
                                 }
@@ -262,22 +186,14 @@ struct MapSheet: View {
                             .transition(.opacity)
                         }
                     }
-                } else if isSearching {
+                } else if store.map.isSearching {
                     MapSheetSearchContent(
-                        isSearching: $isSearching,
-                        searchText: $searchText,
+                        store: store,
                         selectedDetent: $selectedDetent,
-                        userLocation: store.map.currentLocation,
                         onSelectPlace: { place in
                             UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                            store.send(.map(.selectPlace(place)))
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                isSearching = false
-                                searchText = ""
-                                selectedDestination = place
-                                isJourneyDone = false
-                                currentRouteInfo = nil
-                                journeyTracker.reset()
-                                directionMode = .directions
                                 selectedDetent = .fraction(0.52)
                             }
                         }
@@ -288,27 +204,20 @@ struct MapSheet: View {
                         store: store,
                         isExpanded: isExpanded,
                         onSearchTapped: {
+                            store.send(.map(.searchTapped))
                             withAnimation(.easeInOut(duration: 0.25)) {
                                 selectedDetent = .large
-                                isSearching = true
                             }
                         },
                         onSelectPlace: { place in
+                            store.send(.map(.selectPlace(place)))
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                selectedDestination = place
-                                isJourneyDone = false
-                                currentRouteInfo = nil
-                                journeyTracker.reset()
-                                directionMode = .directions
                                 selectedDetent = .fraction(0.52)
                             }
                         },
                         onSelectPerson: { person in
+                            store.send(.map(.selectPerson(person)))
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                selectedWalker = person
-                                isWalkerDestinationReached = false
-                                isViewingHistoryList = false
-                                selectedHistoryTrip = nil
                                 selectedDetent = .large
                             }
                         }
@@ -324,20 +233,10 @@ struct MapSheet: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: isExpanded)
-        .animation(.easeInOut(duration: 0.25), value: selectedDestination != nil)
+        .animation(.easeInOut(duration: 0.25), value: store.map.selectedDestination != nil)
         .onChange(of: selectedDetent) { _, newDetent in
-            if isSearching && newDetent != .large {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    isSearching = false
-                    searchText = ""
-                }
-            }
-        }
-        .onChange(of: store.map.currentLocation) { _, newLocation in
-            if let newCoord = newLocation, directionMode == .progress || directionMode == .journeyLog {
-                Task {
-                    await journeyTracker.updateLocation(newCoord)
-                }
+            if store.map.isSearching && newDetent != .large {
+                store.send(.map(.clearSearchTapped))
             }
         }
     }
