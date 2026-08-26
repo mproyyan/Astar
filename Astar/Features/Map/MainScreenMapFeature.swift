@@ -16,57 +16,66 @@ struct MainScreenMapFeature {
   struct State: Equatable {
     var authorizationStatus: CLAuthorizationStatus = .notDetermined
     var currentLocation: CLLocationCoordinate2D?
+    var isFollowingUser: Bool = true
+
+    var isLocationAuthorized: Bool {
+      authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways
+    }
   }
 
   enum Action: Equatable {
     case onAppear
     case requestLocation
+    case recenterTapped
     case delegate(Delegate)
     case locationManager(LocationManagerAction)
 
     enum Delegate: Equatable {
       case locationUpdated(CLLocationCoordinate2D)
     }
-    
+
     enum LocationManagerAction: Equatable {
       case didChangeAuthorization(CLAuthorizationStatus)
       case didUpdateLocation(CLLocationCoordinate2D)
       case didFailWithError(String)
     }
   }
-  
+
   @Dependency(\.locationManager) var locationManager
 
   var body: some Reducer<State, Action> {
     Reduce { state, action in
       switch action {
       case .onAppear:
-        return .run { send in
-          for await status in await locationManager.authorizationStatus() {
-            await send(.locationManager(.didChangeAuthorization(status)))
+        return .merge(
+          .send(.requestLocation),
+          .run { send in
+            for await status in await locationManager.authorizationStatus() {
+              await send(.locationManager(.didChangeAuthorization(status)))
+            }
+          },
+          .run { send in
+            for await location in await locationManager.locationUpdates() {
+              await send(.locationManager(.didUpdateLocation(location)))
+            }
+          },
+          .run { send in
+            for await error in await locationManager.errorUpdates() {
+              await send(.locationManager(.didFailWithError(error.localizedDescription)))
+            }
           }
-        }
-        .merge(with: .run { send in
-          for await location in await locationManager.locationUpdates() {
-            await send(.locationManager(.didUpdateLocation(location)))
-          }
-        })
-        .merge(with: .run { send in
-          for await error in await locationManager.errorUpdates() {
-            await send(.locationManager(.didFailWithError(error.localizedDescription)))
-          }
-        })
+        )
 
       case .requestLocation:
-        return .run { [status = state.authorizationStatus] _ in
-          switch status {
-          case .notDetermined:
-            await locationManager.requestWhenInUseAuthorization()
-          case .authorizedAlways, .authorizedWhenInUse:
-            await locationManager.requestLocation()
-          default:
-            break
-          }
+        return .run { _ in
+          await locationManager.requestWhenInUseAuthorization()
+          await locationManager.requestLocation()
+        }
+
+      case .recenterTapped:
+        state.isFollowingUser = true
+        return .run { _ in
+          await locationManager.requestLocation()
         }
 
       case let .locationManager(.didChangeAuthorization(status)):
@@ -107,39 +116,23 @@ extension LocationManagerClient: DependencyKey {
   static let liveValue = Self.live()
 
   static func live() -> Self {
-    let locationDelegate = LocationDelegate()
-    let manager = CLLocationManager()
-    manager.delegate = locationDelegate
-    manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
-    manager.distanceFilter = 25
-    
+    let managerActor = LocationManagerActor()
+
     return Self(
       authorizationStatus: {
-        AsyncStream { continuation in
-          continuation.yield(manager.authorizationStatus)
-          locationDelegate.onAuthorizationChange = { status in
-            continuation.yield(status)
-          }
-        }
+        await MainActor.run { managerActor.authorizationStream() }
       },
-      requestWhenInUseAuthorization: { manager.requestWhenInUseAuthorization() },
-      requestLocation: { 
-        manager.requestLocation()
-        manager.startUpdatingLocation()
+      requestWhenInUseAuthorization: {
+        await MainActor.run { managerActor.requestWhenInUseAuthorization() }
+      },
+      requestLocation: {
+        await MainActor.run { managerActor.requestLocation() }
       },
       locationUpdates: {
-        AsyncStream { continuation in
-          locationDelegate.onLocationUpdate = { location in
-            continuation.yield(location)
-          }
-        }
+        await MainActor.run { managerActor.locationStream() }
       },
       errorUpdates: {
-        AsyncStream { continuation in
-          locationDelegate.onError = { error in
-            continuation.yield(error)
-          }
-        }
+        await MainActor.run { managerActor.errorStream() }
       }
     )
   }
@@ -152,27 +145,78 @@ extension DependencyValues {
   }
 }
 
-private final class LocationDelegate: NSObject, CLLocationManagerDelegate {
-  var onAuthorizationChange: ((CLAuthorizationStatus) -> Void)?
-  var onLocationUpdate: ((CLLocationCoordinate2D) -> Void)?
-  var onError: ((Error) -> Void)?
+@MainActor
+private final class LocationManagerActor: NSObject, CLLocationManagerDelegate {
+  private let manager = CLLocationManager()
+  private var authorizationContinuation: AsyncStream<CLAuthorizationStatus>.Continuation?
+  private var locationContinuation: AsyncStream<CLLocationCoordinate2D>.Continuation?
+  private var errorContinuation: AsyncStream<Error>.Continuation?
+
+  override init() {
+    super.init()
+    manager.delegate = self
+    manager.desiredAccuracy = kCLLocationAccuracyBest
+    manager.distanceFilter = 10
+  }
+
+  func authorizationStream() -> AsyncStream<CLAuthorizationStatus> {
+    AsyncStream { continuation in
+      self.authorizationContinuation = continuation
+      continuation.yield(self.manager.authorizationStatus)
+    }
+  }
+
+  func locationStream() -> AsyncStream<CLLocationCoordinate2D> {
+    AsyncStream { continuation in
+      self.locationContinuation = continuation
+      if let location = self.manager.location {
+        continuation.yield(location.coordinate)
+      }
+    }
+  }
+
+  func errorStream() -> AsyncStream<Error> {
+    AsyncStream { continuation in
+      self.errorContinuation = continuation
+    }
+  }
+
+  func requestWhenInUseAuthorization() {
+    if manager.authorizationStatus == .notDetermined {
+      manager.requestWhenInUseAuthorization()
+    }
+  }
+
+  func requestLocation() {
+    let status = manager.authorizationStatus
+    if status == .notDetermined {
+      manager.requestWhenInUseAuthorization()
+    } else if status == .authorizedWhenInUse || status == .authorizedAlways {
+      manager.requestLocation()
+      manager.startUpdatingLocation()
+    }
+  }
 
   func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-    onAuthorizationChange?(manager.authorizationStatus)
+    authorizationContinuation?.yield(manager.authorizationStatus)
+    if manager.authorizationStatus == .authorizedWhenInUse || manager.authorizationStatus == .authorizedAlways {
+      manager.requestLocation()
+      manager.startUpdatingLocation()
+    }
   }
 
   func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
     guard let location = locations.last else { return }
-    onLocationUpdate?(location.coordinate)
+    locationContinuation?.yield(location.coordinate)
   }
 
   func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-    onError?(error)
+    errorContinuation?.yield(error)
   }
 }
 
 // Equatable support for CLLocationCoordinate2D
-extension CLLocationCoordinate2D: Equatable {
+extension CLLocationCoordinate2D: @retroactive Equatable {
   public static func == (lhs: CLLocationCoordinate2D, rhs: CLLocationCoordinate2D) -> Bool {
     lhs.latitude == rhs.latitude && lhs.longitude == rhs.longitude
   }

@@ -5,7 +5,9 @@
 //  Created by Dimas Prihady Setyawan on 25/08/26.
 //
 
+import CoreLocation
 import Foundation
+import SwiftUI
 
 struct Person: Identifiable, Equatable, Sendable {
     let id: UUID
@@ -25,13 +27,71 @@ struct SavedPlace: Identifiable, Equatable, Sendable {
     let subtitle: String
     let iconName: String
     let distance: String?
+    let coordinate: CLLocationCoordinate2D?
 
-    init(id: UUID = UUID(), name: String, subtitle: String, iconName: String, distance: String? = nil) {
+    init(
+        id: UUID = UUID(),
+        name: String,
+        subtitle: String,
+        iconName: String,
+        distance: String? = nil,
+        coordinate: CLLocationCoordinate2D? = nil
+    ) {
         self.id = id
         self.name = name
         self.subtitle = subtitle
         self.iconName = iconName
         self.distance = distance
+        self.coordinate = coordinate
+    }
+}
+
+extension SavedPlace {
+    var categoryColor: Color {
+        SavedPlace.categoryColor(for: iconName)
+    }
+
+    static func categoryColor(for iconName: String) -> Color {
+        switch iconName {
+        case "fork.knife", "cup.and.saucer.fill", "takeoutbag.and.cup.and.straw.fill":
+            return Color(red: 0.98, green: 0.58, blue: 0.16) // Food & Dining: Orange
+
+        case "bag.fill", "cart.fill", "basket.fill":
+            return Color(red: 0.98, green: 0.73, blue: 0.12) // Shopping: Amber/Yellow
+
+        case "tram.fill", "train.side.front.car", "bus.fill", "airplane", "ferry.fill":
+            return Color(red: 0.92, green: 0.34, blue: 0.55) // Transit: Pink/Magenta
+
+        case "figure.strengthtraining.traditional", "figure.run", "figure.pool.swim", "sportscourt.fill":
+            return Color(red: 0.18, green: 0.72, blue: 0.78) // Sports/Fitness: Teal
+
+        case "tree.fill", "leaf.fill", "mountain.2.fill":
+            return Color(red: 0.28, green: 0.72, blue: 0.40) // Parks/Nature: Green
+
+        case "wineglass.fill", "theatermasks.fill", "popcorn.fill", "music.note":
+            return Color(red: 0.65, green: 0.35, blue: 0.85) // Nightlife: Purple
+
+        case "cross.case.fill", "cross.fill", "pills.fill":
+            return Color(red: 0.92, green: 0.28, blue: 0.28) // Health: Red
+
+        case "bed.double.fill":
+            return Color(red: 0.38, green: 0.45, blue: 0.85) // Hotel: Indigo
+
+        case "graduationcap.fill", "landmark.fill", "book.fill":
+            return Color(red: 0.62, green: 0.45, blue: 0.35) // Landmarks/Education: Brown
+
+        case "fuelpump.fill", "ev.charger.fill", "car.fill", "wrench.and.screwdriver.fill":
+            return Color(red: 0.20, green: 0.55, blue: 0.95) // Services/Auto: Blue
+
+        case "house.fill":
+            return Color(red: 0.25, green: 0.60, blue: 0.95) // Home: Sky Blue
+
+        case "location.fill":
+            return Color.blue // Current Location: Apple Blue
+
+        default:
+            return Color(red: 0.55, green: 0.62, blue: 0.82) // General/Address: Periwinkle Slate
+        }
     }
 }
 

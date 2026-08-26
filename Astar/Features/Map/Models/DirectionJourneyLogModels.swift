@@ -5,6 +5,7 @@
 //  Created by Dimas Prihady Setyawan on 25/08/26.
 //
 
+import CoreLocation
 import Foundation
 
 enum JourneyLogEntryType: Equatable, Sendable {
@@ -21,6 +22,7 @@ struct JourneyLogEntry: Identifiable, Equatable, Sendable {
     let timeString: String
     let iconName: String
     let entryType: JourneyLogEntryType
+    var coordinate: CLLocationCoordinate2D?
 
     init(
         id: UUID = UUID(),
@@ -28,7 +30,8 @@ struct JourneyLogEntry: Identifiable, Equatable, Sendable {
         address: String,
         timeString: String,
         iconName: String = "mappin.and.ellipse",
-        entryType: JourneyLogEntryType = .checkpoint
+        entryType: JourneyLogEntryType = .checkpoint,
+        coordinate: CLLocationCoordinate2D? = nil
     ) {
         self.id = id
         self.landmarkName = landmarkName
@@ -36,6 +39,18 @@ struct JourneyLogEntry: Identifiable, Equatable, Sendable {
         self.timeString = timeString
         self.iconName = iconName
         self.entryType = entryType
+        self.coordinate = coordinate
+    }
+
+    static func == (lhs: JourneyLogEntry, rhs: JourneyLogEntry) -> Bool {
+        lhs.id == rhs.id &&
+        lhs.landmarkName == rhs.landmarkName &&
+        lhs.address == rhs.address &&
+        lhs.timeString == rhs.timeString &&
+        lhs.iconName == rhs.iconName &&
+        lhs.entryType == rhs.entryType &&
+        lhs.coordinate?.latitude == rhs.coordinate?.latitude &&
+        lhs.coordinate?.longitude == rhs.coordinate?.longitude
     }
 }
 
