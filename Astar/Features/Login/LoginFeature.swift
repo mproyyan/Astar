@@ -117,7 +117,7 @@ private func upsertUserProfile(with credential: AppleSignInCredential) async thr
   _ = ASAuthorizationAppleIDProvider()
 
   let container = CKContainer.default()
-  let database = container.privateCloudDatabase
+  let database = container.publicCloudDatabase
   let cloudKitUserId = try await container.userRecordID().recordName
   let recordID = CKRecord.ID(recordName: userProfileRecordName(
     appleUserId: credential.appleUserId,
