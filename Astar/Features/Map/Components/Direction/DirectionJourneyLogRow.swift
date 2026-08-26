@@ -21,7 +21,7 @@ struct DirectionJourneyLogRow: View {
         case .currentLocation:
             return .blue
         case .checkpoint:
-            return Color(red: 0.78, green: 0.82, blue: 0.97).opacity(0.92)
+            return SavedPlace.categoryColor(for: entry.iconName)
         }
     }
 

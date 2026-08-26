@@ -5,44 +5,49 @@
 //  Created by Dimas Prihady Setyawan on 25/08/26.
 //
 
+import ComposableArchitecture
 import CoreLocation
 import SwiftUI
 
 struct MapSheetSearchContent: View {
-    @Binding var isSearching: Bool
-    @Binding var searchText: String
+    @Bindable var store: StoreOf<MainFeature>
     @Binding var selectedDetent: PresentationDetent
-    var userLocation: CLLocationCoordinate2D? = nil
     var onSelectPlace: ((SavedPlace) -> Void)? = nil
     @FocusState private var isSearchFieldFocused: Bool
-    @State private var searchResults: [SavedPlace] = []
-    @State private var isSearchingPlaces = false
+
+    private var searchTextBinding: Binding<String> {
+        Binding(
+            get: { store.map.searchQuery },
+            set: { store.send(.map(.searchQueryChanged($0))) }
+        )
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             HStack(spacing: 12) {
                 ActiveSearchBarView(
-                    searchText: $searchText,
+                    searchText: searchTextBinding,
                     isFocused: $isSearchFieldFocused
                 )
 
                 CancelSearchButton {
+                    store.send(.map(.clearSearchTapped))
                     withAnimation(.easeInOut(duration: 0.25)) {
-                        searchText = ""
-                        isSearching = false
                         selectedDetent = .fraction(0.42)
                     }
                 }
             }
             .padding(.top, 8)
 
-            if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if store.map.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 SavedPlacesCard(
                     title: "Saved",
                     places: MapSampleData.savedPlaces,
-                    onSelectPlace: onSelectPlace
+                    onSelectPlace: { place in
+                        onSelectPlace?(place)
+                    }
                 )
-            } else if isSearchingPlaces && searchResults.isEmpty {
+            } else if store.map.isSearchLoading && store.map.searchResults.isEmpty {
                 VStack(spacing: 14) {
                     ProgressView()
                         .padding(.top, 24)
@@ -58,12 +63,14 @@ struct MapSheetSearchContent: View {
                     RoundedRectangle(cornerRadius: 24)
                         .stroke(Color.primary.opacity(0.06), lineWidth: 1)
                 }
-            } else if searchResults.isEmpty {
-                NoResultsView(searchText: searchText)
+            } else if store.map.searchResults.isEmpty {
+                NoResultsView(searchText: store.map.searchQuery)
             } else {
                 SearchResultsCard(
-                    places: searchResults,
-                    onSelectPlace: onSelectPlace
+                    places: store.map.searchResults,
+                    onSelectPlace: { place in
+                        onSelectPlace?(place)
+                    }
                 )
             }
 
@@ -74,35 +81,16 @@ struct MapSheetSearchContent: View {
         .onAppear {
             isSearchFieldFocused = true
         }
-        .task(id: searchText) {
-            let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !query.isEmpty else {
-                searchResults = []
-                isSearchingPlaces = false
-                return
-            }
-
-            isSearchingPlaces = true
-            try? await Task.sleep(for: .milliseconds(300))
-            guard !Task.isCancelled else { return }
-
-            let results = await PlaceSearchService.searchPlaces(query: query, userLocation: userLocation)
-            guard !Task.isCancelled else { return }
-
-            searchResults = results
-            isSearchingPlaces = false
-        }
     }
 }
 
 #Preview {
-    @Previewable @State var isSearching = true
-    @Previewable @State var searchText = ""
     @Previewable @State var selectedDetent: PresentationDetent = .large
 
     MapSheetSearchContent(
-        isSearching: $isSearching,
-        searchText: $searchText,
+        store: Store(initialState: MainFeature.State()) {
+            MainFeature()
+        },
         selectedDetent: $selectedDetent
     )
 }
