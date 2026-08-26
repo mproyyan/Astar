@@ -5,49 +5,18 @@
 //  Created by Dimas Prihady Setyawan on 25/08/26.
 //
 
+import CoreLocation
 import SwiftUI
 
 struct MapSheetSearchContent: View {
     @Binding var isSearching: Bool
     @Binding var searchText: String
     @Binding var selectedDetent: PresentationDetent
+    var userLocation: CLLocationCoordinate2D? = nil
     var onSelectPlace: ((SavedPlace) -> Void)? = nil
     @FocusState private var isSearchFieldFocused: Bool
-
-    private var searchResults: [SavedPlace] {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if query.isEmpty {
-            return []
-        }
-        let matched = MapSampleData.allSearchablePlaces.filter { place in
-            place.name.localizedStandardContains(query) || place.subtitle.localizedStandardContains(query)
-        }
-        if !matched.isEmpty {
-            return matched
-        }
-        // Dynamic mock search results for any query typed by the user
-        let cleanQuery = query.capitalized
-        return [
-            SavedPlace(
-                name: cleanQuery,
-                subtitle: "\(cleanQuery), Central Jakarta, Indonesia",
-                iconName: "mappin.and.ellipse",
-                distance: "300 m"
-            ),
-            SavedPlace(
-                name: "\(cleanQuery) Hub & Mall",
-                subtitle: "Jl. Jend. Sudirman Kav 21, South Jakarta",
-                iconName: "bag.fill",
-                distance: "1.2 km"
-            ),
-            SavedPlace(
-                name: "\(cleanQuery) Station",
-                subtitle: "Transit Line 1, Central Jakarta",
-                iconName: "tram.fill",
-                distance: "2.4 km"
-            )
-        ]
-    }
+    @State private var searchResults: [SavedPlace] = []
+    @State private var isSearchingPlaces = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -73,6 +42,24 @@ struct MapSheetSearchContent: View {
                     places: MapSampleData.savedPlaces,
                     onSelectPlace: onSelectPlace
                 )
+            } else if isSearchingPlaces && searchResults.isEmpty {
+                VStack(spacing: 14) {
+                    ProgressView()
+                        .padding(.top, 24)
+
+                    Text("Searching nearby places...")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 24)
+                .background(.white, in: .rect(cornerRadius: 24))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 24)
+                        .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+                }
+            } else if searchResults.isEmpty {
+                NoResultsView(searchText: searchText)
             } else {
                 SearchResultsCard(
                     places: searchResults,
@@ -86,6 +73,24 @@ struct MapSheetSearchContent: View {
         .padding(.top, 12)
         .onAppear {
             isSearchFieldFocused = true
+        }
+        .task(id: searchText) {
+            let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !query.isEmpty else {
+                searchResults = []
+                isSearchingPlaces = false
+                return
+            }
+
+            isSearchingPlaces = true
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+
+            let results = await PlaceSearchService.searchPlaces(query: query, userLocation: userLocation)
+            guard !Task.isCancelled else { return }
+
+            searchResults = results
+            isSearchingPlaces = false
         }
     }
 }

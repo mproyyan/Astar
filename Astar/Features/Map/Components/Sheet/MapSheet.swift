@@ -6,6 +6,7 @@
 //
 
 import ComposableArchitecture
+import MapKit
 import SwiftUI
 
 struct MapSheet: View {
@@ -17,11 +18,17 @@ struct MapSheet: View {
 
     let store: StoreOf<MainFeature>
     @Binding var selectedDetent: PresentationDetent
+    var onRouteReady: ((MKRoute?, SavedPlace) -> Void)? = nil
+    var onStartNavigation: ((SavedPlace) -> Void)? = nil
+    var onCancelDirections: (() -> Void)? = nil
+
     @State private var isSearching = false
     @State private var searchText = ""
     @State private var selectedDestination: SavedPlace? = nil
     @State private var directionMode: DirectionSheetMode = .directions
     @State private var isJourneyDone = false
+    @State private var currentRouteInfo: WalkingRouteInfo? = nil
+    @State private var journeyTracker = JourneyTrackingManager()
     @State private var selectedWalker: Person? = nil
     @State private var isWalkerDestinationReached = false
     @State private var isViewingHistoryList = false
@@ -38,16 +45,42 @@ struct MapSheet: View {
                     switch directionMode {
                     case .directions:
                         MapSheetDirectionContent(
+                            userLocation: store.map.currentLocation,
                             destination: destination,
                             onCancel: {
+                                onCancelDirections?()
+                                journeyTracker.reset()
                                 withAnimation(.easeInOut(duration: 0.25)) {
                                     selectedDestination = nil
                                     isJourneyDone = false
+                                    currentRouteInfo = nil
                                     directionMode = .directions
                                     selectedDetent = .fraction(0.42)
                                 }
                             },
-                            onStartNavigation: {
+                            onRouteReady: { route, updatedDest in
+                                onRouteReady?(route, updatedDest)
+                            },
+                            onStartNavigation: { routeInfo in
+                                currentRouteInfo = routeInfo
+                                onStartNavigation?(destination)
+
+                                let originCoord = store.map.currentLocation ?? CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
+                                let originPlace = SavedPlace(
+                                    name: "Start Position",
+                                    subtitle: "Current Area",
+                                    iconName: "location.fill",
+                                    coordinate: originCoord
+                                )
+
+                                Task {
+                                    await journeyTracker.startTracking(
+                                        origin: originPlace,
+                                        destination: destination,
+                                        userLocation: store.map.currentLocation
+                                    )
+                                }
+
                                 withAnimation(.easeInOut(duration: 0.25)) {
                                     isJourneyDone = false
                                     directionMode = .progress
@@ -60,7 +93,10 @@ struct MapSheet: View {
                     case .progress:
                         DirectionProgress(
                             destination: destination,
-                            isDone: isJourneyDone,
+                            estimatedTime: currentRouteInfo?.travelTimeString ?? "12 min",
+                            eta: currentRouteInfo?.etaString ?? "11.00 ETA",
+                            totalDistance: currentRouteInfo?.distanceString ?? destination.distance ?? "850 m",
+                            isDone: journeyTracker.isDestinationReached || isJourneyDone,
                             onJourneyLog: {
                                 withAnimation(.easeInOut(duration: 0.25)) {
                                     directionMode = .journeyLog
@@ -68,14 +104,23 @@ struct MapSheet: View {
                                 }
                             },
                             onEndJourney: {
-                                withAnimation(.easeInOut(duration: 0.25)) {
-                                    isJourneyDone = true
-                                }
-                            },
-                            onDone: {
+                                onCancelDirections?()
+                                journeyTracker.reset()
                                 withAnimation(.easeInOut(duration: 0.25)) {
                                     selectedDestination = nil
                                     isJourneyDone = false
+                                    currentRouteInfo = nil
+                                    directionMode = .directions
+                                    selectedDetent = .fraction(0.42)
+                                }
+                            },
+                            onDone: {
+                                onCancelDirections?()
+                                journeyTracker.reset()
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    selectedDestination = nil
+                                    isJourneyDone = false
+                                    currentRouteInfo = nil
                                     directionMode = .directions
                                     selectedDetent = .fraction(0.42)
                                 }
@@ -88,7 +133,8 @@ struct MapSheet: View {
                     case .journeyLog:
                         DirectionJourneyLog(
                             destinationName: destination.name,
-                            isDone: isJourneyDone,
+                            isDone: journeyTracker.isDestinationReached || isJourneyDone,
+                            entries: journeyTracker.currentEntries.isEmpty ? nil : journeyTracker.currentEntries,
                             onDismiss: {
                                 withAnimation(.easeInOut(duration: 0.25)) {
                                     directionMode = .progress
@@ -221,6 +267,7 @@ struct MapSheet: View {
                         isSearching: $isSearching,
                         searchText: $searchText,
                         selectedDetent: $selectedDetent,
+                        userLocation: store.map.currentLocation,
                         onSelectPlace: { place in
                             UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
@@ -228,6 +275,8 @@ struct MapSheet: View {
                                 searchText = ""
                                 selectedDestination = place
                                 isJourneyDone = false
+                                currentRouteInfo = nil
+                                journeyTracker.reset()
                                 directionMode = .directions
                                 selectedDetent = .fraction(0.52)
                             }
@@ -248,6 +297,8 @@ struct MapSheet: View {
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                                 selectedDestination = place
                                 isJourneyDone = false
+                                currentRouteInfo = nil
+                                journeyTracker.reset()
                                 directionMode = .directions
                                 selectedDetent = .fraction(0.52)
                             }
@@ -279,6 +330,13 @@ struct MapSheet: View {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     isSearching = false
                     searchText = ""
+                }
+            }
+        }
+        .onChange(of: store.map.currentLocation) { _, newLocation in
+            if let newCoord = newLocation, directionMode == .progress || directionMode == .journeyLog {
+                Task {
+                    await journeyTracker.updateLocation(newCoord)
                 }
             }
         }

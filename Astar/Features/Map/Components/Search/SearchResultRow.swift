@@ -20,7 +20,7 @@ struct SearchResultRow: View {
             } label: {
                 HStack(spacing: 12) {
                     Circle()
-                        .fill(Color(red: 0.78, green: 0.82, blue: 0.97).opacity(0.92))
+                        .fill(place.categoryColor)
                         .overlay {
                             Image(systemName: place.iconName)
                                 .font(.body.weight(.semibold))

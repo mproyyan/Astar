@@ -19,6 +19,8 @@ struct DirectionCard: View {
         iconName: "building.2.fill",
         distance: "250 m"
     )
+    var walkingRoute: WalkingRouteInfo? = nil
+    var isLoadingRoute: Bool = false
     let onCancel: () -> Void
     var onStartNavigation: (() -> Void)? = nil
 
@@ -66,17 +68,20 @@ struct DirectionCard: View {
                     isLast: false
                 )
 
-//                Divider()
-//                    .opacity(0.5)
-
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("8 hrs 22 min")
-                            .font(.title3.weight(.semibold))
-                            .foregroundStyle(.primary)
+                        if isLoadingRoute {
+                            Text("Calculating...")
+                                .font(.title3.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text(walkingRoute?.travelTimeString ?? "12 min")
+                                .font(.title3.weight(.semibold))
+                                .foregroundStyle(.primary)
+                        }
 
                         HStack(spacing: 6) {
-                            Text("08.16 ETA")
+                            Text(walkingRoute?.etaString ?? "--.-- ETA")
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
 
@@ -84,7 +89,7 @@ struct DirectionCard: View {
                                 .fill(Color.secondary.opacity(0.6))
                                 .frame(width: 4, height: 4)
 
-                            Text("28 km")
+                            Text(walkingRoute?.distanceString ?? destination.distance ?? "-- km")
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
                         }
@@ -104,13 +109,11 @@ struct DirectionCard: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Start navigation")
-                    
-                    
                 }
                 .padding(.top, 16)
                 .padding(.bottom, 20)
                 .padding(.horizontal, 2)
-                
+
                 Divider()
                     .opacity(0.5)
 
@@ -133,7 +136,16 @@ struct DirectionCard: View {
 }
 
 #Preview {
-    DirectionCard(onCancel: {})
-        .padding()
-        .background(Color(red: 0.95, green: 0.95, blue: 0.97))
+    DirectionCard(
+        walkingRoute: WalkingRouteInfo(
+            travelTimeString: "14 min",
+            etaString: "11.02 ETA",
+            distanceString: "850 m",
+            rawTravelTime: 840,
+            rawDistanceMeters: 850
+        ),
+        onCancel: {}
+    )
+    .padding()
+    .background(Color(red: 0.95, green: 0.95, blue: 0.97))
 }

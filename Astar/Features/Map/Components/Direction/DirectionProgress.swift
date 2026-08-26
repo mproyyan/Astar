@@ -157,11 +157,11 @@ struct DirectionProgress: View {
     }
 }
 
-//#Preview("In Progress") {
-//    DirectionProgress(isDone: false)
-//        .padding()
-//        .background(Color(red: 0.95, green: 0.95, blue: 0.97))
-//}
+#Preview("In Progress") {
+    DirectionProgress(isDone: false)
+        .padding()
+        .background(Color(red: 0.95, green: 0.95, blue: 0.97))
+}
 
 #Preview("Done") {
     DirectionProgress(isDone: true)
