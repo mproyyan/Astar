@@ -75,6 +75,9 @@ struct MainScreenMapFeature {
 
     // Direction Actions
     case selectPlace(SavedPlace)
+    case startAlwaysHomeNavigation
+    case startDirectNavigation(destinationQuery: String)
+    case alwaysHomeNavigationReady(origin: SavedPlace, routeInfo: WalkingRouteInfo, userLocation: CLLocationCoordinate2D, streetName: String)
     case routeCalculated(WalkingRouteInfo)
     case originResolved(SavedPlace)
     case startNavigationTapped
@@ -161,6 +164,34 @@ struct MainScreenMapFeature {
       case let .locationManager(.didUpdateLocation(coordinate)):
         state.currentLocation = coordinate
         if state.isNavigating {
+          if (state.originPlace?.subtitle == "Locating current area..." || state.walkingRouteInfo == nil) && !state.isCalculatingRoute,
+             let destination = state.selectedDestination {
+            state.isCalculatingRoute = true
+            return .merge(
+              .send(.delegate(.locationUpdated(coordinate))),
+              .send(.updateTrackingLocation(coordinate)),
+              .run { send in
+                async let originAddressTask = directionRoute.reverseGeocode(coordinate)
+                var destCoord = destination.coordinate
+                if destCoord == nil {
+                  let searchReq = MKLocalSearch.Request()
+                  searchReq.naturalLanguageQuery = "\(destination.name) \(destination.subtitle)"
+                  if let resp = try? await MKLocalSearch(request: searchReq).start(),
+                     let firstItem = resp.mapItems.first {
+                    destCoord = firstItem.placemark.coordinate
+                  } else {
+                    destCoord = CLLocationCoordinate2D(latitude: -6.2155, longitude: 106.8155)
+                  }
+                }
+                let resolvedDest = destCoord ?? CLLocationCoordinate2D(latitude: -6.2155, longitude: 106.8155)
+                async let routeInfoTask = directionRoute.calculateWalkingRoute(coordinate, resolvedDest)
+                let (address, route) = await (originAddressTask, routeInfoTask)
+                let streetName = address.components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces) ?? "Current Area"
+                let origin = SavedPlace(name: "Current Location", subtitle: address, iconName: "location.fill", coordinate: coordinate)
+                await send(.alwaysHomeNavigationReady(origin: origin, routeInfo: route, userLocation: coordinate, streetName: streetName))
+              }
+            )
+          }
           return .merge(
             .send(.delegate(.locationUpdated(coordinate))),
             .send(.updateTrackingLocation(coordinate))
@@ -209,6 +240,269 @@ struct MainScreenMapFeature {
         return .cancel(id: "searchDebounce")
 
       // MARK: - Direction Logic
+      case let .startDirectNavigation(destinationQuery):
+        state.isSearching = false
+        state.searchQuery = ""
+        state.searchResults = []
+        state.selectedWalker = nil
+        state.isWalkerDestinationReached = false
+        state.isViewingHistoryList = false
+        state.selectedHistoryTrip = nil
+
+        let cleanQuery = destinationQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanQuery.isEmpty else {
+          return .send(.startAlwaysHomeNavigation)
+        }
+
+        // Fast resolution for known destinations
+        let matchedPlace: SavedPlace = {
+          let lower = cleanQuery.lowercased()
+          if lower == "office" || lower == "work" || lower.contains("autograph") {
+            return SavedPlace(
+              name: "Office",
+              subtitle: "Autograph Tower, Thamrin Nine, Central Jakarta",
+              iconName: "building.2.fill",
+              coordinate: CLLocationCoordinate2D(latitude: -6.2018, longitude: 106.8229)
+            )
+          } else if lower == "home" {
+            return MapSampleData.savedPlaces.first(where: { $0.name.caseInsensitiveCompare("Home") == .orderedSame }) ?? SavedPlace(
+              name: "Home",
+              subtitle: "Bendungan Hilir, South Jakarta",
+              iconName: "house.fill",
+              coordinate: CLLocationCoordinate2D(latitude: -6.2155, longitude: 106.8155)
+            )
+          } else if let sampleMatch = MapSampleData.allSearchablePlaces.first(where: {
+            $0.name.localizedCaseInsensitiveContains(cleanQuery) || cleanQuery.localizedCaseInsensitiveContains($0.name)
+          }) {
+            return sampleMatch
+          }
+          return SavedPlace(
+            name: cleanQuery.capitalized,
+            subtitle: "Resolving destination...",
+            iconName: "mappin.and.ellipse"
+          )
+        }()
+
+        state.selectedDestination = matchedPlace
+        state.directionMode = .progress
+        state.isCalculatingRoute = true
+        state.isNavigating = true
+        state.isDestinationReached = false
+        state.activeRoute = nil
+
+        let initialCoord = state.currentLocation
+        let defaultOrigin = SavedPlace(
+          name: "Current Location",
+          subtitle: "Locating current area...",
+          iconName: "location.fill",
+          coordinate: initialCoord
+        )
+        state.originPlace = defaultOrigin
+
+        let startTimeString = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .short)
+        let placeholderStartEntry = JourneyLogEntry(
+          landmarkName: "Start Position",
+          address: "Locating current area...",
+          timeString: startTimeString,
+          iconName: "figure.walk.motion",
+          entryType: .start,
+          coordinate: initialCoord
+        )
+        let placeholderCurrentEntry = JourneyLogEntry(
+          landmarkName: "Locating position...",
+          address: "Locating current area...",
+          timeString: "Now",
+          iconName: "location.fill",
+          entryType: .currentLocation,
+          coordinate: initialCoord
+        )
+        state.journeyLogEntries = [placeholderCurrentEntry, placeholderStartEntry]
+
+        return .run { [matchedPlace, cleanQuery, initialCoord] send in
+          // 1. Await actual user GPS location if not already present
+          var userCoord = initialCoord
+          if userCoord == nil {
+            userCoord = await locationManager.getCurrentLocation()
+          }
+          let resolvedUserCoord = userCoord ?? CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
+
+          // 2. Resolve destination place & coordinates
+          var finalDestination = matchedPlace
+          if finalDestination.coordinate == nil {
+            let searchResults = await placeSearch.searchPlaces(cleanQuery, resolvedUserCoord)
+            if let firstResult = searchResults.first {
+              finalDestination = firstResult
+            } else {
+              let searchReq = MKLocalSearch.Request()
+              searchReq.naturalLanguageQuery = cleanQuery
+              if let resp = try? await MKLocalSearch(request: searchReq).start(),
+                 let firstItem = resp.mapItems.first {
+                let pm = firstItem.placemark
+                let parts = [pm.thoroughfare, pm.subLocality, pm.locality, pm.administrativeArea].compactMap { $0 }.filter { !$0.isEmpty }
+                let fullAddr = parts.isEmpty ? (pm.name ?? "Jakarta") : parts.joined(separator: ", ")
+                finalDestination = SavedPlace(
+                  name: firstItem.name ?? cleanQuery.capitalized,
+                  subtitle: fullAddr,
+                  iconName: PlaceSearchEngine.categoryIcon(for: firstItem.pointOfInterestCategory),
+                  coordinate: pm.coordinate
+                )
+              }
+            }
+          }
+
+          let resolvedDest = finalDestination.coordinate ?? CLLocationCoordinate2D(latitude: -6.2155, longitude: 106.8155)
+
+          // 3. Concurrently reverse geocode origin and compute walking route
+          async let originAddressTask = directionRoute.reverseGeocode(resolvedUserCoord)
+          async let routeInfoTask = directionRoute.calculateWalkingRoute(resolvedUserCoord, resolvedDest)
+
+          let (address, calculatedRoute) = await (originAddressTask, routeInfoTask)
+
+          let resolvedOrigin = SavedPlace(
+            name: "Current Location",
+            subtitle: address,
+            iconName: "location.fill",
+            coordinate: resolvedUserCoord
+          )
+
+          let streetName = address.components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces) ?? "Current Area"
+
+          await send(.alwaysHomeNavigationReady(
+            origin: resolvedOrigin,
+            routeInfo: calculatedRoute,
+            userLocation: resolvedUserCoord,
+            streetName: streetName
+          ))
+        }
+
+      case .startAlwaysHomeNavigation:
+        state.isSearching = false
+        state.searchQuery = ""
+        state.searchResults = []
+        state.selectedWalker = nil
+        state.isWalkerDestinationReached = false
+        state.isViewingHistoryList = false
+        state.selectedHistoryTrip = nil
+
+        let homePlace = MapSampleData.savedPlaces.first(where: {
+          $0.name.caseInsensitiveCompare("Home") == .orderedSame
+        }) ?? SavedPlace(
+          name: "Home",
+          subtitle: "Bendungan Hilir, South Jakarta",
+          iconName: "house.fill",
+          coordinate: CLLocationCoordinate2D(latitude: -6.2155, longitude: 106.8155)
+        )
+
+        state.selectedDestination = homePlace
+        state.directionMode = .progress
+        state.isCalculatingRoute = true
+        state.isNavigating = true
+        state.isDestinationReached = false
+        state.activeRoute = nil
+
+        let initialCoord = state.currentLocation
+        let defaultOrigin = SavedPlace(
+          name: "Current Location",
+          subtitle: "Locating current area...",
+          iconName: "location.fill",
+          coordinate: initialCoord
+        )
+        state.originPlace = defaultOrigin
+
+        let startTimeString = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .short)
+        let placeholderStartEntry = JourneyLogEntry(
+          landmarkName: "Start Position",
+          address: "Locating current area...",
+          timeString: startTimeString,
+          iconName: "figure.walk.motion",
+          entryType: .start,
+          coordinate: initialCoord
+        )
+        let placeholderCurrentEntry = JourneyLogEntry(
+          landmarkName: "Locating position...",
+          address: "Locating current area...",
+          timeString: "Now",
+          iconName: "location.fill",
+          entryType: .currentLocation,
+          coordinate: initialCoord
+        )
+        state.journeyLogEntries = [placeholderCurrentEntry, placeholderStartEntry]
+
+        return .run { [homePlace, initialCoord] send in
+          // 1. Await actual user GPS location if not already present
+          var userCoord = initialCoord
+          if userCoord == nil {
+            userCoord = await locationManager.getCurrentLocation()
+          }
+          let resolvedUserCoord = userCoord ?? CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
+
+          // 2. Resolve destination coordinate if nil
+          var destCoord = homePlace.coordinate
+          if destCoord == nil {
+            let searchReq = MKLocalSearch.Request()
+            searchReq.naturalLanguageQuery = "\(homePlace.name) \(homePlace.subtitle)"
+            if let resp = try? await MKLocalSearch(request: searchReq).start(),
+               let firstItem = resp.mapItems.first {
+              destCoord = firstItem.placemark.coordinate
+            } else {
+              destCoord = CLLocationCoordinate2D(latitude: -6.2155, longitude: 106.8155)
+            }
+          }
+          let resolvedDest = destCoord ?? CLLocationCoordinate2D(latitude: -6.2155, longitude: 106.8155)
+
+          // 3. Concurrently reverse geocode origin and compute walking route
+          async let originAddressTask = directionRoute.reverseGeocode(resolvedUserCoord)
+          async let routeInfoTask = directionRoute.calculateWalkingRoute(resolvedUserCoord, resolvedDest)
+
+          let (address, calculatedRoute) = await (originAddressTask, routeInfoTask)
+
+          let resolvedOrigin = SavedPlace(
+            name: "Current Location",
+            subtitle: address,
+            iconName: "location.fill",
+            coordinate: resolvedUserCoord
+          )
+
+          let streetName = address.components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces) ?? "Current Area"
+
+          await send(.alwaysHomeNavigationReady(
+            origin: resolvedOrigin,
+            routeInfo: calculatedRoute,
+            userLocation: resolvedUserCoord,
+            streetName: streetName
+          ))
+        }
+
+      case let .alwaysHomeNavigationReady(origin, routeInfo, userLocation, streetName):
+        state.currentLocation = userLocation
+        state.originPlace = origin
+        state.walkingRouteInfo = routeInfo
+        state.activeRoute = routeInfo.route
+        state.isCalculatingRoute = false
+        state.lastLoggedCoordinate = userLocation
+        state.lastLoggedStreet = streetName
+        state.lastLoggedIcon = "figure.walk"
+
+        let startTimeString = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .short)
+        let startEntry = JourneyLogEntry(
+          landmarkName: "Start Position",
+          address: origin.subtitle,
+          timeString: startTimeString,
+          iconName: "figure.walk.motion",
+          entryType: .start,
+          coordinate: userLocation
+        )
+        let currentEntry = JourneyLogEntry(
+          landmarkName: "Near \(streetName)",
+          address: origin.subtitle,
+          timeString: "Now",
+          iconName: "location.fill",
+          entryType: .currentLocation,
+          coordinate: userLocation
+        )
+        state.journeyLogEntries = [currentEntry, startEntry]
+        return .none
+
       case let .selectPlace(place):
         state.isSearching = false
         state.searchQuery = ""
@@ -263,6 +557,21 @@ struct MainScreenMapFeature {
 
       case let .originResolved(origin):
         state.originPlace = origin
+        let streetName = origin.subtitle.components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces) ?? "Current Area"
+        state.journeyLogEntries = state.journeyLogEntries.map { entry in
+          if entry.address == "Locating current area..." || entry.address.isEmpty {
+            return JourneyLogEntry(
+              id: entry.id,
+              landmarkName: entry.entryType == .currentLocation ? "Near \(streetName)" : entry.landmarkName,
+              address: origin.subtitle,
+              timeString: entry.timeString,
+              iconName: entry.iconName,
+              entryType: entry.entryType,
+              coordinate: entry.coordinate
+            )
+          }
+          return entry
+        }
         return .none
 
       case let .routeCalculated(routeInfo):
@@ -512,6 +821,7 @@ struct LocationManagerClient {
   var requestLocation: () async -> Void
   var locationUpdates: () async -> AsyncStream<CLLocationCoordinate2D> = { .finished }
   var errorUpdates: () async -> AsyncStream<Error> = { .finished }
+  var getCurrentLocation: () async -> CLLocationCoordinate2D? = { nil }
 }
 
 extension LocationManagerClient: DependencyKey {
@@ -535,6 +845,9 @@ extension LocationManagerClient: DependencyKey {
       },
       errorUpdates: {
         await MainActor.run { managerActor.errorStream() }
+      },
+      getCurrentLocation: {
+        await managerActor.getCurrentLocation()
       }
     )
   }
@@ -596,6 +909,44 @@ private final class LocationManagerActor: NSObject, CLLocationManagerDelegate {
     } else if status == .authorizedWhenInUse || status == .authorizedAlways {
       manager.requestLocation()
       manager.startUpdatingLocation()
+    }
+  }
+
+  func getCurrentLocation() async -> CLLocationCoordinate2D? {
+    if manager.authorizationStatus == .notDetermined {
+      manager.requestWhenInUseAuthorization()
+    }
+
+    if let loc = manager.location, abs(loc.timestamp.timeIntervalSinceNow) < 45 {
+      return loc.coordinate
+    }
+
+    manager.requestLocation()
+    manager.startUpdatingLocation()
+
+    return await withTaskGroup(of: CLLocationCoordinate2D?.self) { group in
+      group.addTask { [weak self] in
+        guard let self else { return nil }
+        let stream = await self.locationStream()
+        for await coord in stream {
+          return coord
+        }
+        return nil
+      }
+
+      group.addTask {
+        try? await Task.sleep(for: .seconds(3))
+        return nil
+      }
+
+      for await result in group {
+        if let result {
+          group.cancelAll()
+          return result
+        }
+      }
+
+      return self.manager.location?.coordinate
     }
   }
 

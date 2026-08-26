@@ -45,6 +45,7 @@ struct MapSheet: View {
                             eta: store.map.walkingRouteInfo?.etaString ?? "11.00 ETA",
                             totalDistance: store.map.walkingRouteInfo?.distanceString ?? destination.distance ?? "850 m",
                             isDone: store.map.isDestinationReached,
+                            isLoading: store.map.isCalculatingRoute,
                             onJourneyLog: {
                                 store.send(.map(.journeyLogTapped))
                                 withAnimation(.easeInOut(duration: 0.25)) {

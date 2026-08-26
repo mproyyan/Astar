@@ -106,13 +106,13 @@ enum MapSampleData {
     static let savedPlaces: [SavedPlace] = [
         SavedPlace(name: "Home", subtitle: "Bendungan Hilir, South Jakarta", iconName: "house.fill"),
         SavedPlace(name: "Gym", subtitle: "Agora Mall, Central Jakarta", iconName: "figure.strengthtraining.traditional"),
-        SavedPlace(name: "Office", subtitle: "Bendungan Hilir, South Jakarta", iconName: "building.2.fill")
+        SavedPlace(name: "Office", subtitle: "Autograph Tower, Thamrin Nine, Central Jakarta", iconName: "building.2.fill")
     ]
 
     static let allSearchablePlaces: [SavedPlace] = [
         SavedPlace(name: "Home", subtitle: "Bendungan Hilir, South Jakarta", iconName: "house.fill", distance: "350 m"),
         SavedPlace(name: "Gym", subtitle: "Agora Mall, Central Jakarta", iconName: "figure.strengthtraining.traditional", distance: "450 m"),
-        SavedPlace(name: "Office", subtitle: "Bendungan Hilir, South Jakarta", iconName: "building.2.fill", distance: "500 m"),
+        SavedPlace(name: "Office", subtitle: "Autograph Tower, Thamrin Nine, Central Jakarta", iconName: "building.2.fill", distance: "250 m"),
         SavedPlace(name: "Autograph Tower", subtitle: "Thamrin Nine, Jl. M.H. Thamrin No. 10, Central Jakarta", iconName: "building.2.fill", distance: "250 m"),
         SavedPlace(name: "Agora Mall", subtitle: "Jl. M.H. Thamrin No. 10, Central Jakarta", iconName: "bag.fill", distance: "450 m"),
         SavedPlace(name: "Grand Indonesia", subtitle: "Jl. M.H. Thamrin No. 1, Central Jakarta", iconName: "bag.fill", distance: "850 m"),

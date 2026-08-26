@@ -132,8 +132,13 @@ struct MainScreenMapView: View {
         }
       }
       .onChange(of: store.map.isNavigating) { _, isNavigating in
-        if isNavigating, let userCoord = store.map.currentLocation {
-          zoomToRoadLevel(coordinate: userCoord)
+        if isNavigating {
+          withAnimation(.easeInOut(duration: 0.25)) {
+            selectedDetent = .fraction(0.6)
+          }
+          if let userCoord = store.map.currentLocation {
+            zoomToRoadLevel(coordinate: userCoord)
+          }
         }
       }
     } destination: { store in
