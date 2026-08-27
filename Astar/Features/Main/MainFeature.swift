@@ -48,7 +48,7 @@ struct MainFeature {
             let profiles = try await usersClient.fetchAllUsers()
             let people = profiles
               .filter { $0.appleUserId != currentUser?.appleUserId }
-              .map { Person(id: UUID(), name: $0.name, status: ($0.status == nil || $0.status?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true) ? "Idle" : $0.status!) }
+              .map { Person(id: UUID(), name: $0.name, status: ($0.status == nil || $0.status?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true) ? "Idle" : $0.status!, appleUserId: $0.appleUserId, cloudKitUserId: $0.cloudKitUserId) }
             await send(.fetchPeopleResponse(.success(people)))
           } catch {
             await send(.fetchPeopleResponse(.failure(FetchUsersError(error: error))))

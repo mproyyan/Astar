@@ -465,7 +465,6 @@ struct MainMapFeature {
              if let profile = UserProfileStorage.load() {
                  let selfRecordID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"
                      .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
-                 let walkerRecordID = "UserProfile_\(walker.id)_\(walker.name)" // Mocking this since walker.id is UUID in app logic.
 
                  do {
                      // We would fetch Walker's active session, for now mock joining

@@ -66,7 +66,10 @@ struct MapWalkerSheetFeature {
         let destinationPlaceName = state.destinationPlaceName
         return .run { [walker = state.walker] send in
             // Fetch walker's `activeWalkSessionRef` from CloudKit Profile
-            let walkerRecordID = "UserProfile_\(walker.id)_\(walker.name)"
+            let appleUID = walker.appleUserId ?? "applemock"
+            let cloudUID = walker.cloudKitUserId ?? "cloudmock"
+            let walkerRecordID = "UserProfile_\(appleUID)_\(cloudUID)"
+                .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
 
             do {
                 if let sessionID = try await trackingClient.getWalkerActiveSessionID(walkerRecordID) {
