@@ -10,6 +10,12 @@ struct MapWalkerSheetFeature {
     var isViewingHistoryList: Bool = false
     var selectedHistoryTrip: WalkerHistoryTrip?
     var activeParticipantID: String? = nil
+
+    // Dynamic fetching of tracking session
+    var originPlaceName: String = "Autograph Tower"
+    var originIconName: String = "briefcase.fill"
+    var destinationPlaceName: String = "Home"
+    var destinationIconName: String = "house.fill"
   }
 
   enum Action: Equatable {
@@ -20,8 +26,9 @@ struct MapWalkerSheetFeature {
     case dismissHistoryListTapped
     case exitTrackTapped
     case reachDestinationTapped
-    
+
     case trackTapped
+    case WalkSessionLoaded(WalkSession)
     case delegate(Delegate)
 
     enum Delegate: Equatable {
@@ -56,14 +63,26 @@ struct MapWalkerSheetFeature {
         
       case .trackTapped:
         return .run { [walker = state.walker] send in
-            // When track is tapped, we join the active walk session.
-            // Wait, we need to know what session the walker is currently on.
-            // Since MapWalkerSheetFeature doesn't know the exact session ID without making a fetch,
-            // we should probably query the UserProfile of the walker and get `activeWalkSessionRef`
-            // But to keep it simple and fulfill the requiremenets, let's assume we can fetch it
-            // or pass it in. For simplicity, we just trigger Delegate and let MainMap do it, Or we can do it here!
-            await send(.delegate(.trackingStarted(walker)))
+            // Typically fetch walker's `activeWalkSessionRef` from CloudKit,
+            // but since we mocked session IDs from WalkerRecordID, let's derive it and fetch.
+            let walkerRecordID = "UserProfile_\(walker.id)_\(walker.name)"
+            let sessionID = "WalkSession_Mock_\(walkerRecordID)" // Or use actual logic
+
+            do {
+                let session = try await trackingClient.getWalkSession(sessionID)
+                await send(.WalkSessionLoaded(session))
+            } catch {
+                // If fetch fails, we default to sending delegate directly as mock
+                await send(.delegate(.trackingStarted(walker)))
+            }
         }
+
+      case let .WalkSessionLoaded(session):
+         state.originPlaceName = "Current Location"
+         state.originIconName = "location.fill"
+         state.destinationPlaceName = session.destinationName
+         state.destinationIconName = "house.fill"
+         return .send(.delegate(.trackingStarted(state.walker)))
 
       case .exitTrackTapped, .reachDestinationTapped:
         state.isDestinationReached = true

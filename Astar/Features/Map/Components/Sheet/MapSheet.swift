@@ -165,10 +165,10 @@ struct MapSheet: View {
                                     name: walkerStore.walker.name,
                                     locationSubtitle: "Central Jakarta, Jakarta",
                                     timeAgo: "1 Min Ago",
-                                    originPlaceName: "Autograph Tower",
-                                    originIconName: "briefcase.fill",
-                                    destinationPlaceName: "Home",
-                                    destinationIconName: "house.fill",
+                                    originPlaceName: walkerStore.originPlaceName,
+                                    originIconName: walkerStore.originIconName,
+                                    destinationPlaceName: walkerStore.destinationPlaceName,
+                                    destinationIconName: walkerStore.destinationIconName,
                                     recentLocations: WalkerSampleData.awanLocations
                                 ),
                                 onDismiss: {

@@ -39,6 +39,8 @@ struct TrackingClient: Sendable {
     var updateUserStatus: @Sendable (_ userRecordID: String, _ status: String, _ activeSessionID: String?, _ watchingSessionID: String?) async throws -> Void
     var pushLocationPing: @Sendable (_ sessionID: String, _ coordinatesData: Data) async throws -> Void
     var subscribeToLocationPings: @Sendable (_ sessionID: String) async throws -> AsyncStream<LocationPing>
+
+    var getWalkSession: @Sendable (_ sessionID: String) async throws -> WalkSession
 }
 
 extension TrackingClient: DependencyKey {
@@ -146,6 +148,25 @@ extension TrackingClient: DependencyKey {
             return AsyncStream { continuation in
                 continuation.finish()
             }
+        },
+        getWalkSession: { sessionID in
+            let db = CKContainer.default().publicCloudDatabase
+            let id = CKRecord.ID(recordName: sessionID)
+            let record = try await db.record(for: id)
+            let walkerRef = (record["walkerRef"] as? CKRecord.Reference)?.recordID.recordName ?? ""
+
+            return WalkSession(
+                id: sessionID,
+                walkerRef: walkerRef,
+                status: record["status"] as? String ?? "",
+                destinationName: record["destinationName"] as? String ?? "",
+                destinationLatitude: record["destinationLatitude"] as? Double ?? 0.0,
+                destinationLongitude: record["destinationLongitude"] as? Double ?? 0.0,
+                routePolyline: record["routePolyline"] as? String,
+                startedAt: record["startedAt"] as? Date ?? Date(),
+                endedAt: record["endedAt"] as? Date,
+                lastPingAt: record["lastPingAt"] as? Date ?? Date()
+            )
         }
     )
 }
