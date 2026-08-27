@@ -1,10 +1,3 @@
-//
-//  MapSheet.swift
-//  Astar
-//
-//  Created by Dimas Prihady Setyawan on 25/08/26.
-//
-
 import ComposableArchitecture
 import MapKit
 import SwiftUI
@@ -19,12 +12,26 @@ struct MapSheet: View {
 
     var body: some View {
         ScrollView(.vertical) {
-            Group {
-                if let destination = store.map.selectedDestination {
-                    switch store.map.directionMode {
+            if let sheetStore = store.scope(state: \.map.sheet, action: \.map.sheet.presented) {
+                switch sheetStore.case {
+                case let .search(searchStore):
+                    MapSheetSearchContent(
+                        store: searchStore,
+                        selectedDetent: $selectedDetent,
+                        onSelectPlace: { place in
+                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                            store.send(.map(.sheet(.presented(.search(.selectPlace(place))))))
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                selectedDetent = .fraction(0.52)
+                            }
+                        }
+                    )
+                    
+                case let .direction(directionStore):
+                    switch directionStore.mode {
                     case .directions:
                         MapSheetDirectionContent(
-                            store: store,
+                            store: directionStore,
                             onCancel: {
                                 withAnimation(.easeInOut(duration: 0.25)) {
                                     selectedDetent = .fraction(0.42)
@@ -34,32 +41,32 @@ struct MapSheet: View {
                                 withAnimation(.easeInOut(duration: 0.25)) {
                                     selectedDetent = .fraction(0.6)
                                 }
-                            }
+                            },
+                            currentLocation: store.map.currentLocation
                         )
                         .transition(.opacity)
 
                     case .progress:
                         DirectionProgress(
-                            destination: destination,
-                            estimatedTime: store.map.walkingRouteInfo?.travelTimeString ?? "12 min",
-                            eta: store.map.walkingRouteInfo?.etaString ?? "11.00 ETA",
-                            totalDistance: store.map.walkingRouteInfo?.distanceString ?? destination.distance ?? "850 m",
-                            isDone: store.map.isDestinationReached,
-                            isLoading: store.map.isCalculatingRoute,
+                            destination: directionStore.destination,
+                            estimatedTime: directionStore.walkingRouteInfo?.travelTimeString ?? "12 min",
+                            eta: directionStore.walkingRouteInfo?.etaString ?? "11.00 ETA",
+                            totalDistance: directionStore.walkingRouteInfo?.distanceString ?? directionStore.destination.distance ?? "850 m",
+                            isDone: directionStore.isDestinationReached,
                             onJourneyLog: {
-                                store.send(.map(.journeyLogTapped))
+                                directionStore.send(.journeyLogTapped)
                                 withAnimation(.easeInOut(duration: 0.25)) {
                                     selectedDetent = .large
                                 }
                             },
                             onEndJourney: {
-                                store.send(.map(.endJourneyTapped))
+                                directionStore.send(.endJourneyTapped)
                                 withAnimation(.easeInOut(duration: 0.25)) {
                                     selectedDetent = .fraction(0.42)
                                 }
                             },
                             onDone: {
-                                store.send(.map(.endJourneyTapped))
+                                directionStore.send(.endJourneyTapped)
                                 withAnimation(.easeInOut(duration: 0.25)) {
                                     selectedDetent = .fraction(0.42)
                                 }
@@ -71,17 +78,17 @@ struct MapSheet: View {
 
                     case .journeyLog:
                         DirectionJourneyLog(
-                            destinationName: destination.name,
-                            isDone: store.map.isDestinationReached,
-                            entries: store.map.journeyLogEntries.isEmpty ? nil : store.map.journeyLogEntries,
+                            destinationName: directionStore.destination.name,
+                            isDone: directionStore.isDestinationReached,
+                            entries: directionStore.journeyLogEntries.isEmpty ? nil : directionStore.journeyLogEntries,
                             onDismiss: {
-                                store.send(.map(.dismissJourneyLogTapped))
+                                directionStore.send(.dismissJourneyLogTapped)
                                 withAnimation(.easeInOut(duration: 0.25)) {
                                     selectedDetent = .fraction(0.6)
                                 }
                             },
                             onChecklistTapped: {
-                                store.send(.map(.dismissJourneyLogTapped))
+                                directionStore.send(.dismissJourneyLogTapped)
                                 withAnimation(.easeInOut(duration: 0.25)) {
                                     selectedDetent = .fraction(0.6)
                                 }
@@ -91,25 +98,26 @@ struct MapSheet: View {
                         .padding(.top, 12)
                         .transition(.opacity)
                     }
-                } else if let walker = store.map.selectedWalker {
-                    if walker.status == "Idle" {
-                        if let trip = store.map.selectedHistoryTrip {
+
+                case let .walker(walkerStore):
+                    if walkerStore.status == "Idle" {
+                        if let trip = walkerStore.selectedHistoryTrip {
                             WalkerCardHistoryDetail(
                                 trip: trip,
                                 onDismiss: {
-                                    store.send(.map(.dismissHistoryDetail))
+                                    walkerStore.send(.dismissHistoryDetailTapped)
                                 }
                             )
                             .padding(.horizontal, 16)
                             .padding(.top, 12)
                             .transition(.opacity)
-                        } else if store.map.isViewingHistoryList {
+                        } else if walkerStore.isViewingHistoryList {
                             WalkerCardHistoryList(
                                 onDismiss: {
-                                    store.send(.map(.dismissHistoryList))
+                                    walkerStore.send(.dismissHistoryListTapped)
                                 },
                                 onSelectTrip: { trip in
-                                    store.send(.map(.selectHistoryTrip(trip)))
+                                    walkerStore.send(.selectHistoryTrip(trip))
                                 }
                             )
                             .padding(.horizontal, 16)
@@ -117,19 +125,19 @@ struct MapSheet: View {
                             .transition(.opacity)
                         } else {
                             WalkerCardIdle(
-                                name: walker.name,
+                                name: walkerStore.walker.name,
                                 email: "awanmendung@icloud.com",
                                 onDismiss: {
-                                    store.send(.map(.dismissWalker))
+                                    walkerStore.send(.dismissWalkerTapped)
                                     withAnimation(.easeInOut(duration: 0.25)) {
                                         selectedDetent = .fraction(0.42)
                                     }
                                 },
                                 onViewAllHistory: {
-                                    store.send(.map(.viewAllHistoryTapped))
+                                    walkerStore.send(.viewAllHistoryTapped)
                                 },
                                 onSelectTrip: { trip in
-                                    store.send(.map(.selectHistoryTrip(trip)))
+                                    walkerStore.send(.selectHistoryTrip(trip))
                                 }
                             )
                             .padding(.horizontal, 16)
@@ -137,12 +145,12 @@ struct MapSheet: View {
                             .transition(.opacity)
                         }
                     } else {
-                        if store.map.isWalkerDestinationReached {
+                        if walkerStore.isDestinationReached {
                             WalkerCardReachDestination(
-                                walkerName: "\(walker.name) Mendung",
+                                walkerName: "\(walkerStore.walker.name) Mendung",
                                 avatarImageName: "AwanAvatar",
                                 onDismiss: {
-                                    store.send(.map(.dismissWalker))
+                                    walkerStore.send(.dismissWalkerTapped)
                                     withAnimation(.easeInOut(duration: 0.25)) {
                                         selectedDetent = .fraction(0.42)
                                     }
@@ -154,7 +162,7 @@ struct MapSheet: View {
                         } else {
                             WalkerCardWalking(
                                 walker: WalkerProfile(
-                                    name: walker.name,
+                                    name: walkerStore.walker.name,
                                     locationSubtitle: "Central Jakarta, Jakarta",
                                     timeAgo: "1 Min Ago",
                                     originPlaceName: "Autograph Tower",
@@ -164,19 +172,19 @@ struct MapSheet: View {
                                     recentLocations: WalkerSampleData.awanLocations
                                 ),
                                 onDismiss: {
-                                    store.send(.map(.dismissWalker))
+                                    walkerStore.send(.dismissWalkerTapped)
                                     withAnimation(.easeInOut(duration: 0.25)) {
                                         selectedDetent = .fraction(0.42)
                                     }
                                 },
                                 onExitTrack: {
-                                    store.send(.map(.exitTrackTapped))
+                                    walkerStore.send(.exitTrackTapped)
                                     withAnimation(.easeInOut(duration: 0.25)) {
                                         selectedDetent = .fraction(0.35)
                                     }
                                 },
                                 onReachDestination: {
-                                    store.send(.map(.reachDestinationTapped))
+                                    walkerStore.send(.reachDestinationTapped)
                                     withAnimation(.easeInOut(duration: 0.25)) {
                                         selectedDetent = .fraction(0.35)
                                     }
@@ -187,69 +195,30 @@ struct MapSheet: View {
                             .transition(.opacity)
                         }
                     }
-                } else if store.map.isSearching {
-                    MapSheetSearchContent(
-                        store: store,
-                        selectedDetent: $selectedDetent,
-                        onSelectPlace: { place in
-                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                            store.send(.map(.selectPlace(place)))
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                selectedDetent = .fraction(0.52)
-                            }
-                        }
-                    )
-                    .transition(.opacity)
-                } else {
-                    MapSheetMainContent(
-                        store: store,
-                        isExpanded: isExpanded,
-                        onSearchTapped: {
-                            store.send(.map(.searchTapped))
-                            withAnimation(.easeInOut(duration: 0.25)) {
-                                selectedDetent = .large
-                            }
-                        },
-                        onSelectPlace: { place in
-                            store.send(.map(.selectPlace(place)))
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                selectedDetent = .fraction(0.52)
-                            }
-                        },
-                        onSelectPerson: { person in
-                            store.send(.map(.selectPerson(person)))
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                selectedDetent = .large
-                            }
-                        }
-                    )
-                    .transition(.opacity)
                 }
-            }
-        }
-        .scrollIndicators(.hidden)
-        .presentationBackground {
-            if isExpanded {
-                Color(red: 0.95, green: 0.95, blue: 0.97)
-            }
-        }
-        .animation(.easeInOut(duration: 0.25), value: isExpanded)
-        .animation(.easeInOut(duration: 0.25), value: store.map.selectedDestination != nil)
-        .onChange(of: selectedDetent) { _, newDetent in
-            if store.map.isSearching && newDetent != .large {
-                store.send(.map(.clearSearchTapped))
+            } else {
+                // Main Content (when sheet state is nil)
+                MapSheetMainContent(
+                    store: store,
+                    isExpanded: isExpanded,
+                    onSearchTapped: {
+                        store.send(.map(.searchTapped))
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            selectedDetent = .large
+                        }
+                    },
+                    onSelectPlace: { place in
+                        store.send(.map(.sheet(.presented(.search(.selectPlace(place))))))
+                    },
+                    onSelectPerson: { person in
+                        store.send(.map(.selectPerson(person)))
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            selectedDetent = .fraction(0.42)
+                        }
+                    }
+                )
+                .transition(.opacity)
             }
         }
     }
-}
-
-#Preview {
-    @Previewable @State var selectedDetent: PresentationDetent = .fraction(0.42)
-
-    MapSheet(
-        store: Store(initialState: MainFeature.State()) {
-            MainFeature()
-        },
-        selectedDetent: $selectedDetent
-    )
 }

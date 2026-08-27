@@ -11,7 +11,7 @@ struct MainFeature {
   @ObservableState
   struct State: Equatable {
     var login: LoginFeature.State = .init()
-    var map: MainScreenMapFeature.State = .init()
+    var map: MainMapFeature.State = .init()
     var path = StackState<Path.State>()
 
     init(userProfile: UserProfile? = nil) {
@@ -21,7 +21,7 @@ struct MainFeature {
 
   enum Action: Equatable {
     case login(LoginFeature.Action)
-    case map(MainScreenMapFeature.Action)
+    case map(MainMapFeature.Action)
     case path(StackActionOf<Path>)
     case profileButtonTapped
   }
@@ -32,7 +32,7 @@ struct MainFeature {
     }
 
     Scope(state: \.map, action: \.map) {
-      MainScreenMapFeature()
+      MainMapFeature()
     }
 
     Reduce { state, action in

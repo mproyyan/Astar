@@ -1,24 +1,17 @@
-//
-//  MapSheetSearchContent.swift
-//  Astar
-//
-//  Created by Dimas Prihady Setyawan on 25/08/26.
-//
-
 import ComposableArchitecture
 import CoreLocation
 import SwiftUI
 
 struct MapSheetSearchContent: View {
-    @Bindable var store: StoreOf<MainFeature>
+    @Bindable var store: StoreOf<MapSearchSheetFeature>
     @Binding var selectedDetent: PresentationDetent
     var onSelectPlace: ((SavedPlace) -> Void)? = nil
     @FocusState private var isSearchFieldFocused: Bool
 
     private var searchTextBinding: Binding<String> {
         Binding(
-            get: { store.map.searchQuery },
-            set: { store.send(.map(.searchQueryChanged($0))) }
+            get: { store.searchQuery },
+            set: { store.send(.searchQueryChanged($0)) }
         )
     }
 
@@ -31,7 +24,7 @@ struct MapSheetSearchContent: View {
                 )
 
                 CancelSearchButton {
-                    store.send(.map(.clearSearchTapped))
+                    store.send(.clearSearchTapped)
                     withAnimation(.easeInOut(duration: 0.25)) {
                         selectedDetent = .fraction(0.42)
                     }
@@ -39,15 +32,16 @@ struct MapSheetSearchContent: View {
             }
             .padding(.top, 8)
 
-            if store.map.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if store.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 SavedPlacesCard(
                     title: "Saved",
                     places: MapSampleData.savedPlaces,
                     onSelectPlace: { place in
+                        store.send(.selectPlace(place))
                         onSelectPlace?(place)
                     }
                 )
-            } else if store.map.isSearchLoading && store.map.searchResults.isEmpty {
+            } else if store.isLoading && store.searchResults.isEmpty {
                 VStack(spacing: 14) {
                     ProgressView()
                         .padding(.top, 24)
@@ -63,12 +57,13 @@ struct MapSheetSearchContent: View {
                     RoundedRectangle(cornerRadius: 24)
                         .stroke(Color.primary.opacity(0.06), lineWidth: 1)
                 }
-            } else if store.map.searchResults.isEmpty {
-                NoResultsView(searchText: store.map.searchQuery)
+            } else if store.searchResults.isEmpty {
+                NoResultsView(searchText: store.searchQuery)
             } else {
                 SearchResultsCard(
-                    places: store.map.searchResults,
+                    places: store.searchResults,
                     onSelectPlace: { place in
+                        store.send(.selectPlace(place))
                         onSelectPlace?(place)
                     }
                 )
@@ -82,15 +77,4 @@ struct MapSheetSearchContent: View {
             isSearchFieldFocused = true
         }
     }
-}
-
-#Preview {
-    @Previewable @State var selectedDetent: PresentationDetent = .large
-
-    MapSheetSearchContent(
-        store: Store(initialState: MainFeature.State()) {
-            MainFeature()
-        },
-        selectedDetent: $selectedDetent
-    )
 }

@@ -1,10 +1,3 @@
-//
-//  MainScreenMapView.swift
-//  Astar
-//
-//  Created by Muhammad Pandu Royyan on 24/08/26.
-//
-
 import Combine
 import ComposableArchitecture
 import CoreLocation
@@ -48,8 +41,8 @@ struct MainScreenMapView: View {
         }
 
         // Point B: Destination Marker
-        if let destination = store.map.selectedDestination, let coord = destination.coordinate {
-          Marker(destination.name, coordinate: coord)
+        if let sheet = store.map.sheet, case let .direction(directionState) = sheet, let coord = directionState.destination.coordinate {
+          Marker(directionState.destination.name, coordinate: coord)
             .tint(.red)
         }
 
@@ -200,8 +193,4 @@ private extension MKCoordinateRegion {
     center: CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456),
     span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
   )
-}
-
-#Preview {
-  MainScreenMapView(store: Store(initialState: MainFeature.State()) { MainFeature() })
 }
