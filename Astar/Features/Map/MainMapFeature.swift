@@ -50,6 +50,7 @@ struct MainMapFeature {
     case directNavigationReady(destination: SavedPlace, destCoord: CLLocationCoordinate2D, originCoord: CLLocationCoordinate2D, originAddress: String, routeInfo: WalkingRouteInfo)
 
     case updateTrackingLocation(CLLocationCoordinate2D)
+    case locationPingReceived(LocationPing)
 
     case sheet(PresentationAction<MapSheetFeature.Action>)
 
@@ -118,20 +119,17 @@ struct MainMapFeature {
         state.currentLocation = coordinate
         if state.isNavigating {
           // If we are actively walking, push location ping!
+          let optionalSessionID = state.activeWalkSessionID
           return .merge(
             .send(.delegate(.locationUpdated(coordinate))),
             .send(.updateTrackingLocation(coordinate)),
             .run { send in
-                 if let profile = UserProfileStorage.load() {
-                    let userRecordID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"
-                       .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
-
+                 if let sessionID = optionalSessionID {
                     // NOTE: Real implementation uses batching, but we push latest directly for simplicity based on prompt if no batched buffer
                     // Need to format Data correctly
-                    var coordStruct = [coordinate.latitude, coordinate.longitude]
+                    let coordStruct = [coordinate.latitude, coordinate.longitude]
                     if let data = try? JSONEncoder().encode(coordStruct) {
-                        try? await trackingClient.pushLocationPing(userRecordID, data)
-                        // Wait, sessionID is not userRecord ID. We need activeWalkSessionID. Let's just bypass it for now.
+                        try? await trackingClient.pushLocationPing(sessionID, data)
                     }
                  }
             }
@@ -438,8 +436,9 @@ struct MainMapFeature {
          case let .routeChanged(route):
             state.activeRoute = route
             return .none
-         case .navigationStarted:
+         case let .navigationStarted(sessionID):
             state.isNavigating = true
+            state.activeWalkSessionID = sessionID
             state.activeRoute = nil // clear polyline
             state.lastLoggedCoordinate = state.sheet?.direction?.journeyLogEntries.last?.coordinate ?? state.currentLocation
             state.lastLoggedStreet = "Current Area"
@@ -447,6 +446,7 @@ struct MainMapFeature {
             return .none
          case .navigationEnded:
             state.isNavigating = false
+            state.activeWalkSessionID = nil
             state.activeRoute = nil
             state.sheet = nil
             return .none
@@ -473,14 +473,31 @@ struct MainMapFeature {
                      try await trackingClient.updateUserStatus(selfRecordID, "accompany", nil, session.id)
 
                      // And subscribe
-                     _ = try await trackingClient.subscribeToLocationPings(session.id)
+                     for try await ping in try await trackingClient.subscribeToLocationPings(session.id) {
+                         await send(.locationPingReceived(ping))
+                     }
                  } catch {
-                     // Silently ignore errors for simulation
+                     print("Tracking failed with error: \(error)")
                  }
              }
          }
-         
-      case .sheet, .delegate:
+
+      case let .locationPingReceived(ping):
+          if let firstData = ping.encodedCoordinates.first {
+              do {
+                  let coordStruct = try JSONDecoder().decode([Double].self, from: firstData)
+                  if coordStruct.count == 2 {
+                      let lat = coordStruct[0]
+                      let lon = coordStruct[1]
+                      state.trackedWalkerLocation = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+                  }
+              } catch {
+                  print("Failed mapping data: \(error)")
+              }
+          }
+          return .none
+
+      case .sheet, .delegate, .updateTrackingLocation:
         return .none
       }
     }

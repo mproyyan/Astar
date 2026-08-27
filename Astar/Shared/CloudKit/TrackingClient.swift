@@ -41,6 +41,7 @@ struct TrackingClient: Sendable {
     var subscribeToLocationPings: @Sendable (_ sessionID: String) async throws -> AsyncStream<LocationPing>
 
     var getWalkSession: @Sendable (_ sessionID: String) async throws -> WalkSession
+    var getWalkerActiveSessionID: @Sendable (_ walkerRecordID: String) async throws -> String?
 }
 
 extension TrackingClient: DependencyKey {
@@ -144,9 +145,47 @@ extension TrackingClient: DependencyKey {
             try await db.save(sessionRecord)
         },
         subscribeToLocationPings: { sessionID in
-            // Return an empty stream for now since subscriptions involve setting up CKQuerySubscription and handling notifications
-            return AsyncStream { continuation in
-                continuation.finish()
+            AsyncStream { (continuation: AsyncStream<LocationPing>.Continuation) in
+                let db = CKContainer.default().publicCloudDatabase
+
+                // We use pure polling so no CKQuerySubscription or Remote Notifications are needed.
+                let task = Task {
+                    while !Task.isCancelled {
+                        let predicate = NSPredicate(format: "sessionRef == %@", CKRecord.Reference(recordID: CKRecord.ID(recordName: sessionID), action: .none))
+                        let query = CKQuery(recordType: "LocationPing", predicate: predicate)
+                        // Removed sortDescriptors by creationDate to prevent "Field '___createTime' is not marked sortable" error
+
+                        do {
+                            let (matchResults, _) = try await db.records(matching: query)
+                            // Since it's not sorted in CloudKit, let's sort locally by creationDate:
+                            let sortedRecords = matchResults.compactMap { try? $0.1.get() }.sorted {
+                                ($0.creationDate ?? Date.distantPast) > ($1.creationDate ?? Date.distantPast)
+                            }
+
+                            if let record = sortedRecords.first {
+                                if let encodedCoordinates = record["encodedCoordinates"] as? [Data],
+                                   let sessionRef = (record["sessionRef"] as? CKRecord.Reference)?.recordID.recordName {
+
+                                    let ping = LocationPing(
+                                        id: record.recordID.recordName,
+                                        sessionRef: sessionRef,
+                                        encodedCoordinates: encodedCoordinates,
+                                        recordedAt: record.creationDate ?? Date()
+                                    )
+                                    continuation.yield(ping)
+                                }
+                            }
+                        } catch {
+                            print("Poll error: \(error)")
+                        }
+
+                        try? await Task.sleep(nanoseconds: 3_000_000_000) // Poll every 3 seconds
+                    }
+                }
+
+                continuation.onTermination = { @Sendable _ in
+                    task.cancel()
+                }
             }
         },
         getWalkSession: { sessionID in
@@ -167,6 +206,12 @@ extension TrackingClient: DependencyKey {
                 endedAt: record["endedAt"] as? Date,
                 lastPingAt: record["lastPingAt"] as? Date ?? Date()
             )
+        },
+        getWalkerActiveSessionID: { walkerRecordID in
+            let db = CKContainer.default().publicCloudDatabase
+            let id = CKRecord.ID(recordName: walkerRecordID)
+            let record = try await db.record(for: id)
+            return (record["activeWalkSessionRef"] as? CKRecord.Reference)?.recordID.recordName
         }
     )
 }

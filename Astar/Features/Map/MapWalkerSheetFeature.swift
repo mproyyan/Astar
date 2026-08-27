@@ -65,29 +65,18 @@ struct MapWalkerSheetFeature {
       case .trackTapped:
         let destinationPlaceName = state.destinationPlaceName
         return .run { [walker = state.walker] send in
-            // Typically fetch walker's `activeWalkSessionRef` from CloudKit,
-            // but since we mocked session IDs from WalkerRecordID, let's derive it and fetch.
+            // Fetch walker's `activeWalkSessionRef` from CloudKit Profile
             let walkerRecordID = "UserProfile_\(walker.id)_\(walker.name)"
-            let sessionID = "WalkSession_Mock_\(walkerRecordID)" // Or use actual logic
 
             do {
-                let session = try await trackingClient.getWalkSession(sessionID)
-                await send(.WalkSessionLoaded(session))
+                if let sessionID = try await trackingClient.getWalkerActiveSessionID(walkerRecordID) {
+                    let session = try await trackingClient.getWalkSession(sessionID)
+                    await send(.WalkSessionLoaded(session))
+                } else {
+                    print("Walker isn't actively navigating (no active WalkSession)")
+                }
             } catch {
-                // If fetch fails, we default to sending delegate directly as mock
-                let mockSession = WalkSession(
-                    id: sessionID,
-                    walkerRef: walkerRecordID,
-                    status: "active",
-                    destinationName: destinationPlaceName,
-                    destinationLatitude: 0,
-                    destinationLongitude: 0,
-                    routePolyline: nil,
-                    startedAt: Date(),
-                    endedAt: nil,
-                    lastPingAt: Date()
-                )
-                await send(.WalkSessionLoaded(mockSession))
+                print("Failed tracking walker: \(error)")
             }
         }
 
