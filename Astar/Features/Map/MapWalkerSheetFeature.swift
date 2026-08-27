@@ -1,4 +1,5 @@
 import ComposableArchitecture
+import Foundation
 
 @Reducer
 struct MapWalkerSheetFeature {
@@ -33,7 +34,7 @@ struct MapWalkerSheetFeature {
 
     enum Delegate: Equatable {
       case dismissed
-      case trackingStarted(Person)
+      case trackingStarted(Person, WalkSession)
     }
   }
 
@@ -62,6 +63,7 @@ struct MapWalkerSheetFeature {
         return .none
         
       case .trackTapped:
+        let destinationPlaceName = state.destinationPlaceName
         return .run { [walker = state.walker] send in
             // Typically fetch walker's `activeWalkSessionRef` from CloudKit,
             // but since we mocked session IDs from WalkerRecordID, let's derive it and fetch.
@@ -73,16 +75,29 @@ struct MapWalkerSheetFeature {
                 await send(.WalkSessionLoaded(session))
             } catch {
                 // If fetch fails, we default to sending delegate directly as mock
-                await send(.delegate(.trackingStarted(walker)))
+                let mockSession = WalkSession(
+                    id: sessionID,
+                    walkerRef: walkerRecordID,
+                    status: "active",
+                    destinationName: destinationPlaceName,
+                    destinationLatitude: 0,
+                    destinationLongitude: 0,
+                    routePolyline: nil,
+                    startedAt: Date(),
+                    endedAt: nil,
+                    lastPingAt: Date()
+                )
+                await send(.WalkSessionLoaded(mockSession))
             }
         }
 
       case let .WalkSessionLoaded(session):
+         state.activeParticipantID = session.id
          state.originPlaceName = "Current Location"
          state.originIconName = "location.fill"
          state.destinationPlaceName = session.destinationName
          state.destinationIconName = "house.fill"
-         return .send(.delegate(.trackingStarted(state.walker)))
+         return .send(.delegate(.trackingStarted(state.walker, session)))
 
       case .exitTrackTapped, .reachDestinationTapped:
         state.isDestinationReached = true

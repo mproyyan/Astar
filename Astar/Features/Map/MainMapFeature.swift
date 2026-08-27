@@ -20,6 +20,9 @@ struct MainMapFeature {
     // Live Tracking related logic
     var activeWalkSessionID: String? = nil
     var activeParticipantID: String? = nil
+    var trackedWalkerLocation: CLLocationCoordinate2D? = nil
+    var trackedWalkerDestination: CLLocationCoordinate2D? = nil
+    var trackedWalkerDestinationName: String? = nil
 
     var lastLoggedCoordinate: CLLocationCoordinate2D?
     var lastLoggedStreet: String = ""
@@ -237,8 +240,11 @@ struct MainMapFeature {
          state.sheet = nil
          return .none
 
-      case let .sheet(.presented(.walker(.delegate(.trackingStarted(walker))))):
+      case let .sheet(.presented(.walker(.delegate(.trackingStarted(walker, session))))):
          // Handle joining session
+         state.activeWalkSessionID = session.id
+         state.trackedWalkerDestinationName = session.destinationName
+         state.trackedWalkerDestination = CLLocationCoordinate2D(latitude: session.destinationLatitude, longitude: session.destinationLongitude)
          return .run { send in
              if let profile = UserProfileStorage.load() {
                  let selfRecordID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"
@@ -247,11 +253,11 @@ struct MainMapFeature {
 
                  do {
                      // We would fetch Walker's active session, for now mock joining
-                     let sessionParticipant = try await trackingClient.joinWalkSession("WalkSession_Mock_\(walkerRecordID)", selfRecordID)
-                     try await trackingClient.updateUserStatus(selfRecordID, "accompany", nil, "WalkSession_Mock_\(walkerRecordID)")
+                     let sessionParticipant = try await trackingClient.joinWalkSession(session.id, selfRecordID)
+                     try await trackingClient.updateUserStatus(selfRecordID, "accompany", nil, session.id)
 
                      // And subscribe
-                     _ = try await trackingClient.subscribeToLocationPings("WalkSession_Mock_\(walkerRecordID)")
+                     _ = try await trackingClient.subscribeToLocationPings(session.id)
                  } catch {
                      // Silently ignore errors for simulation
                  }
