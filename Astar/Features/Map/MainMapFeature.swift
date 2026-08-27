@@ -23,6 +23,7 @@ struct MainMapFeature {
     var trackedWalkerLocation: CLLocationCoordinate2D? = nil
     var trackedWalkerDestination: CLLocationCoordinate2D? = nil
     var trackedWalkerDestinationName: String? = nil
+    var hasFittedTrackedWalker: Bool = false
 
     var lastLoggedCoordinate: CLLocationCoordinate2D?
     var lastLoggedStreet: String = ""
@@ -53,6 +54,8 @@ struct MainMapFeature {
     case locationPingReceived(LocationPing)
 
     case sheet(PresentationAction<MapSheetFeature.Action>)
+
+    case markTrackedWalkerFitted
 
     enum Delegate: Equatable {
       case locationUpdated(CLLocationCoordinate2D)
@@ -462,36 +465,54 @@ struct MainMapFeature {
          state.trackedWalkerDestinationName = session.destinationName
          state.trackedWalkerDestination = CLLocationCoordinate2D(latitude: session.destinationLatitude, longitude: session.destinationLongitude)
          return .run { send in
+             print("🔍 Starting tracking for walker. Session ID: \(session.id)")
              if let profile = UserProfileStorage.load() {
                  let selfRecordID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"
                      .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
 
                  do {
-                     // We would fetch Walker's active session, for now mock joining
+                     print("👥 Joining session...")
                      let sessionParticipant = try await trackingClient.joinWalkSession(session.id, selfRecordID)
+                     print("✅ Joined session: \(sessionParticipant.id)")
+
+                     print("🔄 Updating user status to accompany...")
                      try await trackingClient.updateUserStatus(selfRecordID, "accompany", nil, session.id)
 
                      // And subscribe
+                     print("🎣 Subscribing to location pings for session \(session.id)")
                      for try await ping in try await trackingClient.subscribeToLocationPings(session.id) {
+                         print("📥 Stream yielded a ping block.")
                          await send(.locationPingReceived(ping))
                      }
+                     print("❌ Stream ended for session \(session.id)")
                  } catch {
-                     print("Tracking failed with error: \(error)")
+                     print("❌ Tracking failed with error: \(error)")
                  }
+             } else {
+                 print("❌ User profile is nil. Cannot join tracking session!")
              }
          }
 
+      case .markTrackedWalkerFitted:
+          state.hasFittedTrackedWalker = true
+          return .none
+
       case let .locationPingReceived(ping):
+          print("📡 LocationPing received: \(ping.id) with \(ping.encodedCoordinates.count) points")
           if let firstData = ping.encodedCoordinates.first {
               do {
                   let coordStruct = try JSONDecoder().decode([Double].self, from: firstData)
-                  if coordStruct.count == 2 {
+                  print("📍 Decoded ping coordinate array: \(coordStruct)")
+                  if coordStruct.count >= 2 {
+                      // Note ping coordinates are often logged as [lat, lon] or [lon, lat] depending on the backend!
                       let lat = coordStruct[0]
                       let lon = coordStruct[1]
+                      print("🏃 Walker tracking Location -> lat: \(lat), lon: \(lon)")
+
                       state.trackedWalkerLocation = CLLocationCoordinate2D(latitude: lat, longitude: lon)
                   }
               } catch {
-                  print("Failed mapping data: \(error)")
+                  print("❌ Failed mapping location ping data: \(error)")
               }
           }
           return .none

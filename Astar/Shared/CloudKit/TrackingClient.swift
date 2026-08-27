@@ -150,17 +150,36 @@ extension TrackingClient: DependencyKey {
 
                 // We use pure polling so no CKQuerySubscription or Remote Notifications are needed.
                 let task = Task {
+                    // Try to fetch the session first to know its walkerRef
+                    var walkerRefStr: String? = nil
+                    do {
+                        let id = CKRecord.ID(recordName: sessionID)
+                        let record = try await db.record(for: id)
+                        walkerRefStr = (record["walkerRef"] as? CKRecord.Reference)?.recordID.recordName
+                    } catch {
+                        print("📡 [Polling] Failed to get session to determine walkerRef: \(error)")
+                    }
+
                     while !Task.isCancelled {
-                        let predicate = NSPredicate(format: "sessionRef == %@", CKRecord.Reference(recordID: CKRecord.ID(recordName: sessionID), action: .none))
-                        let query = CKQuery(recordType: "LocationPing", predicate: predicate)
+                        print("📡 [Polling] Getting pings for \(sessionID)")
+                        let query = CKQuery(recordType: "LocationPing", predicate: NSPredicate(value: true))
                         // Removed sortDescriptors by creationDate to prevent "Field '___createTime' is not marked sortable" error
 
                         do {
                             let (matchResults, _) = try await db.records(matching: query)
-                            // Since it's not sorted in CloudKit, let's sort locally by creationDate:
-                            let sortedRecords = matchResults.compactMap { try? $0.1.get() }.sorted {
-                                ($0.creationDate ?? Date.distantPast) > ($1.creationDate ?? Date.distantPast)
-                            }
+                            // Filter matches locally! (Inefficient for prod, but good for debug!)
+                            let sortedRecords = matchResults.compactMap { try? $0.1.get() }
+                                .filter { record in
+                                     if let ref = record["sessionRef"] as? CKRecord.Reference {
+                                         let refName = ref.recordID.recordName
+                                         if refName == sessionID { return true }
+                                         if let wRef = walkerRefStr, refName == wRef { return true }
+                                     }
+                                     return false
+                                }
+                                .sorted {
+                                    ($0.creationDate ?? Date.distantPast) > ($1.creationDate ?? Date.distantPast)
+                                }
 
                             if let record = sortedRecords.first {
                                 if let encodedCoordinates = record["encodedCoordinates"] as? [Data],
@@ -173,17 +192,21 @@ extension TrackingClient: DependencyKey {
                                         recordedAt: record.creationDate ?? Date()
                                     )
                                     continuation.yield(ping)
+                                } else {
+                                    print("📡 [Polling] Record found but fields missing.")
                                 }
                             }
                         } catch {
-                            print("Poll error: \(error)")
+                            print("📡 [Polling] error: \(error)")
                         }
 
                         try? await Task.sleep(nanoseconds: 3_000_000_000) // Poll every 3 seconds
                     }
+                    print("📡 [Polling] Task cancelled loop exit.")
                 }
 
                 continuation.onTermination = { @Sendable _ in
+                    print("📡 [Polling] Stream terminated/cancelled.")
                     task.cancel()
                 }
             }
