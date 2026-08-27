@@ -25,11 +25,13 @@ extension UsersClient: DependencyKey {
                let cloudKitUserId = record["cloudKitUserId"] as? String,
                let name = record["name"] as? String,
                let email = record["email"] as? String {
+                let status = record["Status"] as? String
                 let profile = UserProfile(
                     appleUserId: appleUserId,
                     cloudKitUserId: cloudKitUserId,
                     name: name,
-                    email: email
+                    email: email,
+                    status: status
                 )
                 profiles.append(profile)
             }
