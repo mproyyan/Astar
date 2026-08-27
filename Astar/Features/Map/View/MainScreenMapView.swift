@@ -42,8 +42,13 @@ struct MainScreenMapView: View {
 
         // Point B: Destination Marker
         if let sheet = store.map.sheet, case let .direction(directionState) = sheet, let coord = directionState.destination.coordinate {
-          Marker(directionState.destination.name, coordinate: coord)
-            .tint(.red)
+          if !directionState.destination.iconName.isEmpty {
+            Marker(directionState.destination.name, systemImage: directionState.destination.iconName, coordinate: coord)
+              .tint(.red)
+          } else {
+            Marker(directionState.destination.name, coordinate: coord)
+              .tint(.red)
+          }
         }
 
         // Route Polyline from Point A to Point B
@@ -126,8 +131,13 @@ struct MainScreenMapView: View {
         }
       }
       .onChange(of: store.map.isNavigating) { _, isNavigating in
-        if isNavigating, let userCoord = store.map.currentLocation {
-          zoomToRoadLevel(coordinate: userCoord)
+        if isNavigating {
+          withAnimation(.easeInOut(duration: 0.25)) {
+            selectedDetent = .fraction(0.6)
+          }
+          if let userCoord = store.map.currentLocation {
+            zoomToRoadLevel(coordinate: userCoord)
+          }
         }
       }
     } destination: { store in

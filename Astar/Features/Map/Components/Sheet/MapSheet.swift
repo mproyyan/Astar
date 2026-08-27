@@ -53,6 +53,7 @@ struct MapSheet: View {
                             eta: directionStore.walkingRouteInfo?.etaString ?? "11.00 ETA",
                             totalDistance: directionStore.walkingRouteInfo?.distanceString ?? directionStore.destination.distance ?? "850 m",
                             isDone: directionStore.isDestinationReached,
+                            isLoading: directionStore.isCalculatingRoute,
                             onJourneyLog: {
                                 directionStore.send(.journeyLogTapped)
                                 withAnimation(.easeInOut(duration: 0.25)) {

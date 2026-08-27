@@ -30,6 +30,7 @@ struct MapDirectionSheetFeature {
     case onAppear(currentLocation: CLLocationCoordinate2D?)
     case routeCalculated(WalkingRouteInfo)
     case originResolved(SavedPlace)
+    case destinationResolved(CLLocationCoordinate2D)
     
     case startNavigationTapped(currentLocation: CLLocationCoordinate2D?)
     case endJourneyTapped
@@ -53,6 +54,7 @@ struct MapDirectionSheetFeature {
 
   @Dependency(\.directionRoute) var directionRoute
   @Dependency(\.trackingClient) var trackingClient
+  @Dependency(\.uuid) var uuid
 
   var body: some Reducer<State, Action> {
     Reduce { state, action in
@@ -62,6 +64,7 @@ struct MapDirectionSheetFeature {
         let originCoord = currentLocation ?? CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
         
         state.originPlace = SavedPlace(
+          id: uuid(),
           name: "Current Location",
           subtitle: "Locating current area...",
           iconName: "location.fill",
@@ -73,22 +76,35 @@ struct MapDirectionSheetFeature {
 
           var destCoord = destination.coordinate
           if destCoord == nil {
+            let query: String
+            let lowerName = destination.name.lowercased()
+            if lowerName == "home" {
+              query = "Bendungan Hilir, Central Jakarta"
+            } else if lowerName == "office" || lowerName == "work" {
+              query = "Autograph Tower, Thamrin Nine, Central Jakarta"
+            } else if lowerName == "gym" {
+              query = "Agora Mall, Thamrin Nine, Central Jakarta"
+            } else {
+              query = "\(destination.name) \(destination.subtitle)"
+            }
+
             let searchReq = MKLocalSearch.Request()
-            searchReq.naturalLanguageQuery = "\(destination.name) \(destination.subtitle)"
+            searchReq.naturalLanguageQuery = query
             if let resp = try? await MKLocalSearch(request: searchReq).start(),
                let firstItem = resp.mapItems.first {
               destCoord = firstItem.placemark.coordinate
             } else {
-              destCoord = CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
+              destCoord = CLLocationCoordinate2D(latitude: -6.2125, longitude: 106.8166)
             }
           }
-          let resolvedDest = destCoord ?? CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
+          let resolvedDest = destCoord ?? CLLocationCoordinate2D(latitude: -6.2125, longitude: 106.8166)
 
           async let routeInfo = directionRoute.calculateWalkingRoute(origin: originCoord, destination: resolvedDest)
 
           let (address, calculatedRoute) = await (originAddress, routeInfo)
 
           let resolvedOrigin = SavedPlace(
+            id: uuid(),
             name: "Current Location",
             subtitle: address,
             iconName: "location.fill",
@@ -96,6 +112,7 @@ struct MapDirectionSheetFeature {
           )
 
           await send(.originResolved(resolvedOrigin))
+          await send(.destinationResolved(resolvedDest))
           await send(.routeCalculated(calculatedRoute))
         }
 
@@ -103,10 +120,24 @@ struct MapDirectionSheetFeature {
         state.originPlace = origin
         return .none
 
+      case let .destinationResolved(destCoord):
+        state.destination = SavedPlace(
+          id: state.destination.id,
+          name: state.destination.name,
+          subtitle: state.destination.subtitle,
+          iconName: state.destination.iconName,
+          distance: state.destination.distance,
+          coordinate: destCoord
+        )
+        return .none
+
       case let .routeCalculated(routeInfo):
         state.walkingRouteInfo = routeInfo
         state.activeRoute = routeInfo.route
         state.isCalculatingRoute = false
+        if let destCoord = routeInfo.route?.polyline.points() {
+          // coordinate is preserved on destination
+        }
         return .send(.delegate(.routeChanged(routeInfo.route)))
 
       case let .startNavigationTapped(currentLocation):
@@ -121,6 +152,7 @@ struct MapDirectionSheetFeature {
         let startTimeString = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .short)
 
         let startEntry = JourneyLogEntry(
+          id: uuid(),
           landmarkName: "Start Position",
           address: originAddress,
           timeString: startTimeString,
@@ -130,6 +162,7 @@ struct MapDirectionSheetFeature {
         )
 
         let currentEntry = JourneyLogEntry(
+          id: uuid(),
           landmarkName: "Near \(streetName)",
           address: originAddress,
           timeString: "Now",

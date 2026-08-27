@@ -8,10 +8,22 @@
 import ComposableArchitecture
 import Foundation
 
+struct GlossaryItem: Equatable, Identifiable {
+    let id = UUID()
+    let term: String
+    let definition: String
+}
+
+enum PageBody: Equatable {
+    case paragraph(String)
+    case glossary([GlossaryItem])
+}
+
 struct OnboardingContent: Equatable, Identifiable {
   let id = UUID()
   let title: String
-  let description: String
+//  let description: String
+    let body: PageBody
   let imageName: String
 }
 
@@ -20,21 +32,25 @@ struct OnboardingFeature {
   @ObservableState
   struct State: Equatable {
     var currentIndex = 0
+    var pendingDeepLink: DeepLink? = nil
     var contents: [OnboardingContent] = [
       OnboardingContent(
         title: "WalkGuard",
-        description: "Lorem ipsum dolor sit amet, aliqua sint ea consectetur. Consequat proident ea esse enim commodo adipiscing dolor. Adipiscing ut veniam in et dolor enim ad nostrud exercitation.",
+        body: .paragraph("Never feel alone. Trail keeps your trusted person updated in real time, so you can stay aware of your surroundings without checking your phone."),
         imageName: "figure.walk.motion"
       ),
       OnboardingContent(
         title: "Walker & Guardian",
-        description: "Lorem ipsum dolor sit amet, aliqua sint ea consectetur. Consequat proident ea esse enim commodo adipiscing dolor. Adipiscing ut veniam in et dolor enim ad nostrud exercitation.",
+        body: .glossary([
+            GlossaryItem(term: "Walker", definition: "The person commuting on foot. Your journey is shared through your iPhone or Apple Watch."),
+            GlossaryItem(term: "Companion", definition: "Your trusted person. You can assign your Companion in your profile so they can actively watch your journey and get notified when you arrive."),
+        ]),
         imageName: "person.3.fill"
       ),
       OnboardingContent(
-        title: "Setup",
-        description: "Lorem ipsum dolor sit amet, aliqua sint ea consectetur. Consequat proident ea esse enim commodo adipiscing dolor. Adipiscing ut veniam in et dolor enim ad nostrud exercitation.",
-        imageName: "person.crop.circle.fill.badge.plus"
+        title: "Default Place",
+        body: .paragraph("Add frequent stops like Home or Work to your profile. This helps Trail instantly recognize your usual routes without manual typing."),
+        imageName: "house.fill"
       )
     ]
   }

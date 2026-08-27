@@ -6,6 +6,7 @@
 //
 
 import ComposableArchitecture
+import Foundation
 
 @Reducer
 struct RootFeature {
@@ -19,6 +20,8 @@ struct RootFeature {
     case onboarding(OnboardingFeature.Action)
     case main(MainFeature.Action)
     case appDelegate(AppDelegateAction)
+    case openURL(URL)
+    case handleDeepLink(DeepLink)
 
     enum AppDelegateAction: Equatable {
       case didFinishLaunching
@@ -42,8 +45,47 @@ struct RootFeature {
         state = .main(MainFeature.State(userProfile: profile))
         return .none
 
+      case let .openURL(url):
+        guard let deepLink = DeepLink.parse(url: url) else { return .none }
+        return .send(.handleDeepLink(deepLink))
+
+      case let .handleDeepLink(deepLink):
+        switch deepLink {
+        case .alwaysHome:
+          switch state {
+          case .main:
+            return .send(.main(.map(.startAlwaysHomeNavigation)))
+          case var .onboarding(onboardingState):
+            onboardingState.pendingDeepLink = .alwaysHome
+            state = .onboarding(onboardingState)
+            return .none
+          }
+
+        case let .navigate(destination):
+          switch state {
+          case .main:
+            return .send(.main(.map(.startDirectNavigation(destinationQuery: destination))))
+          case var .onboarding(onboardingState):
+            onboardingState.pendingDeepLink = .navigate(destination: destination)
+            state = .onboarding(onboardingState)
+            return .none
+          }
+        }
+
       case let .onboarding(.delegate(.appleSignInCompleted(credential))):
+        let pending: DeepLink? = if case let .onboarding(onboardingState) = state { onboardingState.pendingDeepLink } else { nil }
         state = .main(MainFeature.State())
+        if case .alwaysHome = pending {
+          return .merge(
+            .send(.main(.login(.appleSignInCompleted(credential)))),
+            .send(.main(.map(.startAlwaysHomeNavigation)))
+          )
+        } else if case let .navigate(destination) = pending {
+          return .merge(
+            .send(.main(.login(.appleSignInCompleted(credential)))),
+            .send(.main(.map(.startDirectNavigation(destinationQuery: destination))))
+          )
+        }
         return .send(.main(.login(.appleSignInCompleted(credential))))
 
       case let .main(.login(.delegate(.loggedIn(profile)))):

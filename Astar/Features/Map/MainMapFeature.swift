@@ -41,12 +41,16 @@ struct MainMapFeature {
     case recenterTapped
     case delegate(Delegate)
     case locationManager(LocationManagerAction)
-    
+
     case searchTapped
     case selectPerson(Person)
-    
+
+    case startAlwaysHomeNavigation
+    case startDirectNavigation(destinationQuery: String)
+    case directNavigationReady(destination: SavedPlace, destCoord: CLLocationCoordinate2D, originCoord: CLLocationCoordinate2D, originAddress: String, routeInfo: WalkingRouteInfo)
+
     case updateTrackingLocation(CLLocationCoordinate2D)
-    
+
     case sheet(PresentationAction<MapSheetFeature.Action>)
 
     enum Delegate: Equatable {
@@ -62,6 +66,9 @@ struct MainMapFeature {
 
   @Dependency(\.locationManager) var locationManager
   @Dependency(\.trackingClient) var trackingClient
+  @Dependency(\.directionRoute) var directionRoute
+  @Dependency(\.uuid) var uuid
+  @Dependency(\.date.now) var now
 
   var body: some Reducer<State, Action> {
     Reduce { state, action in
@@ -138,9 +145,218 @@ struct MainMapFeature {
       case .searchTapped:
         state.sheet = .search(MapSearchSheetFeature.State(userLocation: state.currentLocation))
         return .none
-        
+
       case let .selectPerson(person):
         state.sheet = .walker(MapWalkerSheetFeature.State(walker: person, status: person.status))
+        return .none
+
+      case .startAlwaysHomeNavigation:
+        let homePlace = MapSampleData.savedPlaces.first(where: {
+          $0.name.caseInsensitiveCompare("Home") == .orderedSame
+        }) ?? SavedPlace(
+          id: uuid(),
+          name: "Home",
+          subtitle: "Bendungan Hilir, South Jakarta",
+          iconName: "house.fill",
+          coordinate: CLLocationCoordinate2D(latitude: -6.2125, longitude: 106.8166)
+        )
+
+        state.isFollowingUser = true
+        state.isNavigating = true
+
+        let defaultOrigin = SavedPlace(
+          id: uuid(),
+          name: "Current Location",
+          subtitle: "Locating current area...",
+          iconName: "location.fill",
+          coordinate: state.currentLocation
+        )
+
+        let directionState = MapDirectionSheetFeature.State(
+          destination: homePlace,
+          mode: .progress,
+          originPlace: defaultOrigin,
+          isCalculatingRoute: true,
+          isNavigating: true
+        )
+        state.sheet = .direction(directionState)
+
+        return .run { [homePlace] send in
+          let originCoord = await locationManager.getCurrentLocation()
+            ?? CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
+
+          async let originAddress = directionRoute.reverseGeocode(coordinate: originCoord)
+
+          var destCoord = homePlace.coordinate
+          if destCoord == nil {
+            let searchReq = MKLocalSearch.Request()
+            searchReq.naturalLanguageQuery = "Bendungan Hilir, Central Jakarta"
+            if let resp = try? await MKLocalSearch(request: searchReq).start(),
+               let firstItem = resp.mapItems.first {
+              destCoord = firstItem.placemark.coordinate
+            } else {
+              destCoord = CLLocationCoordinate2D(latitude: -6.2125, longitude: 106.8166)
+            }
+          }
+          let resolvedDest = destCoord ?? CLLocationCoordinate2D(latitude: -6.2125, longitude: 106.8166)
+
+          async let routeInfo = directionRoute.calculateWalkingRoute(origin: originCoord, destination: resolvedDest)
+
+          let (address, calculatedRoute) = await (originAddress, routeInfo)
+
+          await send(.directNavigationReady(
+            destination: homePlace,
+            destCoord: resolvedDest,
+            originCoord: originCoord,
+            originAddress: address,
+            routeInfo: calculatedRoute
+          ))
+        }
+
+      case let .startDirectNavigation(destinationQuery):
+        let cleanQuery = destinationQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lowerQuery = cleanQuery.lowercased()
+
+        let targetQuery: String
+        if lowerQuery == "office" || lowerQuery == "work" {
+          targetQuery = "Autograph Tower"
+        } else {
+          targetQuery = cleanQuery
+        }
+
+        let matchedPlace = MapSampleData.allSearchablePlaces.first(where: {
+          $0.name.caseInsensitiveCompare(targetQuery) == .orderedSame ||
+          $0.name.localizedCaseInsensitiveContains(targetQuery)
+        }) ?? MapSampleData.savedPlaces.first(where: {
+          $0.name.caseInsensitiveCompare(targetQuery) == .orderedSame
+        }) ?? SavedPlace(
+          name: targetQuery,
+          subtitle: "Jakarta, Indonesia",
+          iconName: "mappin.and.ellipse"
+        )
+
+        state.isFollowingUser = true
+        state.isNavigating = true
+
+        let defaultOrigin = SavedPlace(
+          id: uuid(),
+          name: "Current Location",
+          subtitle: "Locating current area...",
+          iconName: "location.fill",
+          coordinate: state.currentLocation
+        )
+
+        let directionState = MapDirectionSheetFeature.State(
+          destination: matchedPlace,
+          mode: .progress,
+          originPlace: defaultOrigin,
+          isCalculatingRoute: true,
+          isNavigating: true
+        )
+        state.sheet = .direction(directionState)
+
+        return .run { [matchedPlace] send in
+          let originCoord = await locationManager.getCurrentLocation()
+            ?? CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
+
+          async let originAddress = directionRoute.reverseGeocode(coordinate: originCoord)
+
+          var destCoord = matchedPlace.coordinate
+          if destCoord == nil {
+            let query: String
+            let lowerName = matchedPlace.name.lowercased()
+            if lowerName == "office" || lowerName == "work" || lowerName.contains("autograph") {
+              query = "Autograph Tower, Thamrin Nine, Central Jakarta"
+            } else if lowerName == "home" {
+              query = "Bendungan Hilir, Central Jakarta"
+            } else if lowerName == "gym" || lowerName.contains("agora") {
+              query = "Agora Mall, Thamrin Nine, Central Jakarta"
+            } else {
+              query = "\(matchedPlace.name) \(matchedPlace.subtitle)"
+            }
+
+            let searchReq = MKLocalSearch.Request()
+            searchReq.naturalLanguageQuery = query
+            if let resp = try? await MKLocalSearch(request: searchReq).start(),
+               let firstItem = resp.mapItems.first {
+              destCoord = firstItem.placemark.coordinate
+            } else {
+              destCoord = CLLocationCoordinate2D(latitude: -6.1991, longitude: 106.8212)
+            }
+          }
+          let resolvedDest = destCoord ?? CLLocationCoordinate2D(latitude: -6.1991, longitude: 106.8212)
+
+          async let routeInfo = directionRoute.calculateWalkingRoute(origin: originCoord, destination: resolvedDest)
+
+          let (address, calculatedRoute) = await (originAddress, routeInfo)
+
+          await send(.directNavigationReady(
+            destination: matchedPlace,
+            destCoord: resolvedDest,
+            originCoord: originCoord,
+            originAddress: address,
+            routeInfo: calculatedRoute
+          ))
+        }
+
+      case let .directNavigationReady(destination, destCoord, originCoord, originAddress, routeInfo):
+        state.currentLocation = originCoord
+        state.activeRoute = nil
+        let streetName = originAddress.components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces) ?? "Current Area"
+        let startTimeString = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .short)
+
+        let startEntry = JourneyLogEntry(
+          id: uuid(),
+          landmarkName: "Start Position",
+          address: originAddress,
+          timeString: startTimeString,
+          iconName: "figure.walk.motion",
+          entryType: .start,
+          coordinate: originCoord
+        )
+
+        let currentEntry = JourneyLogEntry(
+          id: uuid(),
+          landmarkName: "Near \(streetName)",
+          address: originAddress,
+          timeString: "Now",
+          iconName: "location.fill",
+          entryType: .currentLocation,
+          coordinate: originCoord
+        )
+
+        let updatedDest = SavedPlace(
+          id: destination.id,
+          name: destination.name,
+          subtitle: destination.subtitle,
+          iconName: destination.iconName,
+          distance: routeInfo.distanceString,
+          coordinate: destCoord
+        )
+
+        let originPlace = SavedPlace(
+          id: uuid(),
+          name: "Current Location",
+          subtitle: originAddress,
+          iconName: "location.fill",
+          coordinate: originCoord
+        )
+
+        let directionState = MapDirectionSheetFeature.State(
+          destination: updatedDest,
+          mode: .progress,
+          originPlace: originPlace,
+          activeRoute: nil,
+          walkingRouteInfo: routeInfo,
+          isCalculatingRoute: false,
+          isNavigating: true,
+          isDestinationReached: false,
+          journeyLogEntries: [currentEntry, startEntry]
+        )
+        state.sheet = .direction(directionState)
+        state.lastLoggedCoordinate = originCoord
+        state.lastLoggedStreet = streetName
+        state.lastLoggedIcon = "figure.walk"
         return .none
 
       case let .updateTrackingLocation(newCoord):
@@ -216,7 +432,7 @@ struct MainMapFeature {
             return .send(.sheet(.presented(.direction(.onAppear(currentLocation: currentLoc)))))
          }
          return .none
-         
+
       case let .sheet(.presented(.direction(.delegate(delegateAction)))):
          switch delegateAction {
          case let .routeChanged(route):
@@ -235,7 +451,7 @@ struct MainMapFeature {
             state.sheet = nil
             return .none
          }
-         
+
       case .sheet(.presented(.walker(.delegate(.dismissed)))):
          state.sheet = nil
          return .none
@@ -311,4 +527,3 @@ private enum LandmarkDetector {
     return (name: streetName, address: fullAddress, icon: "figure.walk")
   }
 }
-
