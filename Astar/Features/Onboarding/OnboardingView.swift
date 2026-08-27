@@ -31,17 +31,41 @@ struct OnboardingView: View {
               .font(.system(size: 64))
               .foregroundColor(.accentColor)
 
-            VStack(spacing: 8) {
+            VStack(spacing: 16) {
               Text(content.title)
                 .font(.title)
                 .fontWeight(.bold)
                 .multilineTextAlignment(.center)
 
-              Text(content.description)
-                .font(.caption)
-                .foregroundColor(.gray)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
+                
+                switch content.body {
+                case .paragraph(let text):
+                    Text(text)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                    
+                case .glossary(let items):
+                    VStack (spacing: 16) {
+                        ForEach(items) { item in
+                            HStack {
+                                Text(item.term)
+                                    .font(.caption)
+                                    .foregroundStyle(.primary)
+                                    .fontWeight(.medium)
+                                    .frame(width: 100, alignment: .leading)
+                                    .multilineTextAlignment(.leading)
+                                
+                                Text(item.definition)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.leading)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 32)
+                }
             }
           }
           .tag(index)
