@@ -13,11 +13,15 @@ struct Person: Identifiable, Equatable, Sendable {
     let id: UUID
     let name: String
     let status: String
+    var appleUserId: String?
+    var cloudKitUserId: String?
 
-    init(id: UUID = UUID(), name: String, status: String) {
+    init(id: UUID = UUID(), name: String, status: String, appleUserId: String? = nil, cloudKitUserId: String? = nil) {
         self.id = id
         self.name = name
         self.status = status
+        self.appleUserId = appleUserId
+        self.cloudKitUserId = cloudKitUserId
     }
 }
 

@@ -41,6 +41,7 @@ struct TrackingClient: Sendable {
     var subscribeToLocationPings: @Sendable (_ sessionID: String) async throws -> AsyncStream<LocationPing>
 
     var getWalkSession: @Sendable (_ sessionID: String) async throws -> WalkSession
+    var getWalkerActiveSessionID: @Sendable (_ walkerRecordID: String) async throws -> String?
 }
 
 extension TrackingClient: DependencyKey {
@@ -144,9 +145,70 @@ extension TrackingClient: DependencyKey {
             try await db.save(sessionRecord)
         },
         subscribeToLocationPings: { sessionID in
-            // Return an empty stream for now since subscriptions involve setting up CKQuerySubscription and handling notifications
-            return AsyncStream { continuation in
-                continuation.finish()
+            AsyncStream { (continuation: AsyncStream<LocationPing>.Continuation) in
+                let db = CKContainer.default().publicCloudDatabase
+
+                // We use pure polling so no CKQuerySubscription or Remote Notifications are needed.
+                let task = Task {
+                    // Try to fetch the session first to know its walkerRef
+                    var walkerRefStr: String? = nil
+                    do {
+                        let id = CKRecord.ID(recordName: sessionID)
+                        let record = try await db.record(for: id)
+                        walkerRefStr = (record["walkerRef"] as? CKRecord.Reference)?.recordID.recordName
+                    } catch {
+                        print("📡 [Polling] Failed to get session to determine walkerRef: \(error)")
+                    }
+
+                    while !Task.isCancelled {
+                        print("📡 [Polling] Getting pings for \(sessionID)")
+                        let query = CKQuery(recordType: "LocationPing", predicate: NSPredicate(value: true))
+                        // Removed sortDescriptors by creationDate to prevent "Field '___createTime' is not marked sortable" error
+
+                        do {
+                            let (matchResults, _) = try await db.records(matching: query)
+                            // Filter matches locally! (Inefficient for prod, but good for debug!)
+                            let sortedRecords = matchResults.compactMap { try? $0.1.get() }
+                                .filter { record in
+                                     if let ref = record["sessionRef"] as? CKRecord.Reference {
+                                         let refName = ref.recordID.recordName
+                                         if refName == sessionID { return true }
+                                         if let wRef = walkerRefStr, refName == wRef { return true }
+                                     }
+                                     return false
+                                }
+                                .sorted {
+                                    ($0.creationDate ?? Date.distantPast) > ($1.creationDate ?? Date.distantPast)
+                                }
+
+                            if let record = sortedRecords.first {
+                                if let encodedCoordinates = record["encodedCoordinates"] as? [Data],
+                                   let sessionRef = (record["sessionRef"] as? CKRecord.Reference)?.recordID.recordName {
+
+                                    let ping = LocationPing(
+                                        id: record.recordID.recordName,
+                                        sessionRef: sessionRef,
+                                        encodedCoordinates: encodedCoordinates,
+                                        recordedAt: record.creationDate ?? Date()
+                                    )
+                                    continuation.yield(ping)
+                                } else {
+                                    print("📡 [Polling] Record found but fields missing.")
+                                }
+                            }
+                        } catch {
+                            print("📡 [Polling] error: \(error)")
+                        }
+
+                        try? await Task.sleep(nanoseconds: 3_000_000_000) // Poll every 3 seconds
+                    }
+                    print("📡 [Polling] Task cancelled loop exit.")
+                }
+
+                continuation.onTermination = { @Sendable _ in
+                    print("📡 [Polling] Stream terminated/cancelled.")
+                    task.cancel()
+                }
             }
         },
         getWalkSession: { sessionID in
@@ -167,6 +229,12 @@ extension TrackingClient: DependencyKey {
                 endedAt: record["endedAt"] as? Date,
                 lastPingAt: record["lastPingAt"] as? Date ?? Date()
             )
+        },
+        getWalkerActiveSessionID: { walkerRecordID in
+            let db = CKContainer.default().publicCloudDatabase
+            let id = CKRecord.ID(recordName: walkerRecordID)
+            let record = try await db.record(for: id)
+            return (record["activeWalkSessionRef"] as? CKRecord.Reference)?.recordID.recordName
         }
     )
 }

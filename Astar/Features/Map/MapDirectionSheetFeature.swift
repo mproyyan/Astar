@@ -47,7 +47,7 @@ struct MapDirectionSheetFeature {
     
     enum Delegate: Equatable {
       case routeChanged(MKRoute?)
-      case navigationStarted
+      case navigationStarted(sessionID: String?)
       case navigationEnded
     }
   }
@@ -188,13 +188,17 @@ struct MapDirectionSheetFeature {
 
                     // Update user status
                     try await trackingClient.updateUserStatus(userRecordID, "walking", session.id, nil)
+
+                    await send(.delegate(.routeChanged(nil)))
+                    await send(.delegate(.navigationStarted(sessionID: session.id)))
+                    return
                 } catch {
                     // Suppress error for now in UI based on design, but it will fail silently if cloudkit dies
                 }
             }
 
             await send(.delegate(.routeChanged(nil)))
-            await send(.delegate(.navigationStarted))
+            await send(.delegate(.navigationStarted(sessionID: nil)))
         }
 
       case .endJourneyTapped, .cancelDirectionsTapped:

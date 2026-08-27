@@ -178,6 +178,9 @@ struct MapSheet: View {
                                         selectedDetent = .fraction(0.42)
                                     }
                                 },
+                                onTrack: {
+                                    walkerStore.send(.trackTapped)
+                                },
                                 onExitTrack: {
                                     walkerStore.send(.exitTrackTapped)
                                     withAnimation(.easeInOut(duration: 0.25)) {

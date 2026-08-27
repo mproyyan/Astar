@@ -10,6 +10,7 @@ import ComposableArchitecture
 
 @main
 struct AstarApp: App {
+  @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
   let store: StoreOf<RootFeature>
 
   init() {

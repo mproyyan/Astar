@@ -12,6 +12,8 @@ struct MapDirectionSheetFeatureTests {
     let dest = SavedPlace(name: "Dest", subtitle: "Sub", iconName: "star", coordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0))
     let store = TestStore(initialState: MapDirectionSheetFeature.State(destination: dest)) {
       MapDirectionSheetFeature()
+    } withDependencies: {
+      $0.trackingClient = .testValue
     }
 
     await store.send(.cancelDirectionsTapped)
@@ -27,6 +29,7 @@ struct MapDirectionSheetFeatureTests {
       MapDirectionSheetFeature()
     } withDependencies: {
       $0.uuid = .incrementing
+      $0.trackingClient = .testValue
     }
 
     await store.send(.startNavigationTapped(currentLocation: coord)) {
@@ -58,6 +61,6 @@ struct MapDirectionSheetFeatureTests {
       $0.journeyLogEntries = [currentEntry, startEntry]
     }
     await store.receive(.delegate(.routeChanged(nil)))
-    await store.receive(.delegate(.navigationStarted))
+    await store.receive(.delegate(.navigationStarted(sessionID: nil)))
   }
 }
