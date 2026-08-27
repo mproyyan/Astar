@@ -21,6 +21,7 @@ struct UserProfile: Codable, Equatable, Sendable {
   let cloudKitUserId: String
   let name: String
   let email: String
+  var status: String?
 }
 
 struct LoginError: Error, Equatable, Sendable {
@@ -149,7 +150,8 @@ private func upsertUserProfile(with credential: AppleSignInCredential) async thr
     appleUserId: credential.appleUserId,
     cloudKitUserId: cloudKitUserId,
     name: name,
-    email: email
+    email: email,
+    status: existingRecord?["Status"] as? String
   )
 }
 

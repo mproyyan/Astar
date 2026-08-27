@@ -15,7 +15,7 @@ struct MapSheetMainContent: View {
     var onSelectPlace: ((SavedPlace) -> Void)? = nil
     var onSelectPerson: ((Person) -> Void)? = nil
 
-    private let people = MapSampleData.people
+    private var people: [Person] { store.people }
     private let savedPlaces = MapSampleData.savedPlaces
 
     var body: some View {

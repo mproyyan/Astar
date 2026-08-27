@@ -53,6 +53,7 @@ struct MapDirectionSheetFeature {
   }
 
   @Dependency(\.directionRoute) var directionRoute
+  @Dependency(\.trackingClient) var trackingClient
   @Dependency(\.uuid) var uuid
 
   var body: some Reducer<State, Action> {
@@ -171,13 +172,44 @@ struct MapDirectionSheetFeature {
         )
 
         state.journeyLogEntries = [currentEntry, startEntry]
-        return .merge(
-          .send(.delegate(.routeChanged(nil))),
-          .send(.delegate(.navigationStarted))
-        )
+
+        let destinationCopy = state.destination
+        return .run { send in
+            // Call TrackingClient to start WalkSession
+            if let userProfile = UserProfileStorage.load() {
+                let userRecordID = "UserProfile_\(userProfile.appleUserId)_\(userProfile.cloudKitUserId)"
+                  .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+
+                let destLat = destinationCopy.coordinate?.latitude ?? -6.2088
+                let destLon = destinationCopy.coordinate?.longitude ?? 106.8456
+
+                do {
+                    let session = try await trackingClient.startWalkSession(userRecordID, destinationCopy.name, destLat, destLon, nil)
+
+                    // Update user status
+                    try await trackingClient.updateUserStatus(userRecordID, "walking", session.id, nil)
+                } catch {
+                    // Suppress error for now in UI based on design, but it will fail silently if cloudkit dies
+                }
+            }
+
+            await send(.delegate(.routeChanged(nil)))
+            await send(.delegate(.navigationStarted))
+        }
 
       case .endJourneyTapped, .cancelDirectionsTapped:
-        return .send(.delegate(.navigationEnded))
+        return .run { send in
+            if let userProfile = UserProfileStorage.load() {
+                let userRecordID = "UserProfile_\(userProfile.appleUserId)_\(userProfile.cloudKitUserId)"
+                  .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+
+                do {
+                    // Revert status to Idle
+                    try await trackingClient.updateUserStatus(userRecordID, "idle", nil, nil)
+                } catch { }
+            }
+            await send(.delegate(.navigationEnded))
+        }
 
       case .journeyLogTapped:
         state.mode = .journeyLog
