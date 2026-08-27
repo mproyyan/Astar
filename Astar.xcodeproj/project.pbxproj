@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		A640BB71303BDF850064EB80 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = A640BB70303BDF850064EB80 /* ComposableArchitecture */; };
-		A640BB74303BDF8E0064EB80 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = A640BB73303BDF8E0064EB80 /* ComposableArchitecture */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -67,7 +66,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A640BB74303BDF8E0064EB80 /* ComposableArchitecture in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -155,7 +153,6 @@
 			);
 			name = AstarTests;
 			packageProductDependencies = (
-				A640BB73303BDF8E0064EB80 /* ComposableArchitecture */,
 			);
 			productName = AstarTests;
 			productReference = A6DE5307303BDE3000940469 /* AstarTests.xctest */;
@@ -421,9 +418,11 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Astar/Astar.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = L6M39L4GV8;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = L6M39L4GV8;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Astar-Info.plist";
@@ -441,6 +440,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.astar.trail;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = ASTAR_DEV_PROFILE;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -458,9 +458,11 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Astar/Astar.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = L6M39L4GV8;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = L6M39L4GV8;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Astar-Info.plist";
@@ -478,6 +480,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.astar.trail;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = ASTAR_DEV_PROFILE;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -626,11 +629,6 @@
 
 /* Begin XCSwiftPackageProductDependency section */
 		A640BB70303BDF850064EB80 /* ComposableArchitecture */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = A640BB6F303BDF850064EB80 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */;
-			productName = ComposableArchitecture;
-		};
-		A640BB73303BDF8E0064EB80 /* ComposableArchitecture */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = A640BB6F303BDF850064EB80 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */;
 			productName = ComposableArchitecture;

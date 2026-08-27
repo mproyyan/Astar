@@ -44,6 +44,10 @@ Carthage/Build/
 # AccuRev
 .accurev/
 
+# Agents
+.agents
+skills-lock.json
+
 # Fastlane
 #
 # It is recommended to not store fastlane log files in a repository.
