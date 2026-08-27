@@ -108,6 +108,7 @@ struct MainScreenMapView: View {
       }
       .task {
         store.send(.map(.onAppear))
+        store.send(.onAppear)
       }
       .onChange(of: store.map.currentLocation) { _, newLocation in
         guard let coordinate = newLocation, !hasCenteredOnUserLocation else { return }
