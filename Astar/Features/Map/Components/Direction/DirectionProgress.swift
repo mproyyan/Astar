@@ -22,6 +22,7 @@ struct DirectionProgress: View {
     ]
 
     var isDone: Bool = false
+    var isLoading: Bool = false
 
     var onJourneyLog: (() -> Void)? = nil
     var onEndJourney: (() -> Void)? = nil
@@ -50,6 +51,28 @@ struct DirectionProgress: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.top, 8)
+                    } else if isLoading {
+                        HStack {
+                            Text("Calculating...")
+                                .font(.title3.weight(.semibold))
+                                .foregroundStyle(.secondary)
+
+                            Spacer()
+
+                            HStack(spacing: 6) {
+                                Text("--.-- ETA")
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
+
+                                Circle()
+                                    .fill(Color.secondary.opacity(0.6))
+                                    .frame(width: 4, height: 4)
+
+                                Text("-- km")
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                     } else {
                         HStack {
                             Text(estimatedTime)

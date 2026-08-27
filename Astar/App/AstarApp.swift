@@ -13,7 +13,20 @@ struct AstarApp: App {
   let store: StoreOf<RootFeature>
 
   init() {
-    self.store = Store(initialState: .onboarding(OnboardingFeature.State())) {
+    let initial: RootFeature.State
+    if let profile = UserProfileStorage.load() {
+      initial = .main(MainFeature.State(userProfile: profile))
+    } else {
+      let defaultProfile = UserProfile(
+        appleUserId: "user-1",
+        cloudKitUserId: "ck-1",
+        name: "Awan",
+        email: "awan@example.com"
+      )
+      UserProfileStorage.save(defaultProfile)
+      initial = .main(MainFeature.State(userProfile: defaultProfile))
+    }
+    self.store = Store(initialState: initial) {
       RootFeature()
     }
   }
@@ -23,6 +36,19 @@ struct AstarApp: App {
       ContentView(store: store)
         .onAppear {
           store.send(.appDelegate(.didFinishLaunching))
+        }
+        .onOpenURL { url in
+          store.send(.openURL(url))
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .startAlwaysHomeNavigation)) { _ in
+          store.send(.handleDeepLink(.alwaysHome))
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .startDirectNavigation)) { notification in
+          if let dest = notification.userInfo?["destination"] as? String, !dest.isEmpty {
+            store.send(.handleDeepLink(.navigate(destination: dest)))
+          } else {
+            store.send(.handleDeepLink(.alwaysHome))
+          }
         }
     }
   }

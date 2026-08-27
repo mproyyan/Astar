@@ -9,6 +9,7 @@ struct LocationManagerClient {
   var requestLocation: () async -> Void
   var locationUpdates: () async -> AsyncStream<CLLocationCoordinate2D> = { .finished }
   var errorUpdates: () async -> AsyncStream<Error> = { .finished }
+  var getCurrentLocation: () async -> CLLocationCoordinate2D? = { nil }
 }
 
 extension LocationManagerClient: DependencyKey {
@@ -32,6 +33,9 @@ extension LocationManagerClient: DependencyKey {
       },
       errorUpdates: {
         await MainActor.run { managerActor.errorStream() }
+      },
+      getCurrentLocation: {
+        await managerActor.getCurrentLocation()
       }
     )
   }
@@ -94,6 +98,17 @@ final class LocationManagerActor: NSObject, CLLocationManagerDelegate {
       manager.requestLocation()
       manager.startUpdatingLocation()
     }
+  }
+
+  func getCurrentLocation() async -> CLLocationCoordinate2D? {
+    if let location = self.manager.location?.coordinate {
+      return location
+    }
+    requestLocation()
+    for await coordinate in locationStream() {
+      return coordinate
+    }
+    return nil
   }
 
   func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {

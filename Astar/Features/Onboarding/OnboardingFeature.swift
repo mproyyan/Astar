@@ -32,6 +32,7 @@ struct OnboardingFeature {
   @ObservableState
   struct State: Equatable {
     var currentIndex = 0
+    var pendingDeepLink: DeepLink? = nil
     var contents: [OnboardingContent] = [
       OnboardingContent(
         title: "WalkGuard",
