@@ -1,0 +1,132 @@
+import Foundation
+import CoreLocation
+import MapKit
+import ComposableArchitecture
+
+struct WalkingRouteInfo: Equatable, Sendable {
+  var travelTimeString: String
+  var etaString: String
+  var distanceString: String
+  var rawTravelTime: TimeInterval
+  var rawDistanceMeters: Double
+  var route: MKRoute?
+}
+
+@DependencyClient
+struct DirectionRouteClient: Sendable {
+  var reverseGeocode: @Sendable (_ coordinate: CLLocationCoordinate2D) async -> String = { _ in "Current Location" }
+  var calculateWalkingRoute: @Sendable (_ origin: CLLocationCoordinate2D, _ destination: CLLocationCoordinate2D) async -> WalkingRouteInfo = { _, _ in
+    WalkingRouteInfo(travelTimeString: "12 min", etaString: "11.00 ETA", distanceString: "850 m", rawTravelTime: 720, rawDistanceMeters: 850, route: nil)
+  }
+}
+
+extension DirectionRouteClient: DependencyKey {
+  static let liveValue = Self(
+    reverseGeocode: { coordinate in
+      await DirectionRouteEngine.reverseGeocode(coordinate: coordinate)
+    },
+    calculateWalkingRoute: { origin, destination in
+      await DirectionRouteEngine.calculateWalkingRoute(from: origin, to: destination)
+    }
+  )
+  static let testValue = Self()
+}
+
+extension DependencyValues {
+  var directionRoute: DirectionRouteClient {
+    get { self[DirectionRouteClient.self] }
+    set { self[DirectionRouteClient.self] = newValue }
+  }
+}
+
+@MainActor
+private enum DirectionRouteEngine {
+  static func reverseGeocode(coordinate: CLLocationCoordinate2D) async -> String {
+    let geocoder = CLGeocoder()
+    let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+
+    do {
+      let placemarks = try await geocoder.reverseGeocodeLocation(location)
+      guard let placemark = placemarks.first else {
+        return "Current Location"
+      }
+      let components = [
+        placemark.thoroughfare ?? placemark.subThoroughfare,
+        placemark.subLocality ?? placemark.locality,
+        placemark.administrativeArea
+      ].compactMap { $0 }.filter { !$0.isEmpty }
+
+      return components.isEmpty ? (placemark.name ?? "Central Jakarta") : components.joined(separator: ", ")
+    } catch {
+      return "Central Jakarta, Indonesia"
+    }
+  }
+
+  static func calculateWalkingRoute(
+    from origin: CLLocationCoordinate2D,
+    to destination: CLLocationCoordinate2D
+  ) async -> WalkingRouteInfo {
+    let request = MKDirections.Request()
+    request.source = MKMapItem(placemark: MKPlacemark(coordinate: origin))
+    request.destination = MKMapItem(placemark: MKPlacemark(coordinate: destination))
+    request.transportType = .walking
+
+    do {
+      let directions = MKDirections(request: request)
+      let response = try await directions.calculate()
+      if let route = response.routes.first {
+        return formatRouteInfo(
+          travelTime: route.expectedTravelTime,
+          distanceMeters: route.distance,
+          route: route
+        )
+      }
+    } catch {
+      // Fallback
+    }
+
+    let originCL = CLLocation(latitude: origin.latitude, longitude: origin.longitude)
+    let destCL = CLLocation(latitude: destination.latitude, longitude: destination.longitude)
+    let dist = originCL.distance(from: destCL)
+    let estTime = (dist * 1.25) / 1.25
+
+    return formatRouteInfo(travelTime: estTime, distanceMeters: dist, route: nil)
+  }
+
+  private static func formatRouteInfo(
+    travelTime: TimeInterval,
+    distanceMeters: Double,
+    route: MKRoute?
+  ) -> WalkingRouteInfo {
+    let minutes = Int(ceil(travelTime / 60.0))
+    let timeString: String
+    if minutes < 60 {
+      timeString = "\(max(1, minutes)) min"
+    } else {
+      let hrs = minutes / 60
+      let remMins = minutes % 60
+      timeString = "\(hrs) hr\(hrs > 1 ? "s" : "") \(remMins) min"
+    }
+
+    let etaDate = Date().addingTimeInterval(travelTime)
+    let formatter = DateFormatter()
+    formatter.dateFormat = "HH.mm"
+    let etaString = "\(formatter.string(from: etaDate)) ETA"
+
+    let distanceString: String
+    if distanceMeters < 1000 {
+      distanceString = "\(Int(distanceMeters)) m"
+    } else {
+      distanceString = String(format: "%.1f km", distanceMeters / 1000.0)
+    }
+
+    return WalkingRouteInfo(
+      travelTimeString: timeString,
+      etaString: etaString,
+      distanceString: distanceString,
+      rawTravelTime: travelTime,
+      rawDistanceMeters: distanceMeters,
+      route: route
+    )
+  }
+}
