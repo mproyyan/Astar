@@ -23,7 +23,7 @@ struct WalkerCardRoute: View {
                 // Origin Row
                 HStack(spacing: 12) {
                     Circle()
-                        .fill(Color(red: 0.85, green: 0.72, blue: 0.65))
+                        .fill(originIconName == "location.fill" ? Color.blue : Color(red: 0.85, green: 0.72, blue: 0.65))
                         .overlay {
                             Image(systemName: originIconName)
                                 .font(.caption.weight(.bold))

@@ -34,5 +34,7 @@ struct MapSearchSheetFeatureTests {
       $0.searchResults = []
       $0.isLoading = false
     }
+
+    await store.receive(.delegate(.dismissed))
   }
 }

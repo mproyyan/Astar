@@ -24,6 +24,8 @@ struct MapSheetSearchContent: View {
                 )
 
                 CancelSearchButton {
+                    isSearchFieldFocused = false
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                     store.send(.clearSearchTapped)
                     withAnimation(.easeInOut(duration: 0.25)) {
                         selectedDetent = .fraction(0.42)
@@ -31,6 +33,19 @@ struct MapSheetSearchContent: View {
                 }
             }
             .padding(.top, 8)
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 20)
+                    .onEnded { value in
+                        if value.translation.height > 50 && abs(value.translation.height) > abs(value.translation.width) {
+                            isSearchFieldFocused = false
+                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                            store.send(.clearSearchTapped)
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                selectedDetent = .fraction(0.42)
+                            }
+                        }
+                    }
+            )
 
             if store.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 SavedPlacesCard(

@@ -26,6 +26,7 @@ struct MapSheet: View {
                             }
                         }
                     )
+                    .transition(.opacity)
                     
                 case let .direction(directionStore):
                     switch directionStore.mode {
@@ -54,6 +55,7 @@ struct MapSheet: View {
                             totalDistance: directionStore.walkingRouteInfo?.distanceString ?? directionStore.destination.distance ?? "850 m",
                             isDone: directionStore.isDestinationReached,
                             isLoading: directionStore.isCalculatingRoute,
+                            isDevelopmentMode: directionStore.isDevelopmentMode,
                             onJourneyLog: {
                                 directionStore.send(.journeyLogTapped)
                                 withAnimation(.easeInOut(duration: 0.25)) {
@@ -71,6 +73,9 @@ struct MapSheet: View {
                                 withAnimation(.easeInOut(duration: 0.25)) {
                                     selectedDetent = .fraction(0.42)
                                 }
+                            },
+                            onSimulateArrival: {
+                                directionStore.send(.simulateArrivalTapped)
                             }
                         )
                         .padding(.horizontal, 16)
@@ -101,7 +106,54 @@ struct MapSheet: View {
                     }
 
                 case let .walker(walkerStore):
-                    if walkerStore.status == "Idle" {
+                    if walkerStore.isViewingJourneyLog {
+                        DirectionJourneyLog(
+                            destinationName: walkerStore.destinationPlaceName,
+                            isDone: true,
+                            entries: walkerStore.journeyLogEntries.isEmpty ? nil : walkerStore.journeyLogEntries,
+                            onDismiss: {
+                                walkerStore.send(.dismissJourneyLogTapped)
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    selectedDetent = .fraction(0.42)
+                                }
+                            },
+                            onChecklistTapped: {
+                                walkerStore.send(.dismissJourneyLogTapped)
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    selectedDetent = .fraction(0.42)
+                                }
+                            }
+                        )
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                        .transition(.opacity)
+                    } else if walkerStore.isDestinationReached {
+                        WalkerCardReachDestination(
+                            walkerName: walkerStore.walker.name == "Awan" ? "\(walkerStore.walker.name) Mendung" : walkerStore.walker.name,
+                            avatarImageName: walkerStore.walker.name == "Awan" ? "AwanAvatar" : "\(walkerStore.walker.name)Avatar",
+                            onDismiss: {
+                                walkerStore.send(.dismissWalkerTapped)
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    selectedDetent = .fraction(0.42)
+                                }
+                            },
+                            onJourneyLog: {
+                                walkerStore.send(.journeyLogTapped)
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    selectedDetent = .large
+                                }
+                            },
+                            onDone: {
+                                walkerStore.send(.dismissWalkerTapped)
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    selectedDetent = .fraction(0.42)
+                                }
+                            }
+                        )
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                        .transition(.opacity)
+                    } else if walkerStore.status.caseInsensitiveCompare("Idle") == .orderedSame {
                         if let trip = walkerStore.selectedHistoryTrip {
                             WalkerCardHistoryDetail(
                                 trip: trip,
@@ -114,6 +166,7 @@ struct MapSheet: View {
                             .transition(.opacity)
                         } else if walkerStore.isViewingHistoryList {
                             WalkerCardHistoryList(
+                                sections: [WalkerHistorySection(title: "Recent", trips: walkerStore.trips)],
                                 onDismiss: {
                                     walkerStore.send(.dismissHistoryListTapped)
                                 },
@@ -127,7 +180,8 @@ struct MapSheet: View {
                         } else {
                             WalkerCardIdle(
                                 name: walkerStore.walker.name,
-                                email: "awanmendung@icloud.com",
+                                email: walkerStore.walker.name == "Doe" ? "doe@icloud.com" : "awanmendung@icloud.com",
+                                trips: walkerStore.trips,
                                 onDismiss: {
                                     walkerStore.send(.dismissWalkerTapped)
                                     withAnimation(.easeInOut(duration: 0.25)) {
@@ -146,21 +200,6 @@ struct MapSheet: View {
                             .transition(.opacity)
                         }
                     } else {
-                        if walkerStore.isDestinationReached {
-                            WalkerCardReachDestination(
-                                walkerName: "\(walkerStore.walker.name) Mendung",
-                                avatarImageName: "AwanAvatar",
-                                onDismiss: {
-                                    walkerStore.send(.dismissWalkerTapped)
-                                    withAnimation(.easeInOut(duration: 0.25)) {
-                                        selectedDetent = .fraction(0.42)
-                                    }
-                                }
-                            )
-                            .padding(.horizontal, 16)
-                            .padding(.top, 12)
-                            .transition(.opacity)
-                        } else {
                             WalkerCardWalking(
                                 walker: WalkerProfile(
                                     name: walkerStore.walker.name,
@@ -170,8 +209,9 @@ struct MapSheet: View {
                                     originIconName: walkerStore.originIconName,
                                     destinationPlaceName: walkerStore.destinationPlaceName,
                                     destinationIconName: walkerStore.destinationIconName,
-                                    recentLocations: WalkerSampleData.awanLocations
+                                    recentLocations: walkerStore.journeyLogEntries.isEmpty ? WalkerSampleData.awanLocations : walkerStore.journeyLogEntries
                                 ),
+                                initialTracked: walkerStore.activeParticipantID != nil,
                                 onDismiss: {
                                     walkerStore.send(.dismissWalkerTapped)
                                     withAnimation(.easeInOut(duration: 0.25)) {
@@ -194,10 +234,10 @@ struct MapSheet: View {
                                     }
                                 }
                             )
+                            .id(walkerStore.activeParticipantID != nil)
                             .padding(.horizontal, 16)
                             .padding(.top, 12)
                             .transition(.opacity)
-                        }
                     }
                 }
             } else {
@@ -224,5 +264,6 @@ struct MapSheet: View {
                 .transition(.opacity)
             }
         }
+        .scrollDismissesKeyboard(.interactively)
     }
 }

@@ -14,19 +14,34 @@ struct MainFeature {
     var map: MainMapFeature.State = .init()
     var path = StackState<Path.State>()
     var people: [Person] = []
+    var isDevelopmentMode: Bool = DeveloperSettingsStorage.isDevelopmentMode
+    var isShowRouteGuide: Bool = DeveloperSettingsStorage.isShowRouteGuide
+    var isDoeWalkingMock: Bool = DeveloperSettingsStorage.isDoeWalkingMockEnabled
 
     init(userProfile: UserProfile? = nil) {
       self.login = LoginFeature.State(userProfile: userProfile)
+      let devMode = DeveloperSettingsStorage.isDevelopmentMode
+      self.isDevelopmentMode = devMode
+      let routeGuide = DeveloperSettingsStorage.isShowRouteGuide
+      self.isShowRouteGuide = routeGuide
+      self.map.isShowRouteGuide = routeGuide
+      let doeWalking = DeveloperSettingsStorage.isDoeWalkingMockEnabled
+      self.isDoeWalkingMock = doeWalking
+      if devMode {
+        self.people = [Person.mockDoe]
+      } else {
+        self.people = []
+      }
     }
   }
 
   enum Action: Equatable {
     case onAppear
     case fetchPeopleResponse(Result<[Person], FetchUsersError>)
+    case profileButtonTapped
     case login(LoginFeature.Action)
     case map(MainMapFeature.Action)
     case path(StackActionOf<Path>)
-    case profileButtonTapped
   }
 
   @Dependency(\.usersClient) var usersClient
@@ -56,25 +71,106 @@ struct MainFeature {
         } // We ignore errors for now, or you can add error handling
 
       case let .fetchPeopleResponse(.success(people)):
-        state.people = people
+        if state.isDevelopmentMode {
+          state.people = [Person.mockDoe] + people
+        } else {
+          state.people = people
+        }
         return .none
 
       case .fetchPeopleResponse(.failure):
+        if state.isDevelopmentMode {
+          state.people = [Person.mockDoe]
+        } else {
+          state.people = []
+        }
         return .none
 
       case .profileButtonTapped:
-        let profileState = ProfileFeature.State(userProfile: state.login.userProfile)
+        let profileState = ProfileFeature.State(
+          userProfile: state.login.userProfile,
+          isDevelopmentMode: state.isDevelopmentMode,
+          isShowRouteGuide: state.isShowRouteGuide,
+          isDoeWalkingMock: state.isDoeWalkingMock
+        )
         state.path.append(.profile(profileState))
         return .none
+
+      case let .path(.element(id: _, action: .profile(.delegate(.developmentModeChanged(isEnabled))))):
+        state.isDevelopmentMode = isEnabled
+        if isEnabled {
+          if !state.people.contains(where: { $0.id == Person.mockDoeID }) {
+            state.people.insert(Person.mockDoe, at: 0)
+          }
+        } else {
+          state.people.removeAll(where: { $0.id == Person.mockDoeID })
+        }
+        return .none
+
+      case let .path(.element(id: _, action: .profile(.delegate(.routeGuideChanged(isEnabled))))):
+        state.isShowRouteGuide = isEnabled
+        state.map.isShowRouteGuide = isEnabled
+        return .none
+
+      case let .path(.element(id: _, action: .profile(.delegate(.doeWalkingMockChanged(isEnabled))))):
+        state.isDoeWalkingMock = isEnabled
+        if state.isDevelopmentMode {
+          let newStatus = isEnabled ? "Walking" : "Idle"
+          if let idx = state.people.firstIndex(where: { $0.id == Person.mockDoeID }) {
+            state.people[idx] = Person(id: Person.mockDoeID, name: "Doe", status: newStatus)
+          } else {
+            state.people.insert(Person(id: Person.mockDoeID, name: "Doe", status: newStatus), at: 0)
+          }
+        }
+        return .none
+
+      case .path(.element(id: _, action: .profile(.delegate(.restartDoeWalkingSimulation)))):
+        state.isDoeWalkingMock = true
+        if let idx = state.people.firstIndex(where: { $0.id == Person.mockDoeID }) {
+          state.people[idx] = Person(id: Person.mockDoeID, name: "Doe", status: "Walking")
+        }
+        return .send(.map(.resetDoeWalking))
 
       case .path(.element(id: _, action: .profile(.delegate(.signedOut)))):
         return .send(.login(.signOutButtonTapped))
         
       case let .login(.delegate(.loggedIn(user))):
-        // If they log in, fetch the people to refresh logic
         return .send(.onAppear)
         
       case .login:
+        return .none
+
+      case let .map(.delegate(.walkerStatusChanged(id, newStatus))):
+        if let idx = state.people.firstIndex(where: { $0.id == id }) {
+          let person = state.people[idx]
+          state.people[idx] = Person(
+            id: person.id,
+            name: person.name,
+            status: newStatus,
+            appleUserId: person.appleUserId,
+            cloudKitUserId: person.cloudKitUserId
+          )
+        }
+        return .none
+
+      case let .map(.delegate(.companionStatusChanged(newStatus))):
+        state.login.userProfile?.status = newStatus
+        if var profile = UserProfileStorage.load() {
+          profile.status = newStatus
+          UserProfileStorage.save(profile)
+        }
+        for i in 0..<state.people.count {
+          if state.people[i].status.caseInsensitiveCompare("accompany") == .orderedSame {
+            let p = state.people[i]
+            state.people[i] = Person(
+              id: p.id,
+              name: p.name,
+              status: "Idle",
+              appleUserId: p.appleUserId,
+              cloudKitUserId: p.cloudKitUserId
+            )
+          }
+        }
         return .none
 
       case .map:

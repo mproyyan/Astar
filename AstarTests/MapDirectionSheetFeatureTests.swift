@@ -13,7 +13,7 @@ struct MapDirectionSheetFeatureTests {
     let store = TestStore(initialState: MapDirectionSheetFeature.State(destination: dest)) {
       MapDirectionSheetFeature()
     } withDependencies: {
-      $0.trackingClient = .testValue
+      $0.trackingClient.updateUserStatus = { _, _, _, _ in }
     }
 
     await store.send(.cancelDirectionsTapped)
@@ -29,13 +29,26 @@ struct MapDirectionSheetFeatureTests {
       MapDirectionSheetFeature()
     } withDependencies: {
       $0.uuid = .incrementing
-      $0.trackingClient = .testValue
+      $0.trackingClient.startWalkSession = { _, _, _, _, _ in
+        WalkSession(
+          id: "session-1",
+          walkerRef: "ref",
+          status: "active",
+          destinationName: "Dest",
+          destinationLatitude: 0,
+          destinationLongitude: 0,
+          routePolyline: nil,
+          startedAt: Date(timeIntervalSince1970: 0),
+          endedAt: nil,
+          lastPingAt: Date(timeIntervalSince1970: 0)
+        )
+      }
+      $0.trackingClient.updateUserStatus = { _, _, _, _ in }
     }
 
     await store.send(.startNavigationTapped(currentLocation: coord)) {
       $0.isNavigating = true
       $0.isDestinationReached = false
-      $0.activeRoute = nil
       $0.mode = .progress
       let originAddress = "Current Location"
       let streetName = "Current Location"
@@ -60,7 +73,46 @@ struct MapDirectionSheetFeatureTests {
       )
       $0.journeyLogEntries = [currentEntry, startEntry]
     }
-    await store.receive(.delegate(.routeChanged(nil)))
-    await store.receive(.delegate(.navigationStarted(sessionID: nil)))
+    if UserProfileStorage.load() != nil {
+      await store.receive(.delegate(.navigationStarted(sessionID: "session-1")))
+    } else {
+      await store.receive(.delegate(.navigationStarted(sessionID: nil)))
+    }
+  }
+
+  @Test
+  @MainActor
+  func testSimulateArrivalTapped() async {
+    let dest = SavedPlace(name: "Home", subtitle: "123 Main St", iconName: "house.fill", coordinate: CLLocationCoordinate2D(latitude: -6.2, longitude: 106.8))
+    let store = TestStore(initialState: MapDirectionSheetFeature.State(destination: dest, mode: .progress)) {
+      MapDirectionSheetFeature()
+    } withDependencies: {
+      $0.uuid = .incrementing
+      $0.trackingClient.updateUserStatus = { _, _, _, _ in }
+    }
+
+    await store.send(.simulateArrivalTapped) {
+      $0.isDestinationReached = true
+      let timeString = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .short)
+      let destEntry = JourneyLogEntry(
+        id: UUID(0),
+        landmarkName: "Destination: Home",
+        address: "123 Main St",
+        timeString: timeString,
+        iconName: "house.fill",
+        entryType: .destination,
+        coordinate: dest.coordinate
+      )
+      let intermediateEntry = JourneyLogEntry(
+        id: UUID(1),
+        landmarkName: "Passed Jl. M.H. Thamrin",
+        address: "Central Jakarta",
+        timeString: timeString,
+        iconName: "figure.walk",
+        entryType: .checkpoint,
+        coordinate: nil
+      )
+      $0.journeyLogEntries = [destEntry, intermediateEntry]
+    }
   }
 }

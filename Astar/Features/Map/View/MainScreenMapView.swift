@@ -75,7 +75,12 @@ struct MainScreenMapView: View {
           store: store,
           selectedDetent: $selectedDetent
         )
-        .presentationDetents([.fraction(0.1), .fraction(0.35), .fraction(0.42), .fraction(0.52), .fraction(0.6), .large], selection: $selectedDetent)
+        .presentationDetents(
+          store.map.isSearchActive
+            ? [.fraction(0.42), .large]
+            : [.fraction(0.1), .fraction(0.35), .fraction(0.42), .fraction(0.52), .fraction(0.6), .large],
+          selection: $selectedDetent
+        )
         .presentationDragIndicator(.visible)
         .presentationBackgroundInteraction(.enabled(upThrough: .large))
         .presentationCornerRadius(34)
@@ -84,6 +89,22 @@ struct MainScreenMapView: View {
       .task {
         store.send(.map(.onAppear))
         store.send(.onAppear)
+      }
+      .onChange(of: store.map.isSearchActive) { _, isSearching in
+        if isSearching {
+          withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            selectedDetent = .large
+          }
+        }
+      }
+      .onChange(of: selectedDetent) { _, newDetent in
+        if store.map.isSearchActive && newDetent != .large {
+          UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+          store.send(.map(.dismissSearch))
+          withAnimation(.easeInOut(duration: 0.25)) {
+            selectedDetent = .fraction(0.42)
+          }
+        }
       }
       .onChange(of: store.map.currentLocation) { _, newLocation in
         guard let coordinate = newLocation, !hasCenteredOnUserLocation else { return }
@@ -111,6 +132,7 @@ struct MainScreenMapView: View {
         }
       }
       .onChange(of: store.map.trackedWalkerLocation, initial: true) { _, newTrackerCoord in
+        guard !store.map.isNavigating, store.map.activeWalkSessionID != nil else { return }
         guard let trackerCoordinate = newTrackerCoord, !store.map.hasFittedTrackedWalker else { return }
 
         if let destCoordinate = store.map.trackedWalkerDestination {
@@ -119,6 +141,15 @@ struct MainScreenMapView: View {
             centerCamera(on: trackerCoordinate)
         }
 
+        store.send(.map(.markTrackedWalkerFitted))
+      }
+      .onChange(of: store.map.activeWalkSessionID) { _, newSession in
+        guard !store.map.isNavigating, newSession != nil, let trackerCoordinate = store.map.trackedWalkerLocation else { return }
+        if let destCoordinate = store.map.trackedWalkerDestination {
+            fitTrackedWalker(tracker: trackerCoordinate, destination: destCoordinate)
+        } else {
+            centerCamera(on: trackerCoordinate)
+        }
         store.send(.map(.markTrackedWalkerFitted))
       }
     } destination: { store in
@@ -211,33 +242,43 @@ struct MainScreenMapView: View {
 
   @MapContentBuilder
   private var trackedWalkerPart: some MapContent {
-    if let trackedCoord = store.map.trackedWalkerLocation {
-      Annotation("Walker", coordinate: trackedCoord, anchor: .bottom) {
-        ZStack {
-          Circle()
-            .fill(Color.orange.opacity(0.3))
-            .frame(width: 44, height: 44)
-          Circle()
-            .fill(Color.white)
-            .frame(width: 28, height: 28)
-            .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
-          Image(systemName: "figure.walk")
-            .font(.system(size: 14, weight: .bold))
-            .foregroundColor(.orange)
-        }
+    if !store.map.isNavigating && store.map.activeWalkSessionID != nil {
+      if let polyline = store.map.trackedWalkerPolyline {
+        MapPolyline(polyline)
+          .stroke(Color.orange.opacity(0.8), lineWidth: 4)
+      } else if let route = store.map.trackedWalkerRoute {
+        MapPolyline(route.polyline)
+          .stroke(Color.orange.opacity(0.8), lineWidth: 4)
       }
-      .annotationTitles(.hidden)
-    }
 
-    if let destinationCoord = store.map.trackedWalkerDestination {
-      Marker(store.map.trackedWalkerDestinationName ?? "Destination", coordinate: destinationCoord)
-        .tint(.orange)
+      if let trackedCoord = store.map.trackedWalkerLocation {
+        Annotation("Walker", coordinate: trackedCoord, anchor: .bottom) {
+          ZStack {
+            Circle()
+              .fill(Color.orange.opacity(0.3))
+              .frame(width: 44, height: 44)
+            Circle()
+              .fill(Color.white)
+              .frame(width: 28, height: 28)
+              .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
+            Image(systemName: "figure.walk")
+              .font(.system(size: 14, weight: .bold))
+              .foregroundColor(.orange)
+          }
+        }
+        .annotationTitles(.hidden)
+      }
+
+      if let destinationCoord = store.map.trackedWalkerDestination {
+        Marker(store.map.trackedWalkerDestinationName ?? "Destination", coordinate: destinationCoord)
+          .tint(.orange)
+      }
     }
   }
 
   @MapContentBuilder
   private var activeRoutePart: some MapContent {
-    if let route = store.map.activeRoute {
+    if store.map.isShowRouteGuide, let route = store.map.activeRoute {
       MapPolyline(route.polyline)
         .stroke(Color.blue, lineWidth: 5)
     }

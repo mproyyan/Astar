@@ -16,6 +16,8 @@ struct MainMapFeature {
 
     var activeRoute: MKRoute?
     var isNavigating: Bool = false
+    var isShowRouteGuide: Bool = DeveloperSettingsStorage.isShowRouteGuide
+    var userWalkSessionID: String? = nil
 
     // Live Tracking related logic
     var activeWalkSessionID: String? = nil
@@ -23,7 +25,10 @@ struct MainMapFeature {
     var trackedWalkerLocation: CLLocationCoordinate2D? = nil
     var trackedWalkerDestination: CLLocationCoordinate2D? = nil
     var trackedWalkerDestinationName: String? = nil
+    var trackedWalkerRoute: MKRoute? = nil
+    var trackedWalkerPolyline: MKPolyline? = nil
     var hasFittedTrackedWalker: Bool = false
+    var isMockDoeWalking: Bool = false
 
     var lastLoggedCoordinate: CLLocationCoordinate2D?
     var lastLoggedStreet: String = ""
@@ -33,6 +38,11 @@ struct MainMapFeature {
 
     var isLocationAuthorized: Bool {
       authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways
+    }
+
+    var isSearchActive: Bool {
+      if case .search = sheet { return true }
+      return false
     }
   }
 
@@ -44,6 +54,7 @@ struct MainMapFeature {
     case locationManager(LocationManagerAction)
 
     case searchTapped
+    case dismissSearch
     case selectPerson(Person)
 
     case startAlwaysHomeNavigation
@@ -56,9 +67,17 @@ struct MainMapFeature {
     case sheet(PresentationAction<MapSheetFeature.Action>)
 
     case markTrackedWalkerFitted
+    case setShowRouteGuide(Bool)
+    case setTrackedWalkerRoute(MKRoute?)
+    case setTrackedWalkerPolyline(MKPolyline?)
+    case updateMockDoeStep(coordinate: CLLocationCoordinate2D, journeyLogEntries: [JourneyLogEntry])
+    case mockDoeReachedDestination
+    case resetDoeWalking
 
     enum Delegate: Equatable {
       case locationUpdated(CLLocationCoordinate2D)
+      case walkerStatusChanged(id: UUID, newStatus: String)
+      case companionStatusChanged(newStatus: String)
     }
 
     enum LocationManagerAction: Equatable {
@@ -75,7 +94,7 @@ struct MainMapFeature {
   @Dependency(\.date.now) var now
 
   var body: some Reducer<State, Action> {
-    Reduce { state, action in
+    Reduce { (state: inout State, action: Action) -> Effect<Action> in
       switch action {
       case .onAppear:
         return .merge(
@@ -122,7 +141,7 @@ struct MainMapFeature {
         state.currentLocation = coordinate
         if state.isNavigating {
           // If we are actively walking, push location ping!
-          let optionalSessionID = state.activeWalkSessionID
+          let optionalSessionID = state.userWalkSessionID
           return .merge(
             .send(.delegate(.locationUpdated(coordinate))),
             .send(.updateTrackingLocation(coordinate)),
@@ -147,8 +166,39 @@ struct MainMapFeature {
         state.sheet = .search(MapSearchSheetFeature.State(userLocation: state.currentLocation))
         return .none
 
+      case .dismissSearch:
+        state.sheet = nil
+        return .none
+
       case let .selectPerson(person):
-        state.sheet = .walker(MapWalkerSheetFeature.State(walker: person, status: person.status))
+        let isReached = person.status.caseInsensitiveCompare("Arrived") == .orderedSame
+                     || person.status.caseInsensitiveCompare("Reached Destination") == .orderedSame
+                     || person.status.caseInsensitiveCompare("Finished") == .orderedSame
+        var walkerState = MapWalkerSheetFeature.State(
+          walker: person,
+          status: person.status,
+          isDestinationReached: isReached
+        )
+        if person.id == Person.mockDoeID || person.name == "Doe" {
+          walkerState.destinationPlaceName = "Home"
+          walkerState.destinationIconName = "house.fill"
+          if isReached {
+            walkerState.originPlaceName = "Autograph Tower"
+            walkerState.originIconName = "briefcase.fill"
+            let finalLog = MockDoeWalkSimulation.completedJourneyLog(now: now)
+            walkerState.journeyLogEntries = finalLog
+            let trip = MockDoeWalkSimulation.completedTrip(now: now)
+            walkerState.trips = [trip] + WalkerSampleData.defaultTrips
+          } else {
+            walkerState.originPlaceName = "Current Location"
+            walkerState.originIconName = "location.fill"
+            walkerState.journeyLogEntries = MockDoeWalkSimulation.journeyLogFromStartToFinish(now: now)
+            if state.activeWalkSessionID != nil {
+              walkerState.activeParticipantID = state.activeWalkSessionID
+            }
+          }
+        }
+        state.sheet = .walker(walkerState)
         return .none
 
       case .startAlwaysHomeNavigation:
@@ -164,6 +214,10 @@ struct MainMapFeature {
 
         state.isFollowingUser = true
         state.isNavigating = true
+        state.activeWalkSessionID = nil
+        state.trackedWalkerPolyline = nil
+        state.trackedWalkerRoute = nil
+        state.trackedWalkerDestination = nil
 
         let defaultOrigin = SavedPlace(
           id: uuid(),
@@ -238,6 +292,10 @@ struct MainMapFeature {
 
         state.isFollowingUser = true
         state.isNavigating = true
+        state.activeWalkSessionID = nil
+        state.trackedWalkerPolyline = nil
+        state.trackedWalkerRoute = nil
+        state.trackedWalkerDestination = nil
 
         let defaultOrigin = SavedPlace(
           id: uuid(),
@@ -302,7 +360,7 @@ struct MainMapFeature {
 
       case let .directNavigationReady(destination, destCoord, originCoord, originAddress, routeInfo):
         state.currentLocation = originCoord
-        state.activeRoute = nil
+        state.activeRoute = routeInfo.route
         let streetName = originAddress.components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces) ?? "Current Area"
         let startTimeString = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .short)
 
@@ -347,7 +405,7 @@ struct MainMapFeature {
           destination: updatedDest,
           mode: .progress,
           originPlace: originPlace,
-          activeRoute: nil,
+          activeRoute: routeInfo.route,
           walkingRouteInfo: routeInfo,
           isCalculatingRoute: false,
           isNavigating: true,
@@ -434,6 +492,10 @@ struct MainMapFeature {
          }
          return .none
 
+      case let .setShowRouteGuide(isEnabled):
+        state.isShowRouteGuide = isEnabled
+        return .none
+
       case let .sheet(.presented(.direction(.delegate(delegateAction)))):
          switch delegateAction {
          case let .routeChanged(route):
@@ -441,61 +503,237 @@ struct MainMapFeature {
             return .none
          case let .navigationStarted(sessionID):
             state.isNavigating = true
-            state.activeWalkSessionID = sessionID
-            state.activeRoute = nil // clear polyline
+            state.userWalkSessionID = sessionID
+            state.activeWalkSessionID = nil
+            state.trackedWalkerPolyline = nil
+            state.trackedWalkerRoute = nil
+            state.trackedWalkerDestination = nil
+            if state.activeRoute == nil, let sheetRoute = state.sheet?.direction?.activeRoute {
+              state.activeRoute = sheetRoute
+            }
             state.lastLoggedCoordinate = state.sheet?.direction?.journeyLogEntries.last?.coordinate ?? state.currentLocation
             state.lastLoggedStreet = "Current Area"
             state.lastLoggedIcon = "figure.walk"
             return .none
          case .navigationEnded:
             state.isNavigating = false
+            state.userWalkSessionID = nil
             state.activeWalkSessionID = nil
             state.activeRoute = nil
             state.sheet = nil
             return .none
          }
 
-      case .sheet(.presented(.walker(.delegate(.dismissed)))):
+      case .sheet(.presented(.search(.delegate(.dismissed)))):
          state.sheet = nil
          return .none
 
-      case let .sheet(.presented(.walker(.delegate(.trackingStarted(walker, session))))):
-         // Handle joining session
-         state.activeWalkSessionID = session.id
-         state.trackedWalkerDestinationName = session.destinationName
-         state.trackedWalkerDestination = CLLocationCoordinate2D(latitude: session.destinationLatitude, longitude: session.destinationLongitude)
-         return .run { send in
-             print("🔍 Starting tracking for walker. Session ID: \(session.id)")
-             if let profile = UserProfileStorage.load() {
-                 let selfRecordID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"
-                     .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+        case .sheet(.presented(.walker(.delegate(.dismissed)))):
+           state.sheet = nil
+           return .none
 
-                 do {
-                     print("👥 Joining session...")
-                     let sessionParticipant = try await trackingClient.joinWalkSession(session.id, selfRecordID)
-                     print("✅ Joined session: \(sessionParticipant.id)")
+        case let .sheet(.presented(.walker(.delegate(.trackingStarted(walker, session))))):
+           // Handle joining session
+           let currentNow = now
+           state.activeWalkSessionID = session.id
+           state.trackedWalkerDestinationName = session.destinationName
+           state.trackedWalkerDestination = CLLocationCoordinate2D(latitude: session.destinationLatitude, longitude: session.destinationLongitude)
+           state.hasFittedTrackedWalker = false
 
-                     print("🔄 Updating user status to accompany...")
-                     try await trackingClient.updateUserStatus(selfRecordID, "accompany", nil, session.id)
+            if session.id == "mock-doe-session" {
+               let origin = state.trackedWalkerLocation ?? MockDoeWalkSimulation.originCoordinate
+               let destination = MockDoeWalkSimulation.destinationCoordinate
+               state.trackedWalkerLocation = origin
 
-                     // And subscribe
-                     print("🎣 Subscribing to location pings for session \(session.id)")
-                     for try await ping in try await trackingClient.subscribeToLocationPings(session.id) {
-                         print("📥 Stream yielded a ping block.")
-                         await send(.locationPingReceived(ping))
-                     }
-                     print("❌ Stream ended for session \(session.id)")
-                 } catch {
-                     print("❌ Tracking failed with error: \(error)")
-                 }
-             } else {
-                 print("❌ User profile is nil. Cannot join tracking session!")
-             }
-         }
+               if !state.isMockDoeWalking {
+                  state.isMockDoeWalking = true
+                  let initialLog = MockDoeWalkSimulation.journeyLog(
+                      forProgress: 0.0,
+                      currentCoord: origin,
+                      startTime: currentNow,
+                      now: currentNow
+                  )
+                  if case var .walker(walkerState) = state.sheet {
+                      walkerState.journeyLogEntries = initialLog
+                      state.sheet = .walker(walkerState)
+                  }
 
-      case .markTrackedWalkerFitted:
-          state.hasFittedTrackedWalker = true
-          return .none
+                  return .run { send in
+                      // Calculate route polyline for Doe to show on map
+                      let routeInfo = await directionRoute.calculateWalkingRoute(origin: origin, destination: destination)
+                      let polyline = routeInfo.route?.polyline ?? MockDoeWalkSimulation.fallbackPolyline
+                      await send(.setTrackedWalkerRoute(routeInfo.route))
+                      await send(.setTrackedWalkerPolyline(polyline))
+
+                      // Sample points strictly along the polyline so Doe follows the line exactly
+                      let points = MockDoeWalkSimulation.samplePoints(from: polyline, targetCount: 10)
+                      let startTime = Date()
+
+                      for (index, point) in points.enumerated() {
+                          if index > 0 {
+                              try? await Task.sleep(nanoseconds: 1_800_000_000) // 1.8s per step
+                          }
+                          if Task.isCancelled { return }
+
+                          let progress = Double(index) / Double(max(points.count - 1, 1))
+                          let currentLog = MockDoeWalkSimulation.journeyLog(
+                              forProgress: progress,
+                              currentCoord: point,
+                              startTime: startTime,
+                              now: Date()
+                          )
+
+                          await send(.updateMockDoeStep(coordinate: point, journeyLogEntries: currentLog))
+
+                          let data = try? JSONEncoder().encode([point.latitude, point.longitude])
+                          let ping = LocationPing(
+                              id: UUID().uuidString,
+                              sessionRef: session.id,
+                              encodedCoordinates: data != nil ? [data!] : [],
+                              recordedAt: Date()
+                          )
+                          await send(.locationPingReceived(ping))
+                      }
+
+                      // Destination reached!
+                      await send(.mockDoeReachedDestination)
+                  }
+                  .cancellable(id: "MockDoeWalkCancelID", cancelInFlight: true)
+               } else {
+                  // Simulation is ALREADY running in the background!
+                  // Rejoining: calculate and show route polyline from Doe's current location to destination
+                  return .run { send in
+                      let routeInfo = await directionRoute.calculateWalkingRoute(origin: origin, destination: destination)
+                      let polyline = routeInfo.route?.polyline ?? MockDoeWalkSimulation.fallbackPolyline
+                      await send(.setTrackedWalkerRoute(routeInfo.route))
+                      await send(.setTrackedWalkerPolyline(polyline))
+                  }
+               }
+            }
+
+            return .run { send in
+                print("🔍 Starting tracking for walker. Session ID: \(session.id)")
+                if let profile = UserProfileStorage.load() {
+                    let selfRecordID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"
+                        .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+
+                    do {
+                        print("👥 Joining session...")
+                        let sessionParticipant = try await trackingClient.joinWalkSession(session.id, selfRecordID)
+                        print("✅ Joined session: \(sessionParticipant.id)")
+
+                        print("🔄 Updating user status to accompany...")
+                        try await trackingClient.updateUserStatus(selfRecordID, "accompany", nil, session.id)
+
+                        // And subscribe
+                        print("🎣 Subscribing to location pings for session \(session.id)")
+                        for try await ping in try await trackingClient.subscribeToLocationPings(session.id) {
+                            print("📥 Stream yielded a ping block.")
+                            await send(.locationPingReceived(ping))
+                        }
+                        print("❌ Stream ended for session \(session.id)")
+                    } catch {
+                        print("❌ Tracking failed with error: \(error)")
+                    }
+                } else {
+                    print("❌ User profile is nil. Cannot join tracking session!")
+                }
+            }
+
+         case let .setTrackedWalkerRoute(route):
+            state.trackedWalkerRoute = route
+            return .none
+
+         case let .setTrackedWalkerPolyline(polyline):
+            state.trackedWalkerPolyline = polyline
+            return .none
+
+         case let .updateMockDoeStep(coordinate, journeyLogEntries):
+            state.trackedWalkerLocation = coordinate
+            if case var .walker(walkerState) = state.sheet {
+               walkerState.journeyLogEntries = journeyLogEntries
+               state.sheet = .walker(walkerState)
+            }
+            return .none
+
+         case .mockDoeReachedDestination:
+            let currentNow = now
+            state.isMockDoeWalking = false
+            state.activeWalkSessionID = nil
+            state.trackedWalkerPolyline = nil
+            state.trackedWalkerRoute = nil
+            state.trackedWalkerDestination = nil
+            state.trackedWalkerLocation = MockDoeWalkSimulation.destinationCoordinate
+            let finalLog = MockDoeWalkSimulation.completedJourneyLog(now: currentNow)
+            print("📝 [Mock Doe] Completed walking session logged with \(finalLog.count) checkpoints.")
+            if case var .walker(walkerState) = state.sheet {
+               walkerState.isDestinationReached = true
+               walkerState.activeParticipantID = nil
+               walkerState.status = "Idle"
+               walkerState.walker = Person(
+                  id: walkerState.walker.id,
+                  name: walkerState.walker.name,
+                  status: "Idle",
+                  appleUserId: walkerState.walker.appleUserId,
+                  cloudKitUserId: walkerState.walker.cloudKitUserId
+               )
+               walkerState.journeyLogEntries = finalLog
+               let completedTrip = MockDoeWalkSimulation.completedTrip(now: currentNow)
+               if !walkerState.trips.contains(where: { $0.destinationName == walkerState.destinationPlaceName && $0.dateString.hasPrefix("Today") }) {
+                  walkerState.trips.insert(completedTrip, at: 0)
+               }
+               state.sheet = .walker(walkerState)
+            }
+            return .merge(
+               .send(.delegate(.walkerStatusChanged(id: Person.mockDoeID, newStatus: "Idle"))),
+               .send(.delegate(.companionStatusChanged(newStatus: "idle"))),
+               .run { [trackingClient] _ in
+                  if let profile = UserProfileStorage.load() {
+                     let selfRecordID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"
+                        .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+                     try? await trackingClient.updateUserStatus(selfRecordID, "idle", nil, nil)
+                  }
+               }
+            )
+
+         case .resetDoeWalking:
+            state.isMockDoeWalking = false
+            state.trackedWalkerLocation = nil
+            state.trackedWalkerDestination = nil
+            state.trackedWalkerRoute = nil
+            state.trackedWalkerPolyline = nil
+            state.hasFittedTrackedWalker = false
+            return .merge(
+               .cancel(id: "MockDoeWalkCancelID"),
+               .send(.delegate(.walkerStatusChanged(id: Person.mockDoeID, newStatus: "Walking")))
+            )
+
+         case .sheet(.presented(.walker(.delegate(.trackingEnded)))):
+            state.activeWalkSessionID = nil
+            state.trackedWalkerDestination = nil
+            state.trackedWalkerRoute = nil
+            state.trackedWalkerPolyline = nil
+            return .merge(
+               .send(.delegate(.companionStatusChanged(newStatus: "idle"))),
+               .run { [trackingClient] _ in
+                  if let profile = UserProfileStorage.load() {
+                     let selfRecordID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"
+                        .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+                     try? await trackingClient.updateUserStatus(selfRecordID, "idle", nil, nil)
+                  }
+               }
+            )
+
+         case let .sheet(.presented(.walker(.delegate(.walkerReachedDestination(walker))))):
+            return .merge(
+               .cancel(id: "MockDoeWalkCancelID"),
+               .send(.mockDoeReachedDestination),
+               .send(.delegate(.walkerStatusChanged(id: walker.id, newStatus: "Idle")))
+            )
+
+        case .markTrackedWalkerFitted:
+           state.hasFittedTrackedWalker = true
+           return .none
 
       case let .locationPingReceived(ping):
           print("📡 LocationPing received: \(ping.id) with \(ping.encodedCoordinates.count) points")

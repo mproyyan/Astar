@@ -7,7 +7,17 @@
 
 import CoreLocation
 import Foundation
+import MapKit
 import SwiftUI
+
+extension MKMultiPoint {
+    var coordinates: [CLLocationCoordinate2D] {
+        guard pointCount > 0 else { return [] }
+        var coords = [CLLocationCoordinate2D](repeating: kCLLocationCoordinate2DInvalid, count: pointCount)
+        getCoordinates(&coords, range: NSRange(location: 0, length: pointCount))
+        return coords
+    }
+}
 
 struct Person: Identifiable, Equatable, Sendable {
     let id: UUID
@@ -22,6 +32,23 @@ struct Person: Identifiable, Equatable, Sendable {
         self.status = status
         self.appleUserId = appleUserId
         self.cloudKitUserId = cloudKitUserId
+    }
+
+    static let mockJohnDoe = Person(
+        id: UUID(uuidString: "00000000-0000-0000-0000-000000000001") ?? UUID(),
+        name: "John Doe",
+        status: "Idle"
+    )
+
+    static let mockDoeID = UUID(uuidString: "00000000-0000-0000-0000-000000000002") ?? UUID()
+
+    static var mockDoe: Person {
+        let status = DeveloperSettingsStorage.isDoeWalkingMockEnabled ? "Walking" : "Idle"
+        return Person(
+            id: mockDoeID,
+            name: "Doe",
+            status: status
+        )
     }
 }
 
@@ -99,13 +126,286 @@ extension SavedPlace {
     }
 }
 
-enum MapSampleData {
-    static let people: [Person] = [
-        Person(name: "Awan", status: "Walking"),
-        Person(name: "Royyan", status: "Idle"),
-        Person(name: "Safa", status: "Idle"),
-        Person(name: "Nadia", status: "Idle")
+enum MockDoeWalkSimulation {
+    static let originCoordinate = CLLocationCoordinate2D(latitude: -6.1991, longitude: 106.8230)
+    static let destinationCoordinate = CLLocationCoordinate2D(latitude: -6.2125, longitude: 106.8166)
+    static let destinationName = "Home"
+
+    static let waypoints: [CLLocationCoordinate2D] = [
+        CLLocationCoordinate2D(latitude: -6.1991, longitude: 106.8230), // Autograph Tower (Thamrin Nine)
+        CLLocationCoordinate2D(latitude: -6.2018, longitude: 106.8223), // Dukuh Atas
+        CLLocationCoordinate2D(latitude: -6.2052, longitude: 106.8208), // Jl. Jend. Sudirman
+        CLLocationCoordinate2D(latitude: -6.2084, longitude: 106.8194), // JPO Phinisi / Karet
+        CLLocationCoordinate2D(latitude: -6.2110, longitude: 106.8179), // Jl. Bendungan Hilir
+        CLLocationCoordinate2D(latitude: -6.2125, longitude: 106.8166)  // Home (Destination)
     ]
+
+    static let fallbackPolyline: MKPolyline = {
+        var coords = waypoints
+        return MKPolyline(coordinates: &coords, count: coords.count)
+    }()
+
+    static func samplePoints(from polyline: MKPolyline, targetCount: Int = 10) -> [CLLocationCoordinate2D] {
+        let allCoords = polyline.coordinates
+        guard allCoords.count >= 2 else {
+            return allCoords.isEmpty ? waypoints : allCoords
+        }
+        guard targetCount > 1 else { return [allCoords[0]] }
+
+        var distances: [Double] = [0.0]
+        for i in 1..<allCoords.count {
+            let p1 = CLLocation(latitude: allCoords[i-1].latitude, longitude: allCoords[i-1].longitude)
+            let p2 = CLLocation(latitude: allCoords[i].latitude, longitude: allCoords[i].longitude)
+            distances.append(distances.last! + p2.distance(from: p1))
+        }
+        let totalDistance = distances.last ?? 0.0
+        guard totalDistance > 0 else { return Array(repeating: allCoords[0], count: targetCount) }
+
+        var sampled: [CLLocationCoordinate2D] = []
+        for i in 0..<targetCount {
+            let targetDist = (Double(i) / Double(targetCount - 1)) * totalDistance
+            var segmentIdx = 0
+            while segmentIdx < distances.count - 2 && distances[segmentIdx + 1] < targetDist {
+                segmentIdx += 1
+            }
+            let segStartDist = distances[segmentIdx]
+            let segEndDist = distances[segmentIdx + 1]
+            let segLen = segEndDist - segStartDist
+            let ratio = segLen > 0 ? (targetDist - segStartDist) / segLen : 0.0
+
+            let c1 = allCoords[segmentIdx]
+            let c2 = allCoords[segmentIdx + 1]
+            let lat = c1.latitude + (c2.latitude - c1.latitude) * ratio
+            let lon = c1.longitude + (c2.longitude - c1.longitude) * ratio
+            sampled.append(CLLocationCoordinate2D(latitude: lat, longitude: lon))
+        }
+        return sampled
+    }
+
+    struct CheckpointDef: Sendable {
+        let landmarkName: String
+        let address: String
+        let iconName: String
+        let coordinate: CLLocationCoordinate2D
+    }
+
+    static let checkpointDefs: [CheckpointDef] = [
+        CheckpointDef(
+            landmarkName: "Start: Autograph Tower",
+            address: "Jl. M.H. Thamrin No. 10, Central Jakarta",
+            iconName: "figure.walk.motion",
+            coordinate: originCoordinate
+        ),
+        CheckpointDef(
+            landmarkName: "Passed Dukuh Atas",
+            address: "Jl. Jend. Sudirman, Central Jakarta",
+            iconName: "tram.fill",
+            coordinate: waypoints[1]
+        ),
+        CheckpointDef(
+            landmarkName: "Passed Jl. Jend. Sudirman",
+            address: "Central Jakarta",
+            iconName: "figure.walk",
+            coordinate: waypoints[2]
+        ),
+        CheckpointDef(
+            landmarkName: "Passed JPO Phinisi",
+            address: "Karet Sudirman, Central Jakarta",
+            iconName: "figure.walk",
+            coordinate: waypoints[3]
+        ),
+        CheckpointDef(
+            landmarkName: "Passed Jl. Bendungan Hilir",
+            address: "Central Jakarta",
+            iconName: "figure.walk",
+            coordinate: waypoints[4]
+        ),
+        CheckpointDef(
+            landmarkName: "Destination: Home",
+            address: "Bendungan Hilir, South Jakarta",
+            iconName: "house.fill",
+            coordinate: destinationCoordinate
+        )
+    ]
+
+    static func journeyLog(
+        forProgress progress: Double,
+        currentCoord: CLLocationCoordinate2D,
+        startTime: Date,
+        now: Date
+    ) -> [JourneyLogEntry] {
+        if progress >= 1.0 {
+            return completedJourneyLog(now: now)
+        }
+
+        let startStr = DateFormatter.localizedString(from: startTime, dateStyle: .none, timeStyle: .short)
+        let numCheckpoints = checkpointDefs.count
+        let passedCount = Int((progress * Double(numCheckpoints - 1)).rounded(.down))
+
+        let currentLandmark: String
+        let currentAddress: String
+        if passedCount == 0 {
+            currentLandmark = "Near Autograph Tower"
+            currentAddress = checkpointDefs[0].address
+        } else {
+            let def = checkpointDefs[min(passedCount, checkpointDefs.count - 2)]
+            currentLandmark = def.landmarkName.replacingOccurrences(of: "Passed ", with: "Near ")
+            currentAddress = def.address
+        }
+
+        let currentEntry = JourneyLogEntry(
+            id: UUID(),
+            landmarkName: currentLandmark,
+            address: currentAddress,
+            timeString: "Now",
+            iconName: "location.fill",
+            entryType: .currentLocation,
+            coordinate: currentCoord
+        )
+
+        var entries: [JourneyLogEntry] = [currentEntry]
+
+        if passedCount >= 1 {
+            for i in stride(from: min(passedCount, checkpointDefs.count - 2), through: 1, by: -1) {
+                let def = checkpointDefs[i]
+                entries.append(
+                    JourneyLogEntry(
+                        id: UUID(),
+                        landmarkName: def.landmarkName,
+                        address: def.address,
+                        timeString: startStr,
+                        iconName: def.iconName,
+                        entryType: .checkpoint,
+                        coordinate: def.coordinate
+                    )
+                )
+            }
+        }
+
+        entries.append(
+            JourneyLogEntry(
+                id: UUID(),
+                landmarkName: checkpointDefs[0].landmarkName,
+                address: checkpointDefs[0].address,
+                timeString: startStr,
+                iconName: checkpointDefs[0].iconName,
+                entryType: .start,
+                coordinate: checkpointDefs[0].coordinate
+            )
+        )
+
+        return entries
+    }
+
+    static let completedTripID = UUID(uuidString: "00000000-0000-0000-0002-000000000099")!
+    static let currentLocEntryID = UUID(uuidString: "00000000-0000-0000-0002-000000000000")!
+    static let destinationEntryID = UUID(uuidString: "00000000-0000-0000-0002-000000000001")!
+    static let benhilEntryID = UUID(uuidString: "00000000-0000-0000-0002-000000000002")!
+    static let phinisiEntryID = UUID(uuidString: "00000000-0000-0000-0002-000000000003")!
+    static let sudirmanEntryID = UUID(uuidString: "00000000-0000-0000-0002-000000000004")!
+    static let dukuhAtasEntryID = UUID(uuidString: "00000000-0000-0000-0002-000000000005")!
+    static let autographEntryID = UUID(uuidString: "00000000-0000-0000-0002-000000000006")!
+
+    static func completedTrip(
+        id: UUID? = nil,
+        now: Date = Date(),
+        tripIndex: Int = 0
+    ) -> WalkerHistoryTrip {
+        let finalLog = completedJourneyLog(now: now)
+        let resolvedID = id ?? (tripIndex == 0 ? completedTripID : UUID())
+        return WalkerHistoryTrip(
+            id: resolvedID,
+            destinationName: "Home",
+            iconName: "house.fill",
+            iconColor: .blue,
+            dateString: "Today, " + DateFormatter.localizedString(from: now, dateStyle: .none, timeStyle: .short),
+            durationString: "18 min",
+            distanceString: "1.9 km",
+            checkpoints: finalLog
+        )
+    }
+
+    static func journeyLogFromStartToFinish(now: Date = Date()) -> [JourneyLogEntry] {
+        return completedJourneyLog(now: now)
+    }
+
+    static func completedJourneyLog(now: Date = Date()) -> [JourneyLogEntry] {
+        let timeStr = DateFormatter.localizedString(from: now, dateStyle: .none, timeStyle: .short)
+        let earlierTimeStr = DateFormatter.localizedString(from: now.addingTimeInterval(-15 * 60), dateStyle: .none, timeStyle: .short)
+
+        return [
+            JourneyLogEntry(
+                id: destinationEntryID,
+                landmarkName: "Destination: Home",
+                address: "Bendungan Hilir, South Jakarta",
+                timeString: timeStr,
+                iconName: "house.fill",
+                entryType: .destination,
+                coordinate: destinationCoordinate
+            ),
+            JourneyLogEntry(
+                id: benhilEntryID,
+                landmarkName: "Passed Jl. Bendungan Hilir",
+                address: "Central Jakarta",
+                timeString: timeStr,
+                iconName: "figure.walk",
+                entryType: .checkpoint,
+                coordinate: waypoints[4]
+            ),
+            JourneyLogEntry(
+                id: phinisiEntryID,
+                landmarkName: "Passed JPO Phinisi",
+                address: "Karet Sudirman, Central Jakarta",
+                timeString: timeStr,
+                iconName: "figure.walk",
+                entryType: .checkpoint,
+                coordinate: waypoints[3]
+            ),
+            JourneyLogEntry(
+                id: sudirmanEntryID,
+                landmarkName: "Passed Jl. Jend. Sudirman",
+                address: "Central Jakarta",
+                timeString: earlierTimeStr,
+                iconName: "figure.walk",
+                entryType: .checkpoint,
+                coordinate: waypoints[2]
+            ),
+            JourneyLogEntry(
+                id: dukuhAtasEntryID,
+                landmarkName: "Passed Dukuh Atas",
+                address: "Jl. Jend. Sudirman, Central Jakarta",
+                timeString: earlierTimeStr,
+                iconName: "tram.fill",
+                entryType: .checkpoint,
+                coordinate: waypoints[1]
+            ),
+            JourneyLogEntry(
+                id: autographEntryID,
+                landmarkName: "Start: Autograph Tower",
+                address: "Jl. M.H. Thamrin No. 10, Central Jakarta",
+                timeString: earlierTimeStr,
+                iconName: "figure.walk.motion",
+                entryType: .start,
+                coordinate: originCoordinate
+            )
+        ]
+    }
+}
+
+enum MapSampleData {
+    static var people: [Person] {
+        let basePeople = [
+            Person(name: "Awan", status: "Walking"),
+            Person(name: "Royyan", status: "Idle"),
+            Person(name: "Safa", status: "Idle"),
+            Person(name: "Nadia", status: "Idle")
+        ]
+        if DeveloperSettingsStorage.isDevelopmentMode {
+            return [Person.mockDoe] + basePeople
+        } else {
+            return basePeople
+        }
+    }
 
     static let savedPlaces: [SavedPlace] = [
         SavedPlace(

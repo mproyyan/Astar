@@ -22,7 +22,8 @@ struct MapDirectionSheetFeature {
     
     var isNavigating: Bool = false
     var isDestinationReached: Bool = false
-    
+    var isDevelopmentMode: Bool = DeveloperSettingsStorage.isDevelopmentMode
+
     var journeyLogEntries: [JourneyLogEntry] = []
   }
 
@@ -38,7 +39,8 @@ struct MapDirectionSheetFeature {
     
     case journeyLogTapped
     case dismissJourneyLogTapped
-    
+    case simulateArrivalTapped
+
     // Updates from parent
     case updateLocation(CLLocationCoordinate2D, newMilestones: [JourneyLogEntry])
     case destinationReached(finalEntry: JourneyLogEntry)
@@ -143,7 +145,9 @@ struct MapDirectionSheetFeature {
       case let .startNavigationTapped(currentLocation):
         state.isNavigating = true
         state.isDestinationReached = false
-        state.activeRoute = nil
+        if state.activeRoute == nil {
+          state.activeRoute = state.walkingRouteInfo?.route
+        }
         state.mode = .progress
 
         let originCoord = currentLocation ?? CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
@@ -189,7 +193,6 @@ struct MapDirectionSheetFeature {
                     // Update user status
                     try await trackingClient.updateUserStatus(userRecordID, "walking", session.id, nil)
 
-                    await send(.delegate(.routeChanged(nil)))
                     await send(.delegate(.navigationStarted(sessionID: session.id)))
                     return
                 } catch {
@@ -197,7 +200,6 @@ struct MapDirectionSheetFeature {
                 }
             }
 
-            await send(.delegate(.routeChanged(nil)))
             await send(.delegate(.navigationStarted(sessionID: nil)))
         }
 
@@ -237,7 +239,37 @@ struct MapDirectionSheetFeature {
         state.journeyLogEntries.removeAll(where: { $0.entryType == .currentLocation })
         state.journeyLogEntries.insert(finalEntry, at: 0)
         return .none
-        
+
+      case .simulateArrivalTapped:
+        state.isDestinationReached = true
+        state.journeyLogEntries.removeAll(where: { $0.entryType == .currentLocation })
+        let destName = state.destination.name
+        let destSubtitle = state.destination.subtitle
+        let destTime = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .short)
+        let destEntry = JourneyLogEntry(
+          id: uuid(),
+          landmarkName: "Destination: \(destName)",
+          address: destSubtitle,
+          timeString: destTime,
+          iconName: state.destination.iconName.isEmpty ? "house.fill" : state.destination.iconName,
+          entryType: .destination,
+          coordinate: state.destination.coordinate
+        )
+        if state.journeyLogEntries.count <= 1 {
+          let intermediateEntry = JourneyLogEntry(
+            id: uuid(),
+            landmarkName: "Passed Jl. M.H. Thamrin",
+            address: "Central Jakarta",
+            timeString: destTime,
+            iconName: "figure.walk",
+            entryType: .checkpoint,
+            coordinate: nil
+          )
+          state.journeyLogEntries.insert(intermediateEntry, at: 0)
+        }
+        state.journeyLogEntries.insert(destEntry, at: 0)
+        return .none
+
       case .delegate:
         return .none
       }
