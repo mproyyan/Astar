@@ -16,6 +16,7 @@ struct MainFeature {
 
     init(userProfile: UserProfile? = nil) {
       self.login = LoginFeature.State(userProfile: userProfile)
+      self.map.userId = userProfile?.appleUserId
     }
   }
 
@@ -44,6 +45,10 @@ struct MainFeature {
 
       case .path(.element(id: _, action: .profile(.delegate(.signedOut)))):
         return .send(.login(.signOutButtonTapped))
+
+      case let .login(.delegate(.loggedIn(profile))):
+        state.map.userId = profile.appleUserId
+        return .send(.map(.loadUserSavedPlaces))
 
       case .login:
         return .none

@@ -22,7 +22,9 @@ struct MapSheetDirectionContent: View {
                     name: "Current Location",
                     subtitle: "Locating current area...",
                     iconName: "location.fill",
-                    coordinate: store.map.currentLocation
+//                    coordinate: store.map.currentLocation
+                    latitude: store.map.currentLocation?.latitude,
+                    longitude: store.map.currentLocation?.longitude
                 )
 
                 DirectionCard(

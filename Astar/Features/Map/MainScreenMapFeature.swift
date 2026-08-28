@@ -33,6 +33,10 @@ struct MainScreenMapFeature {
     var searchResults: [SavedPlace] = []
     var isSearchLoading: Bool = false
 
+    // Dynamic User Saved Places
+    var userId: String? = nil
+    var userSavedPlaces: [SavedPlace] = MapSampleData.savedPlaces
+
     // Direction & Route
     var selectedDestination: SavedPlace?
     var originPlace: SavedPlace?
@@ -62,6 +66,8 @@ struct MainScreenMapFeature {
 
   enum Action: Equatable {
     case onAppear
+    case setUserId(String?)
+    case loadUserSavedPlaces
     case requestLocation
     case recenterTapped
     case delegate(Delegate)
@@ -119,6 +125,7 @@ struct MainScreenMapFeature {
       switch action {
       case .onAppear:
         return .merge(
+          .send(.loadUserSavedPlaces),
           .send(.requestLocation),
           .run { send in
             for await status in await locationManager.authorizationStatus() {
@@ -136,6 +143,18 @@ struct MainScreenMapFeature {
             }
           }
         )
+
+      case let .setUserId(userId):
+        state.userId = userId
+        return .send(.loadUserSavedPlaces)
+
+      case .loadUserSavedPlaces:
+        let uid = state.userId ?? "default_user"
+        let loaded = SavedPlacesStorage.load(for: uid)
+        if !loaded.isEmpty {
+          state.userSavedPlaces = loaded
+        }
+        return .none
 
       case .requestLocation:
         return .run { _ in
@@ -224,7 +243,9 @@ struct MainScreenMapFeature {
           name: "Current Location",
           subtitle: "Locating current area...",
           iconName: "location.fill",
-          coordinate: originCoord
+          // coordinate: originCoord
+          latitude: originCoord.latitude,
+          longitude: originCoord.longitude
         )
 
         return .run { [place] send in
@@ -254,7 +275,9 @@ struct MainScreenMapFeature {
             name: "Current Location",
             subtitle: address,
             iconName: "location.fill",
-            coordinate: originCoord
+            // coordinate: originCoord
+            latitude: originCoord.latitude,
+          longitude: originCoord.longitude
           )
 
           await send(.originResolved(resolvedOrigin))
@@ -289,7 +312,9 @@ struct MainScreenMapFeature {
           timeString: startTimeString,
           iconName: "figure.walk.motion",
           entryType: .start,
-          coordinate: originCoord
+           coordinate: originCoord
+//          latitude: originCoord.latitude,
+//          longitude: originCoord.longitude
         )
 
         let currentEntry = JourneyLogEntry(
@@ -349,7 +374,9 @@ struct MainScreenMapFeature {
               timeString: destTime,
               iconName: destination.iconName.isEmpty ? "house.fill" : destination.iconName,
               entryType: .destination,
-              coordinate: destCoord
+               coordinate: destCoord
+//              latitude: destCoord.latitude,
+//              longitude: destCoord.longitude
             )
             return .send(.destinationReached(finalEntry: destEntry))
           }
@@ -707,7 +734,7 @@ enum PlaceSearchEngine {
             subtitle: completion.subtitle.isEmpty ? "Jakarta, Indonesia" : completion.subtitle,
             iconName: icon,
             distance: nil,
-            coordinate: nil
+            // coordinate: nil
           )
         }
       }
@@ -781,7 +808,9 @@ enum PlaceSearchEngine {
       subtitle: subtitle,
       iconName: icon,
       distance: distanceString,
-      coordinate: placemark.coordinate
+      // coordinate: placemark.coordinate
+      latitude: placemark.coordinate.latitude,
+      longitude: placemark.coordinate.longitude
     )
   }
 
