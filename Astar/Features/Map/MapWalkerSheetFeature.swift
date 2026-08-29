@@ -23,6 +23,11 @@ struct MapWalkerSheetFeature {
 
     var journeyLogEntries: [JourneyLogEntry] = []
     var trips: [WalkerHistoryTrip] = WalkerSampleData.defaultTrips
+
+    var isIdleOrAccompany: Bool {
+      status.caseInsensitiveCompare("Idle") == .orderedSame
+        || status.caseInsensitiveCompare("accompany") == .orderedSame
+    }
   }
 
   enum Action: Equatable {
@@ -77,13 +82,16 @@ struct MapWalkerSheetFeature {
         
       case .trackTapped:
         if state.walker.name == "Doe" || state.walker.name == "John Doe" || state.walker.id == Person.mockDoeID {
+          let isReturn = state.destinationPlaceName == "Autograph Tower" || state.originPlaceName == "Home"
+          let destName = isReturn ? "Autograph Tower" : MockDoeWalkSimulation.destinationName
+          let destCoord = isReturn ? MockDoeWalkSimulation.originCoordinate : MockDoeWalkSimulation.destinationCoordinate
           let session = WalkSession(
             id: "mock-doe-session",
             walkerRef: "mock-doe",
             status: "active",
-            destinationName: MockDoeWalkSimulation.destinationName,
-            destinationLatitude: MockDoeWalkSimulation.destinationCoordinate.latitude,
-            destinationLongitude: MockDoeWalkSimulation.destinationCoordinate.longitude,
+            destinationName: destName,
+            destinationLatitude: destCoord.latitude,
+            destinationLongitude: destCoord.longitude,
             routePolyline: nil,
             startedAt: now,
             endedAt: nil,
@@ -114,14 +122,23 @@ struct MapWalkerSheetFeature {
       case let .WalkSessionLoaded(session):
          state.activeParticipantID = session.id
          if state.walker.name == "Doe" || state.walker.id == Person.mockDoeID {
-           state.originPlaceName = "Autograph Tower"
-           state.originIconName = "briefcase.fill"
+           if session.destinationName == "Autograph Tower" {
+             state.originPlaceName = "Home"
+             state.originIconName = "house.fill"
+             state.destinationPlaceName = "Autograph Tower"
+             state.destinationIconName = "building.2.fill"
+           } else {
+             state.originPlaceName = "Autograph Tower"
+             state.originIconName = "briefcase.fill"
+             state.destinationPlaceName = "Home"
+             state.destinationIconName = "house.fill"
+           }
          } else {
            state.originPlaceName = "Current Location"
            state.originIconName = "location.fill"
+           state.destinationPlaceName = session.destinationName
+           state.destinationIconName = "house.fill"
          }
-         state.destinationPlaceName = session.destinationName
-         state.destinationIconName = "house.fill"
          return .send(.delegate(.trackingStarted(state.walker, session)))
 
       case .exitTrackTapped:
@@ -140,9 +157,10 @@ struct MapWalkerSheetFeature {
           cloudKitUserId: state.walker.cloudKitUserId
         )
         if state.walker.name == "Doe" || state.walker.id == Person.mockDoeID {
-          let finalLog = MockDoeWalkSimulation.completedJourneyLog(now: now)
+          let isReturn = state.destinationPlaceName == "Autograph Tower"
+          let finalLog = MockDoeWalkSimulation.completedJourneyLog(isReturnTrip: isReturn, now: now)
           state.journeyLogEntries = finalLog
-          let trip = MockDoeWalkSimulation.completedTrip(now: now)
+          let trip = MockDoeWalkSimulation.completedTrip(now: now, isReturnTrip: isReturn)
           if !state.trips.contains(where: { $0.destinationName == state.destinationPlaceName && $0.dateString.hasPrefix("Today") }) {
             state.trips.insert(trip, at: 0)
           }

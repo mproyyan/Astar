@@ -153,7 +153,7 @@ struct MapSheet: View {
                         .padding(.horizontal, 16)
                         .padding(.top, 12)
                         .transition(.opacity)
-                    } else if walkerStore.status.caseInsensitiveCompare("Idle") == .orderedSame {
+                    } else if walkerStore.isIdleOrAccompany {
                         if let trip = walkerStore.selectedHistoryTrip {
                             WalkerCardHistoryDetail(
                                 trip: trip,
@@ -178,9 +178,11 @@ struct MapSheet: View {
                             .padding(.top, 12)
                             .transition(.opacity)
                         } else {
+                            let userEmail = sampleData.first(where: { $0.displayName.localizedCaseInsensitiveContains(walkerStore.walker.name) })?.icloud
+                                ?? (walkerStore.walker.name == "Doe" ? "doe@icloud.com" : "\(walkerStore.walker.name.lowercased().filter { !$0.isWhitespace })@icloud.com")
                             WalkerCardIdle(
                                 name: walkerStore.walker.name,
-                                email: walkerStore.walker.name == "Doe" ? "doe@icloud.com" : "awanmendung@icloud.com",
+                                email: userEmail,
                                 trips: walkerStore.trips,
                                 onDismiss: {
                                     walkerStore.send(.dismissWalkerTapped)

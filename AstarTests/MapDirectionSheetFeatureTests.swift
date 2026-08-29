@@ -5,6 +5,7 @@ import MapKit
 import Foundation
 @testable import Astar
 
+@Suite(.serialized)
 struct MapDirectionSheetFeatureTests {
   @Test
   @MainActor

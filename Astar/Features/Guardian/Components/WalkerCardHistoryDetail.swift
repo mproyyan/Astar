@@ -38,7 +38,7 @@ struct WalkerCardHistoryDetail: View {
             }
 
             // Date Subtitle
-            Text("21 August 2026")
+            Text(trip.dateString)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
 
@@ -87,73 +87,155 @@ struct WalkerCardHistoryDetail: View {
 
             // Milestones Timeline Card
             VStack(spacing: 0) {
-                // 1. Destination Node
-                HStack(spacing: 14) {
-                    Circle()
-                        .fill(Color.blue)
-                        .frame(width: 32, height: 32)
-                        .overlay {
-                            Image(systemName: trip.iconName)
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(.white)
+                if !trip.checkpoints.isEmpty {
+                    let destEntry = trip.checkpoints.first(where: { $0.entryType == .destination }) ?? trip.checkpoints.first
+                    let startEntry = trip.checkpoints.first(where: { $0.entryType == .start }) ?? trip.checkpoints.last
+                    let intermediate = trip.checkpoints.filter { $0.entryType == .checkpoint }
+
+                    // 1. Destination Node
+                    if let dest = destEntry {
+                        HStack(spacing: 14) {
+                            Circle()
+                                .fill(trip.iconColor)
+                                .frame(width: 32, height: 32)
+                                .overlay {
+                                    Image(systemName: trip.iconName)
+                                        .font(.system(size: 15, weight: .semibold))
+                                        .foregroundStyle(.white)
+                                }
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(dest.landmarkName)
+                                    .font(.headline.weight(.semibold))
+                                    .foregroundStyle(.primary)
+
+                                if !dest.address.isEmpty {
+                                    Text(dest.address)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+                            }
+
+                            Spacer()
+
+                            Text(dest.timeString)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 16)
+                        .padding(.bottom, intermediate.isEmpty && startEntry == nil ? 16 : 8)
+                    }
+
+                    // Intermediate Checkpoints
+                    ForEach(intermediate) { checkpoint in
+                        timelineSegment(title: checkpoint.landmarkName, subtitle: checkpoint.address, time: checkpoint.timeString)
+                    }
+
+                    // Start Position Node
+                    if let start = startEntry, start.id != destEntry?.id {
+                        HStack(spacing: 0) {
+                            Rectangle()
+                                .fill(Color.secondary.opacity(0.25))
+                                .frame(width: 3, height: 16)
+                                .padding(.leading, 30.5)
+                            Spacer()
                         }
 
-                    Text("Destination")
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(.primary)
+                        HStack(spacing: 14) {
+                            Circle()
+                                .fill(Color.blue)
+                                .frame(width: 32, height: 32)
+                                .overlay {
+                                    Image(systemName: start.iconName.isEmpty ? "mappin.fill" : start.iconName)
+                                        .font(.system(size: 15, weight: .semibold))
+                                        .foregroundStyle(.white)
+                                }
 
-                    Spacer()
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(start.landmarkName)
+                                    .font(.headline.weight(.semibold))
+                                    .foregroundStyle(.primary)
 
-                    Text("9:45 PM")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
-                .padding(.bottom, 8)
+                                if !start.address.isEmpty {
+                                    Text(start.address)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+                            }
 
-                // Connecting Line + Intermediate Checkpoint 1
-                timelineSegment(title: "Near Plaza Indonesia", subtitle: "Walking north on Jl. M.H. Thamrin", time: "9:45 PM")
+                            Spacer()
 
-                // Connecting Line + Intermediate Checkpoint 2
-                timelineSegment(title: "Near Plaza Indonesia", subtitle: "Walking north on Jl. M.H. Thamrin", time: "9:45 PM")
-
-                // Connecting Line + Intermediate Checkpoint 3
-                timelineSegment(title: "Near Plaza Indonesia", subtitle: "Walking north on Jl. M.H. Thamrin", time: "9:45 PM")
-
-                // Connecting Line to Start
-                HStack(spacing: 0) {
-                    Rectangle()
-                        .fill(Color.secondary.opacity(0.25))
-                        .frame(width: 3, height: 16)
-                        .padding(.leading, 30.5)
-                    Spacer()
-                }
-
-                // Start Position Node
-                HStack(spacing: 14) {
-                    Circle()
-                        .fill(Color.blue)
-                        .frame(width: 32, height: 32)
-                        .overlay {
-                            Image(systemName: "mappin.fill")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(.white)
+                            Text(start.timeString)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 4)
+                        .padding(.bottom, 16)
+                    }
+                } else {
+                    // Fallback sample static milestone card
+                    HStack(spacing: 14) {
+                        Circle()
+                            .fill(trip.iconColor)
+                            .frame(width: 32, height: 32)
+                            .overlay {
+                                Image(systemName: trip.iconName)
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(.white)
+                            }
 
-                    Text("Start position")
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(.primary)
+                        Text(trip.destinationName)
+                            .font(.headline.weight(.semibold))
+                            .foregroundStyle(.primary)
 
-                    Spacer()
+                        Spacer()
 
-                    Text("9:45 PM")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        Text("Now")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+                    .padding(.bottom, 8)
+
+                    timelineSegment(title: "Passed Checkpoint", subtitle: "Along journey path", time: "Now")
+
+                    HStack(spacing: 0) {
+                        Rectangle()
+                            .fill(Color.secondary.opacity(0.25))
+                            .frame(width: 3, height: 16)
+                            .padding(.leading, 30.5)
+                        Spacer()
+                    }
+
+                    HStack(spacing: 14) {
+                        Circle()
+                            .fill(Color.blue)
+                            .frame(width: 32, height: 32)
+                            .overlay {
+                                Image(systemName: "mappin.fill")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(.white)
+                            }
+
+                        Text("Start position")
+                            .font(.headline.weight(.semibold))
+                            .foregroundStyle(.primary)
+
+                        Spacer()
+
+                        Text("Start")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+                    .padding(.bottom, 16)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 4)
-                .padding(.bottom, 16)
             }
             .background(Color.white, in: .rect(cornerRadius: 16))
         }

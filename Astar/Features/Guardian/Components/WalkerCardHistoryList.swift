@@ -39,63 +39,74 @@ struct WalkerCardHistoryList: View {
             }
 
             // Time Sections
-            ForEach(sections) { section in
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(section.title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
+            if sections.allSatisfy({ $0.trips.isEmpty }) {
+                Text("No walking history yet")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 32)
+                    .background(Color.white, in: .rect(cornerRadius: 16))
+            } else {
+                ForEach(sections) { section in
+                    if !section.trips.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text(section.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.secondary)
 
-                    VStack(spacing: 0) {
-                        ForEach(Array(section.trips.enumerated()), id: \.element.id) { index, trip in
-                            Button {
-                                onSelectTrip?(trip)
-                            } label: {
-                                HStack(spacing: 16) {
-                                    // Icon
-                                    Circle()
-                                        .fill(trip.iconColor)
-                                        .frame(width: 32, height: 32)
-                                        .overlay {
-                                            Image(systemName: trip.iconName)
-                                                .font(.system(size: 15, weight: .semibold))
-                                                .foregroundStyle(.white)
+                            VStack(spacing: 0) {
+                                ForEach(Array(section.trips.enumerated()), id: \.element.id) { index, trip in
+                                    Button {
+                                        onSelectTrip?(trip)
+                                    } label: {
+                                        HStack(spacing: 16) {
+                                            // Icon
+                                            Circle()
+                                                .fill(trip.iconColor)
+                                                .frame(width: 32, height: 32)
+                                                .overlay {
+                                                    Image(systemName: trip.iconName)
+                                                        .font(.system(size: 15, weight: .semibold))
+                                                        .foregroundStyle(.white)
+                                                }
+
+                                            // Text Info
+                                            VStack(alignment: .leading, spacing: 3) {
+                                                Text(trip.destinationName)
+                                                    .font(.headline.weight(.semibold))
+                                                    .foregroundStyle(.primary)
+
+                                                HStack(spacing: 4) {
+                                                    Text(trip.dateString)
+                                                    Text("•")
+                                                    Text("\(trip.durationString), \(trip.distanceString)")
+                                                }
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                                .lineLimit(1)
+                                            }
+
+                                            Spacer(minLength: 0)
+
+                                            Image(systemName: "chevron.right")
+                                                .font(.footnote.weight(.semibold))
+                                                .foregroundStyle(Color(UIColor.tertiaryLabel))
                                         }
-
-                                    // Text Info
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(trip.destinationName)
-                                            .font(.headline.weight(.semibold))
-                                            .foregroundStyle(.primary)
-
-                                        HStack(spacing: 4) {
-                                            Text(trip.dateString)
-                                            Text("•")
-                                            Text("\(trip.durationString), 1.4km")
-                                        }
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(1)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 14)
+                                        .contentShape(Rectangle())
                                     }
+                                    .buttonStyle(.plain)
 
-                                    Spacer(minLength: 0)
-
-                                    Image(systemName: "chevron.right")
-                                        .font(.footnote.weight(.semibold))
-                                        .foregroundStyle(Color(UIColor.tertiaryLabel))
+                                    if index < section.trips.count - 1 {
+                                        Divider()
+                                            .padding(.leading, 64)
+                                    }
                                 }
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 14)
-                                .contentShape(Rectangle())
                             }
-                            .buttonStyle(.plain)
-
-                            if index < section.trips.count - 1 {
-                                Divider()
-                                    .padding(.leading, 64)
-                            }
+                            .background(Color.white, in: .rect(cornerRadius: 16))
                         }
                     }
-                    .background(Color.white, in: .rect(cornerRadius: 16))
                 }
             }
         }

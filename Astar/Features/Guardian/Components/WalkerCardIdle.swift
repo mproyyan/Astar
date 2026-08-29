@@ -97,52 +97,60 @@ struct WalkerCardIdle: View {
 
             // History Card
             VStack(spacing: 0) {
-                ForEach(Array(trips.enumerated()), id: \.element.id) { index, trip in
-                    Button {
-                        onSelectTrip?(trip)
-                    } label: {
-                        HStack(spacing: 16) {
-                            // Icon
-                            Circle()
-                                .fill(trip.iconColor)
-                                .frame(width: 32, height: 32)
-                                .overlay {
-                                    Image(systemName: trip.iconName)
-                                        .font(.system(size: 15, weight: .semibold))
-                                        .foregroundStyle(.white)
+                if trips.isEmpty {
+                    Text("No walking history yet")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 24)
+                } else {
+                    ForEach(Array(trips.enumerated()), id: \.element.id) { index, trip in
+                        Button {
+                            onSelectTrip?(trip)
+                        } label: {
+                            HStack(spacing: 16) {
+                                // Icon
+                                Circle()
+                                    .fill(trip.iconColor)
+                                    .frame(width: 32, height: 32)
+                                    .overlay {
+                                        Image(systemName: trip.iconName)
+                                            .font(.system(size: 15, weight: .semibold))
+                                            .foregroundStyle(.white)
+                                    }
+
+                                // Text Info
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(trip.destinationName)
+                                        .font(.headline.weight(.semibold))
+                                        .foregroundStyle(.primary)
+
+                                    HStack(spacing: 4) {
+                                        Text(trip.dateString)
+                                        Text("•")
+                                        Text("\(trip.durationString), \(trip.distanceString)")
+                                    }
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
                                 }
 
-                            // Text Info
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(trip.destinationName)
-                                    .font(.headline.weight(.semibold))
-                                    .foregroundStyle(.primary)
+                                Spacer(minLength: 0)
 
-                                HStack(spacing: 4) {
-                                    Text(trip.dateString)
-                                    Text("•")
-                                    Text("\(trip.durationString), 1.4km")
-                                }
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
+                                Image(systemName: "chevron.right")
+                                    .font(.footnote.weight(.semibold))
+                                    .foregroundStyle(Color(UIColor.tertiaryLabel))
                             }
-
-                            Spacer(minLength: 0)
-
-                            Image(systemName: "chevron.right")
-                                .font(.footnote.weight(.semibold))
-                                .foregroundStyle(Color(UIColor.tertiaryLabel))
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 14)
+                            .contentShape(Rectangle())
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 14)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
+                        .buttonStyle(.plain)
 
-                    if index < trips.count - 1 {
-                        Divider()
-                            .padding(.leading, 64)
+                        if index < trips.count - 1 {
+                            Divider()
+                                .padding(.leading, 64)
+                        }
                     }
                 }
             }

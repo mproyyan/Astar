@@ -145,6 +145,22 @@ enum MockDoeWalkSimulation {
         return MKPolyline(coordinates: &coords, count: coords.count)
     }()
 
+    static var returnWaypoints: [CLLocationCoordinate2D] {
+        waypoints.reversed()
+    }
+
+    static let returnFallbackPolyline: MKPolyline = {
+        var coords = returnWaypoints
+        return MKPolyline(coordinates: &coords, count: coords.count)
+    }()
+
+    static func isNearHome(_ coordinate: CLLocationCoordinate2D?) -> Bool {
+        guard let coordinate else { return false }
+        let loc1 = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        let homeLoc = CLLocation(latitude: destinationCoordinate.latitude, longitude: destinationCoordinate.longitude)
+        return loc1.distance(from: homeLoc) < 150
+    }
+
     static func samplePoints(from polyline: MKPolyline, targetCount: Int = 10) -> [CLLocationCoordinate2D] {
         let allCoords = polyline.coordinates
         guard allCoords.count >= 2 else {
@@ -228,27 +244,68 @@ enum MockDoeWalkSimulation {
         )
     ]
 
+    static let returnCheckpointDefs: [CheckpointDef] = [
+        CheckpointDef(
+            landmarkName: "Start: Home",
+            address: "Bendungan Hilir, South Jakarta",
+            iconName: "house.fill",
+            coordinate: destinationCoordinate
+        ),
+        CheckpointDef(
+            landmarkName: "Passed Jl. Bendungan Hilir",
+            address: "Central Jakarta",
+            iconName: "figure.walk",
+            coordinate: waypoints[4]
+        ),
+        CheckpointDef(
+            landmarkName: "Passed JPO Phinisi",
+            address: "Karet Sudirman, Central Jakarta",
+            iconName: "figure.walk",
+            coordinate: waypoints[3]
+        ),
+        CheckpointDef(
+            landmarkName: "Passed Jl. Jend. Sudirman",
+            address: "Central Jakarta",
+            iconName: "figure.walk",
+            coordinate: waypoints[2]
+        ),
+        CheckpointDef(
+            landmarkName: "Passed Dukuh Atas",
+            address: "Jl. Jend. Sudirman, Central Jakarta",
+            iconName: "tram.fill",
+            coordinate: waypoints[1]
+        ),
+        CheckpointDef(
+            landmarkName: "Destination: Autograph Tower",
+            address: "Jl. M.H. Thamrin No. 10, Central Jakarta",
+            iconName: "building.2.fill",
+            coordinate: originCoordinate
+        )
+    ]
+
     static func journeyLog(
         forProgress progress: Double,
         currentCoord: CLLocationCoordinate2D,
         startTime: Date,
-        now: Date
+        now: Date,
+        isReturnTrip: Bool = false
     ) -> [JourneyLogEntry] {
         if progress >= 1.0 {
-            return completedJourneyLog(now: now)
+            return completedJourneyLog(isReturnTrip: isReturnTrip, now: now)
         }
 
+        let defs = isReturnTrip ? returnCheckpointDefs : checkpointDefs
         let startStr = DateFormatter.localizedString(from: startTime, dateStyle: .none, timeStyle: .short)
-        let numCheckpoints = checkpointDefs.count
+        let numCheckpoints = defs.count
         let passedCount = Int((progress * Double(numCheckpoints - 1)).rounded(.down))
 
         let currentLandmark: String
         let currentAddress: String
         if passedCount == 0 {
-            currentLandmark = "Near Autograph Tower"
-            currentAddress = checkpointDefs[0].address
+            currentLandmark = isReturnTrip ? "Near Home" : "Near Autograph Tower"
+            currentAddress = defs[0].address
         } else {
-            let def = checkpointDefs[min(passedCount, checkpointDefs.count - 2)]
+            let def = defs[min(passedCount, defs.count - 2)]
             currentLandmark = def.landmarkName.replacingOccurrences(of: "Passed ", with: "Near ")
             currentAddress = def.address
         }
@@ -266,8 +323,8 @@ enum MockDoeWalkSimulation {
         var entries: [JourneyLogEntry] = [currentEntry]
 
         if passedCount >= 1 {
-            for i in stride(from: min(passedCount, checkpointDefs.count - 2), through: 1, by: -1) {
-                let def = checkpointDefs[i]
+            for i in stride(from: min(passedCount, defs.count - 2), through: 1, by: -1) {
+                let def = defs[i]
                 entries.append(
                     JourneyLogEntry(
                         id: UUID(),
@@ -285,12 +342,12 @@ enum MockDoeWalkSimulation {
         entries.append(
             JourneyLogEntry(
                 id: UUID(),
-                landmarkName: checkpointDefs[0].landmarkName,
-                address: checkpointDefs[0].address,
+                landmarkName: defs[0].landmarkName,
+                address: defs[0].address,
                 timeString: startStr,
-                iconName: checkpointDefs[0].iconName,
+                iconName: defs[0].iconName,
                 entryType: .start,
-                coordinate: checkpointDefs[0].coordinate
+                coordinate: defs[0].coordinate
             )
         )
 
@@ -309,15 +366,19 @@ enum MockDoeWalkSimulation {
     static func completedTrip(
         id: UUID? = nil,
         now: Date = Date(),
-        tripIndex: Int = 0
+        tripIndex: Int = 0,
+        isReturnTrip: Bool = false
     ) -> WalkerHistoryTrip {
-        let finalLog = completedJourneyLog(now: now)
-        let resolvedID = id ?? (tripIndex == 0 ? completedTripID : UUID())
+        let finalLog = completedJourneyLog(isReturnTrip: isReturnTrip, now: now)
+        let resolvedID = id ?? UUID()
+        let destName = isReturnTrip ? "Office" : "Home"
+        let destIcon = isReturnTrip ? "building.2.fill" : "house.fill"
+        let iconColor: Color = isReturnTrip ? Color(red: 0.35, green: 0.34, blue: 0.84) : .blue
         return WalkerHistoryTrip(
             id: resolvedID,
-            destinationName: "Home",
-            iconName: "house.fill",
-            iconColor: .blue,
+            destinationName: destName,
+            iconName: destIcon,
+            iconColor: iconColor,
             dateString: "Today, " + DateFormatter.localizedString(from: now, dateStyle: .none, timeStyle: .short),
             durationString: "18 min",
             distanceString: "1.9 km",
@@ -325,13 +386,72 @@ enum MockDoeWalkSimulation {
         )
     }
 
-    static func journeyLogFromStartToFinish(now: Date = Date()) -> [JourneyLogEntry] {
-        return completedJourneyLog(now: now)
+    static func journeyLogFromStartToFinish(isReturnTrip: Bool = false, now: Date = Date()) -> [JourneyLogEntry] {
+        return completedJourneyLog(isReturnTrip: isReturnTrip, now: now)
     }
 
-    static func completedJourneyLog(now: Date = Date()) -> [JourneyLogEntry] {
+    static func completedJourneyLog(isReturnTrip: Bool = false, now: Date = Date()) -> [JourneyLogEntry] {
         let timeStr = DateFormatter.localizedString(from: now, dateStyle: .none, timeStyle: .short)
         let earlierTimeStr = DateFormatter.localizedString(from: now.addingTimeInterval(-15 * 60), dateStyle: .none, timeStyle: .short)
+
+        if isReturnTrip {
+            return [
+                JourneyLogEntry(
+                    id: autographEntryID,
+                    landmarkName: "Destination: Autograph Tower",
+                    address: "Jl. M.H. Thamrin No. 10, Central Jakarta",
+                    timeString: timeStr,
+                    iconName: "building.2.fill",
+                    entryType: .destination,
+                    coordinate: originCoordinate
+                ),
+                JourneyLogEntry(
+                    id: dukuhAtasEntryID,
+                    landmarkName: "Passed Dukuh Atas",
+                    address: "Jl. Jend. Sudirman, Central Jakarta",
+                    timeString: timeStr,
+                    iconName: "tram.fill",
+                    entryType: .checkpoint,
+                    coordinate: waypoints[1]
+                ),
+                JourneyLogEntry(
+                    id: sudirmanEntryID,
+                    landmarkName: "Passed Jl. Jend. Sudirman",
+                    address: "Central Jakarta",
+                    timeString: timeStr,
+                    iconName: "figure.walk",
+                    entryType: .checkpoint,
+                    coordinate: waypoints[2]
+                ),
+                JourneyLogEntry(
+                    id: phinisiEntryID,
+                    landmarkName: "Passed JPO Phinisi",
+                    address: "Karet Sudirman, Central Jakarta",
+                    timeString: earlierTimeStr,
+                    iconName: "figure.walk",
+                    entryType: .checkpoint,
+                    coordinate: waypoints[3]
+                ),
+                JourneyLogEntry(
+                    id: benhilEntryID,
+                    landmarkName: "Passed Jl. Bendungan Hilir",
+                    address: "Central Jakarta",
+                    timeString: earlierTimeStr,
+                    iconName: "figure.walk",
+                    entryType: .checkpoint,
+                    coordinate: waypoints[4]
+                ),
+                JourneyLogEntry(
+                    id: destinationEntryID,
+                    landmarkName: "Start: Home",
+                    address: "Bendungan Hilir, South Jakarta",
+                    timeString: earlierTimeStr,
+                    iconName: "house.fill",
+                    entryType: .start,
+                    coordinate: destinationCoordinate
+                )
+            ]
+        }
 
         return [
             JourneyLogEntry(

@@ -5,6 +5,7 @@ import MapKit
 import SwiftUI
 @testable import Astar
 
+@Suite(.serialized)
 struct MainMapFeatureTests {
   @Test
   @MainActor
@@ -132,6 +133,23 @@ struct MainMapFeatureTests {
 
   @Test
   @MainActor
+  func testSelectPersonAccompany() async {
+    let store = TestStore(initialState: MainMapFeature.State()) {
+      MainMapFeature()
+    }
+
+    let person = Person(
+        name: "Companion Person",
+        status: "accompany"
+    )
+
+    await store.send(.selectPerson(person)) {
+      $0.sheet = .walker(MapWalkerSheetFeature.State(walker: person, status: person.status, isDestinationReached: false))
+    }
+  }
+
+  @Test
+  @MainActor
   func testStartAlwaysHomeNavigation() async {
     let homePlace = MapSampleData.savedPlaces.first(where: { $0.name == "Home" })!
     let mockCoord = CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
@@ -144,6 +162,7 @@ struct MainMapFeatureTests {
       route: nil
     )
 
+    DeveloperSettingsStorage.isDevelopmentMode = false
     let store = TestStore(initialState: MainMapFeature.State()) {
       MainMapFeature()
     } withDependencies: {
@@ -240,6 +259,7 @@ struct MainMapFeatureTests {
       route: nil
     )
 
+    DeveloperSettingsStorage.isDevelopmentMode = false
     let store = TestStore(initialState: MainMapFeature.State()) {
       MainMapFeature()
     } withDependencies: {
@@ -338,11 +358,12 @@ struct MainMapFeatureTests {
       status: "Walking",
       isDestinationReached: false
     )
-    expectedWalkerState.originPlaceName = "Current Location"
-    expectedWalkerState.originIconName = "location.fill"
+    expectedWalkerState.originPlaceName = "Autograph Tower"
+    expectedWalkerState.originIconName = "briefcase.fill"
     expectedWalkerState.destinationPlaceName = "Home"
     expectedWalkerState.destinationIconName = "house.fill"
     expectedWalkerState.journeyLogEntries = MockDoeWalkSimulation.journeyLogFromStartToFinish(now: now)
+    expectedWalkerState.trips = []
 
     await store.send(.selectPerson(walkingDoe)) {
       $0.sheet = .walker(expectedWalkerState)
@@ -379,6 +400,7 @@ struct MainMapFeatureTests {
     }
 
     let idleWalker = Person(id: Person.mockDoeID, name: "Doe", status: "Idle")
+    let completedTrip = MockDoeWalkSimulation.completedTrip(now: now)
 
     await store.send(.mockDoeReachedDestination) {
       $0.activeWalkSessionID = nil
@@ -386,6 +408,7 @@ struct MainMapFeatureTests {
       $0.trackedWalkerRoute = nil
       $0.trackedWalkerDestination = nil
       $0.trackedWalkerLocation = MockDoeWalkSimulation.destinationCoordinate
+      $0.mockDoeHistoryTrips = [completedTrip]
       var expectedWalkerState = MapWalkerSheetFeature.State(
         walker: idleWalker,
         status: "Idle",
@@ -393,7 +416,7 @@ struct MainMapFeatureTests {
         activeParticipantID: nil
       )
       expectedWalkerState.journeyLogEntries = MockDoeWalkSimulation.completedJourneyLog(now: now)
-      expectedWalkerState.trips = [MockDoeWalkSimulation.completedTrip(now: now)] + WalkerSampleData.defaultTrips
+      expectedWalkerState.trips = [completedTrip]
       $0.sheet = .walker(expectedWalkerState)
     }
 
@@ -519,13 +542,93 @@ struct MainMapFeatureTests {
     }
 
     await store.send(.resetDoeWalking) {
-      $0.trackedWalkerLocation = nil
+      // Preserves accurate location!
       $0.trackedWalkerDestination = nil
       $0.trackedWalkerRoute = nil
       $0.hasFittedTrackedWalker = false
     }
 
     await store.receive(.delegate(.walkerStatusChanged(id: Person.mockDoeID, newStatus: "Walking")))
+  }
+
+  @Test
+  @MainActor
+  func testSelectPersonDoeWhenAtHomeSetsReturnTripDestination() async {
+    let doe = Person(id: Person.mockDoeID, name: "Doe", status: "Walking")
+    let store = TestStore(initialState: MainMapFeature.State(
+      trackedWalkerLocation: MockDoeWalkSimulation.destinationCoordinate
+    )) {
+      MainMapFeature()
+    } withDependencies: {
+      $0.date.now = Date(timeIntervalSince1970: 1000)
+    }
+
+    await store.send(.selectPerson(doe)) {
+      var walkerState = MapWalkerSheetFeature.State(
+        walker: doe,
+        status: "Walking",
+        isDestinationReached: false
+      )
+      walkerState.originPlaceName = "Home"
+      walkerState.originIconName = "house.fill"
+      walkerState.destinationPlaceName = "Autograph Tower"
+      walkerState.destinationIconName = "building.2.fill"
+      walkerState.journeyLogEntries = MockDoeWalkSimulation.completedJourneyLog(isReturnTrip: true, now: Date(timeIntervalSince1970: 1000))
+      walkerState.trips = []
+      $0.sheet = .walker(walkerState)
+    }
+  }
+
+  @Test
+  @MainActor
+  func testDoeMultipleWalksRecordedInHistory() async {
+    let now1 = Date(timeIntervalSince1970: 1000)
+    let now2 = Date(timeIntervalSince1970: 3000)
+
+    let trip1 = MockDoeWalkSimulation.completedTrip(now: now1, isReturnTrip: false)
+    let trip2 = MockDoeWalkSimulation.completedTrip(now: now2, isReturnTrip: true)
+
+    // 1. First walk: Doe reaches Home
+    let store = TestStore(initialState: MainMapFeature.State(
+      trackedWalkerDestinationName: "Home",
+      mockDoeHistoryTrips: []
+    )) {
+      MainMapFeature()
+    } withDependencies: {
+      $0.date.now = now1
+      $0.trackingClient.updateUserStatus = { _, _, _, _ in }
+    }
+
+    await store.send(.mockDoeReachedDestination) {
+      $0.trackedWalkerLocation = MockDoeWalkSimulation.destinationCoordinate
+      $0.mockDoeHistoryTrips = [trip1]
+    }
+    await store.receive(.delegate(.walkerStatusChanged(id: Person.mockDoeID, newStatus: "Idle")))
+    await store.receive(.delegate(.companionStatusChanged(newStatus: "idle")))
+    #expect(store.state.mockDoeHistoryTrips == [trip1])
+
+    // 2. Return walk: Doe reaches Autograph Tower and adds return trip to history
+    let returnStore = TestStore(initialState: MainMapFeature.State(
+      trackedWalkerLocation: MockDoeWalkSimulation.destinationCoordinate,
+      trackedWalkerDestinationName: "Autograph Tower",
+      mockDoeHistoryTrips: [trip1]
+    )) {
+      MainMapFeature()
+    } withDependencies: {
+      $0.date.now = now2
+      $0.trackingClient.updateUserStatus = { _, _, _, _ in }
+    }
+
+    await returnStore.send(.mockDoeReachedDestination) {
+      $0.trackedWalkerLocation = MockDoeWalkSimulation.originCoordinate
+      $0.mockDoeHistoryTrips = [trip2, trip1]
+    }
+    await returnStore.receive(.delegate(.walkerStatusChanged(id: Person.mockDoeID, newStatus: "Idle")))
+    await returnStore.receive(.delegate(.companionStatusChanged(newStatus: "idle")))
+
+    #expect(returnStore.state.mockDoeHistoryTrips.count == 2)
+    #expect(returnStore.state.mockDoeHistoryTrips[0] == trip2)
+    #expect(returnStore.state.mockDoeHistoryTrips[1] == trip1)
   }
 
   @Test

@@ -3,6 +3,7 @@ import Testing
 import CoreLocation
 @testable import Astar
 
+@Suite(.serialized)
 struct MapSearchSheetFeatureTests {
   @Test
   @MainActor
