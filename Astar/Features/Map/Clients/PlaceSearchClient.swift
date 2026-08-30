@@ -42,7 +42,7 @@ enum PlaceSearchEngine {
     let center = userLocation ?? CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
     let searchRegion = MKCoordinateRegion(
       center: center,
-      span: MKCoordinateSpan(latitudeDelta: 0.5, longitudeDelta: 0.5)
+      span: MKCoordinateSpan(latitudeDelta: 1.5, longitudeDelta: 1.5)
     )
 
     var liveResults: [SavedPlace] = []
@@ -73,25 +73,52 @@ enum PlaceSearchEngine {
     await withTaskGroup(of: SavedPlace?.self) { group in
       for completion in completions.prefix(12) {
         group.addTask { @MainActor in
+          // A. Resolve completion via MKLocalSearch without restricting region (retains completion's geographic context)
           let compRequest = MKLocalSearch.Request(completion: completion)
           compRequest.resultTypes = [.pointOfInterest, .address]
-          compRequest.region = searchRegion
 
           if let compResponse = try? await MKLocalSearch(request: compRequest).start(),
              let firstItem = compResponse.mapItems.first {
             return convertMapItemToSavedPlace(item: firstItem, userLocation: userLocation, cleanQuery: completion.title)
           }
 
-          let icon = completion.subtitle.localizedCaseInsensitiveContains("station") ? "tram.fill" :
-                     completion.subtitle.localizedCaseInsensitiveContains("restaurant") || completion.subtitle.localizedCaseInsensitiveContains("food") ? "fork.knife" :
-                     completion.subtitle.localizedCaseInsensitiveContains("mall") || completion.subtitle.localizedCaseInsensitiveContains("shop") ? "bag.fill" : "mappin.and.ellipse"
+          // B. Direct natural language search fallback
+          let directReq = MKLocalSearch.Request()
+          directReq.naturalLanguageQuery = completion.subtitle.isEmpty ? completion.title : "\(completion.title), \(completion.subtitle)"
+          directReq.region = searchRegion
+          if let directResp = try? await MKLocalSearch(request: directReq).start(),
+             let firstItem = directResp.mapItems.first {
+            return convertMapItemToSavedPlace(item: firstItem, userLocation: userLocation, cleanQuery: completion.title)
+          }
+
+          // C. CoreLocation forward geocoding fallback
+          let geocoder = CLGeocoder()
+          let addrString = completion.subtitle.isEmpty ? completion.title : "\(completion.title), \(completion.subtitle)"
+          var resolvedCoord: CLLocationCoordinate2D? = nil
+          var distanceString: String? = nil
+
+          if let placemarks = try? await geocoder.geocodeAddressString(addrString),
+             let location = placemarks.first?.location {
+            resolvedCoord = location.coordinate
+            if let userLocation {
+              let userCL = CLLocation(latitude: userLocation.latitude, longitude: userLocation.longitude)
+              let distMeters = userCL.distance(from: location)
+              if distMeters < 1000 {
+                distanceString = "\(Int(distMeters)) m"
+              } else {
+                distanceString = String(format: "%.1f km", distMeters / 1000.0)
+              }
+            }
+          }
+
+          let icon = categoryIcon(for: nil, name: completion.title, subtitle: completion.subtitle)
 
           return SavedPlace(
             name: completion.title,
             subtitle: completion.subtitle.isEmpty ? "Jakarta, Indonesia" : completion.subtitle,
             iconName: icon,
-            distance: nil,
-            coordinate: nil
+            distance: distanceString,
+            coordinate: resolvedCoord
           )
         }
       }
@@ -158,7 +185,7 @@ enum PlaceSearchEngine {
       }
     }
 
-    let icon = categoryIcon(for: item.pointOfInterestCategory)
+    let icon = categoryIcon(for: item.pointOfInterestCategory, name: name, subtitle: subtitle)
 
     return SavedPlace(
       name: name,
@@ -222,38 +249,68 @@ enum PlaceSearchEngine {
     }
   }
 
-  static func categoryIcon(for category: MKPointOfInterestCategory?) -> String {
-    guard let category else { return "mappin.and.ellipse" }
-    switch category {
-    case .restaurant, .foodMarket:
-      return "fork.knife"
-    case .cafe, .bakery:
-      return "cup.and.saucer.fill"
-    case .store:
-      return "bag.fill"
-    case .fitnessCenter:
-      return "figure.strengthtraining.traditional"
-    case .publicTransport:
-      return "tram.fill"
-    case .airport:
-      return "airplane"
-    case .hotel:
-      return "bed.double.fill"
-    case .hospital, .pharmacy:
-      return "cross.case.fill"
-    case .park, .nationalPark:
-      return "tree.fill"
-    case .school, .university:
-      return "graduationcap.fill"
-    case .landmark:
-      return "landmark.fill"
-    case .nightlife:
-      return "wineglass.fill"
-    case .gasStation, .evCharger:
-      return "fuelpump.fill"
-    default:
-      return "mappin.and.ellipse"
+  static func categoryIcon(for category: MKPointOfInterestCategory?, name: String = "", subtitle: String = "") -> String {
+    if let category {
+      switch category {
+      case .fitnessCenter:
+        return "figure.strengthtraining.traditional"
+      case .restaurant, .foodMarket:
+        return "fork.knife"
+      case .cafe, .bakery:
+        return "cup.and.saucer.fill"
+      case .store:
+        return "bag.fill"
+      case .publicTransport:
+        return "tram.fill"
+      case .airport:
+        return "airplane"
+      case .hotel:
+        return "bed.double.fill"
+      case .hospital, .pharmacy:
+        return "cross.case.fill"
+      case .park, .nationalPark:
+        return "tree.fill"
+      case .school, .university:
+        return "graduationcap.fill"
+      case .landmark:
+        return "landmark.fill"
+      case .nightlife:
+        return "wineglass.fill"
+      case .gasStation, .evCharger:
+        return "fuelpump.fill"
+      default:
+        break
+      }
     }
+
+    let text = "\(name) \(subtitle)".lowercased()
+    if text.contains("gym") || text.contains("fitness") || text.contains("workout") || text.contains("sport") || text.contains("badminton") || text.contains("futsal") || text.contains("arena") || text.contains("stadium") {
+      return "figure.strengthtraining.traditional"
+    } else if text.contains("cafe") || text.contains("coffee") || text.contains("kopi") || text.contains("starbucks") || text.contains("bakery") {
+      return "cup.and.saucer.fill"
+    } else if text.contains("resto") || text.contains("restaurant") || text.contains("makan") || text.contains("food") || text.contains("kitchen") || text.contains("dining") || text.contains("kuliner") || text.contains("warung") {
+      return "fork.knife"
+    } else if text.contains("mall") || text.contains("plaza") || text.contains("store") || text.contains("mart") || text.contains("shop") || text.contains("supermarket") || text.contains("pasar") {
+      return "bag.fill"
+    } else if text.contains("station") || text.contains("stasiun") || text.contains("mrt") || text.contains("lrt") || text.contains("busway") || text.contains("terminal") || text.contains("halte") {
+      return "tram.fill"
+    } else if text.contains("airport") || text.contains("bandara") {
+      return "airplane"
+    } else if text.contains("hotel") || text.contains("resort") || text.contains("inn") || text.contains("hostel") || text.contains("villa") {
+      return "bed.double.fill"
+    } else if text.contains("hospital") || text.contains("rumah sakit") || text.contains("rs ") || text.contains("rsud") || text.contains("clinic") || text.contains("klinik") || text.contains("apotek") || text.contains("pharmacy") {
+      return "cross.case.fill"
+    } else if text.contains("park") || text.contains("taman") || text.contains("hutan") || text.contains("kebun") {
+      return "tree.fill"
+    } else if text.contains("school") || text.contains("sekolah") || text.contains("universitas") || text.contains("university") || text.contains("kampus") || text.contains("college") {
+      return "graduationcap.fill"
+    } else if text.contains("office") || text.contains("kantor") || text.contains("tower") || text.contains("gedung") || text.contains("building") {
+      return "building.2.fill"
+    } else if text.contains("home") || text.contains("rumah") || text.contains("kost") || text.contains("residence") || text.contains("apartment") || text.contains("apartemen") {
+      return "house.fill"
+    }
+
+    return "mappin.fill"
   }
 }
 

@@ -201,7 +201,14 @@ struct SavedPlacesFeature {
                         iconName = "briefcase.fill"
                         categoryLabel = "Office"
                     case .custom:
-                        iconName = "mappin.fill"
+                        let inferred = PlaceSearchEngine.categoryIcon(for: nil, name: finalName, subtitle: targetPlace.subtitle)
+                        if targetPlace.resolvedIconName != "mappin.fill" {
+                            iconName = targetPlace.resolvedIconName
+                        } else if inferred != "mappin.fill" {
+                            iconName = inferred
+                        } else {
+                            iconName = "mappin.fill"
+                        }
                         categoryLabel = finalName
                     }
                 } else if finalName.lowercased() == "home" {
@@ -211,7 +218,14 @@ struct SavedPlacesFeature {
                     iconName = "briefcase.fill"
                     categoryLabel = "Office"
                 } else {
-                    iconName = "mappin.fill"
+                    let inferred = PlaceSearchEngine.categoryIcon(for: nil, name: finalName, subtitle: targetPlace.subtitle)
+                    if targetPlace.resolvedIconName != "mappin.fill" {
+                        iconName = targetPlace.resolvedIconName
+                    } else if inferred != "mappin.fill" {
+                        iconName = inferred
+                    } else {
+                        iconName = "mappin.fill"
+                    }
                     categoryLabel = finalName
                 }
 

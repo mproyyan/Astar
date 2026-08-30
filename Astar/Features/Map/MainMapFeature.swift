@@ -325,7 +325,7 @@ struct MainMapFeature {
           }) ?? SavedPlace(
             name: cleanQuery,
             subtitle: "Jakarta, Indonesia",
-            iconName: "mappin.and.ellipse"
+            iconName: "mappin.fill"
           )
         }
 
@@ -353,7 +353,7 @@ struct MainMapFeature {
         )
         state.sheet = .direction(directionState)
 
-        return .run { [matchedPlace] send in
+        return .run { [matchedPlace, savedPlaces = state.savedPlaces] send in
           let originCoord = await locationManager.getCurrentLocation()
             ?? CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
 
@@ -361,28 +361,50 @@ struct MainMapFeature {
 
           var destCoord = matchedPlace.coordinate
           if destCoord == nil {
-            let query: String
             let lowerName = matchedPlace.name.lowercased()
-            if lowerName == "office" || lowerName == "work" || lowerName.contains("autograph") {
-              query = "Autograph Tower, Thamrin Nine, Central Jakarta"
-            } else if lowerName == "home" {
-              query = "Bendungan Hilir, Central Jakarta"
-            } else if lowerName == "gym" || lowerName.contains("agora") {
-              query = "Agora Mall, Thamrin Nine, Central Jakarta"
+            if lowerName == "home" {
+              destCoord = savedPlaces.first(where: { $0.isHome })?.coordinate
+                ?? CLLocationCoordinate2D(latitude: -6.2125, longitude: 106.8166)
+            } else if lowerName == "office" || lowerName == "work" {
+              destCoord = savedPlaces.first(where: { $0.isOffice })?.coordinate
+                ?? CLLocationCoordinate2D(latitude: -6.1991, longitude: 106.8212)
             } else {
-              query = "\(matchedPlace.name) \(matchedPlace.subtitle)"
-            }
+              let searchReq = MKLocalSearch.Request()
+              searchReq.naturalLanguageQuery = matchedPlace.name
+              let jabodetabekRegion = MKCoordinateRegion(
+                center: originCoord,
+                span: MKCoordinateSpan(latitudeDelta: 1.5, longitudeDelta: 1.5)
+              )
+              searchReq.region = jabodetabekRegion
 
-            let searchReq = MKLocalSearch.Request()
-            searchReq.naturalLanguageQuery = query
-            if let resp = try? await MKLocalSearch(request: searchReq).start(),
-               let firstItem = resp.mapItems.first {
-              destCoord = firstItem.placemark.coordinate
-            } else {
-              destCoord = CLLocationCoordinate2D(latitude: -6.1991, longitude: 106.8212)
+              if let resp = try? await MKLocalSearch(request: searchReq).start(),
+                 let firstItem = resp.mapItems.first {
+                destCoord = firstItem.placemark.coordinate
+              } else {
+                let detailedReq = MKLocalSearch.Request()
+                let cleanSub = matchedPlace.subtitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                detailedReq.naturalLanguageQuery = cleanSub.isEmpty ? matchedPlace.name : "\(matchedPlace.name) \(cleanSub)"
+                detailedReq.region = jabodetabekRegion
+
+                if let resp = try? await MKLocalSearch(request: detailedReq).start(),
+                   let firstItem = resp.mapItems.first {
+                  destCoord = firstItem.placemark.coordinate
+                } else {
+                  let geocoder = CLGeocoder()
+                  let queryAddr = cleanSub.isEmpty ? matchedPlace.name : "\(matchedPlace.name), \(cleanSub)"
+                  if let placemarks = try? await geocoder.geocodeAddressString(queryAddr),
+                     let loc = placemarks.first?.location?.coordinate {
+                    destCoord = loc
+                  } else if !cleanSub.isEmpty,
+                            let placemarks = try? await geocoder.geocodeAddressString(cleanSub),
+                            let loc = placemarks.first?.location?.coordinate {
+                    destCoord = loc
+                  }
+                }
+              }
             }
           }
-          let resolvedDest = destCoord ?? CLLocationCoordinate2D(latitude: -6.1991, longitude: 106.8212)
+          let resolvedDest = destCoord ?? originCoord
 
           async let routeInfo = directionRoute.calculateWalkingRoute(origin: originCoord, destination: resolvedDest)
 

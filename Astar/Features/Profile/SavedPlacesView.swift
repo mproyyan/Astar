@@ -74,7 +74,7 @@ struct SavedPlacesView: View {
                                 CircularPlaceCard(
                                     title: place.label ?? place.name,
                                     subtitle: "Change",
-                                    iconName: place.iconName.isEmpty ? "mappin.fill" : place.iconName,
+                                    iconName: place.resolvedIconName,
                                     categoryColor: place.categoryColor,
                                     onAction: {
                                         store.send(.changeLocationTapped(place, .custom))
@@ -182,7 +182,7 @@ private struct CircularPlaceCard<MenuContent: View>: View {
                     .fill(categoryColor)
                     .frame(width: 80, height: 80)
                     .overlay {
-                        Image(systemName: iconName)
+                        Image(systemName: iconName.isEmpty || iconName == "mappin.and.ellipse" ? "mappin.fill" : iconName)
                             .font(.system(size: 34, weight: .semibold))
                             .foregroundStyle(.white)
                     }
@@ -229,13 +229,20 @@ private struct PinPlaceSheet: View {
             switch preset {
             case .home: return Color(red: 0.15, green: 0.75, blue: 0.85)
             case .office: return Color(red: 0.65, green: 0.48, blue: 0.35)
-            case .custom: return Color(red: 0.98, green: 0.78, blue: 0.12)
+            case .custom:
+                if let selected = store.selectedPlaceForLabel {
+                    return selected.categoryColor
+                }
+                return Color(red: 0.98, green: 0.78, blue: 0.12)
             }
         }
         if store.customLabel.lowercased() == "home" {
             return Color(red: 0.15, green: 0.75, blue: 0.85)
         } else if store.customLabel.lowercased() == "office" || store.customLabel.lowercased() == "work" {
             return Color(red: 0.65, green: 0.48, blue: 0.35)
+        }
+        if let selected = store.selectedPlaceForLabel {
+            return selected.categoryColor
         }
         return Color(red: 0.98, green: 0.78, blue: 0.12)
     }
@@ -245,13 +252,20 @@ private struct PinPlaceSheet: View {
             switch preset {
             case .home: return "house.fill"
             case .office: return "briefcase.fill"
-            case .custom: return "mappin.fill"
+            case .custom:
+                if let selected = store.selectedPlaceForLabel {
+                    return selected.resolvedIconName
+                }
+                return "mappin.fill"
             }
         }
         if store.customLabel.lowercased() == "home" {
             return "house.fill"
         } else if store.customLabel.lowercased() == "office" || store.customLabel.lowercased() == "work" {
             return "briefcase.fill"
+        }
+        if let selected = store.selectedPlaceForLabel {
+            return selected.resolvedIconName
         }
         return "mappin.fill"
     }
@@ -290,12 +304,11 @@ private struct PinPlaceSheet: View {
                                             isSearchFocused = false
                                         } label: {
                                             HStack(spacing: 14) {
-                                                // Landmark Red Pin Circle
                                                 Circle()
-                                                    .fill(Color(red: 0.95, green: 0.25, blue: 0.22))
+                                                    .fill(place.categoryColor)
                                                     .frame(width: 36, height: 36)
                                                     .overlay {
-                                                        Image(systemName: "mappin.fill")
+                                                        Image(systemName: place.resolvedIconName)
                                                             .font(.system(size: 18, weight: .semibold))
                                                             .foregroundStyle(.white)
                                                     }

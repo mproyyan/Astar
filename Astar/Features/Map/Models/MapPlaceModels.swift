@@ -103,15 +103,23 @@ extension SavedPlace {
         !isHome && !isOffice
     }
 
+    var resolvedIconName: String {
+        let trimmed = iconName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty || trimmed == "mappin.and.ellipse" {
+            return "mappin.fill"
+        }
+        return trimmed
+    }
+
     var categoryColor: Color {
         if isHome {
             return Color(red: 0.15, green: 0.75, blue: 0.85)
         } else if isOffice {
             return Color(red: 0.65, green: 0.48, blue: 0.35)
-        } else if isCustom && (iconName == "mappin.fill" || iconName == "key.fill" || label != nil) {
+        } else if isCustom && (resolvedIconName == "mappin.fill" || resolvedIconName == "key.fill" || label != nil) {
             return Color(red: 0.98, green: 0.78, blue: 0.05)
         }
-        return SavedPlace.categoryColor(for: iconName)
+        return SavedPlace.categoryColor(for: resolvedIconName)
     }
 
     static func categoryColor(for iconName: String) -> Color {
@@ -162,7 +170,7 @@ extension SavedPlace {
             return Color.blue // Current Location: Apple Blue
 
         default:
-            return Color(red: 0.55, green: 0.62, blue: 0.82) // General/Address: Periwinkle Slate
+            return Color(red: 0.92, green: 0.25, blue: 0.20) // Default Search Map Pin: Red (Figma)
         }
     }
 }

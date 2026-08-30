@@ -78,28 +78,53 @@ struct MapDirectionSheetFeature {
 
           var destCoord = destination.coordinate
           if destCoord == nil {
-            let query: String
             let lowerName = destination.name.lowercased()
             if lowerName == "home" {
-              query = "Bendungan Hilir, Central Jakarta"
+              destCoord = SavedPlacesStorage.load().first(where: { $0.isHome })?.coordinate
+                ?? CLLocationCoordinate2D(latitude: -6.2125, longitude: 106.8166)
             } else if lowerName == "office" || lowerName == "work" {
-              query = "Autograph Tower, Thamrin Nine, Central Jakarta"
-            } else if lowerName == "gym" {
-              query = "Agora Mall, Thamrin Nine, Central Jakarta"
+              destCoord = SavedPlacesStorage.load().first(where: { $0.isOffice })?.coordinate
+                ?? CLLocationCoordinate2D(latitude: -6.1991, longitude: 106.8212)
             } else {
-              query = "\(destination.name) \(destination.subtitle)"
-            }
+              // 1. Regional search for destination name
+              let searchReq = MKLocalSearch.Request()
+              searchReq.naturalLanguageQuery = destination.name
+              let jabodetabekRegion = MKCoordinateRegion(
+                center: originCoord,
+                span: MKCoordinateSpan(latitudeDelta: 1.5, longitudeDelta: 1.5)
+              )
+              searchReq.region = jabodetabekRegion
 
-            let searchReq = MKLocalSearch.Request()
-            searchReq.naturalLanguageQuery = query
-            if let resp = try? await MKLocalSearch(request: searchReq).start(),
-               let firstItem = resp.mapItems.first {
-              destCoord = firstItem.placemark.coordinate
-            } else {
-              destCoord = CLLocationCoordinate2D(latitude: -6.2125, longitude: 106.8166)
+              if let resp = try? await MKLocalSearch(request: searchReq).start(),
+                 let firstItem = resp.mapItems.first {
+                destCoord = firstItem.placemark.coordinate
+              } else {
+                // 2. Detailed search with name + subtitle
+                let detailedReq = MKLocalSearch.Request()
+                let cleanSub = destination.subtitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                detailedReq.naturalLanguageQuery = cleanSub.isEmpty ? destination.name : "\(destination.name) \(cleanSub)"
+                detailedReq.region = jabodetabekRegion
+
+                if let resp = try? await MKLocalSearch(request: detailedReq).start(),
+                   let firstItem = resp.mapItems.first {
+                  destCoord = firstItem.placemark.coordinate
+                } else {
+                  // 3. CoreLocation forward geocoding on name/subtitle
+                  let geocoder = CLGeocoder()
+                  let queryAddr = cleanSub.isEmpty ? destination.name : "\(destination.name), \(cleanSub)"
+                  if let placemarks = try? await geocoder.geocodeAddressString(queryAddr),
+                     let loc = placemarks.first?.location?.coordinate {
+                    destCoord = loc
+                  } else if !cleanSub.isEmpty,
+                            let placemarks = try? await geocoder.geocodeAddressString(cleanSub),
+                            let loc = placemarks.first?.location?.coordinate {
+                    destCoord = loc
+                  }
+                }
+              }
             }
           }
-          let resolvedDest = destCoord ?? CLLocationCoordinate2D(latitude: -6.2125, longitude: 106.8166)
+          let resolvedDest = destCoord ?? originCoord
 
           async let routeInfo = directionRoute.calculateWalkingRoute(origin: originCoord, destination: resolvedDest)
 

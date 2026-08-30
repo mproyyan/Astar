@@ -116,4 +116,44 @@ struct MapDirectionSheetFeatureTests {
       $0.journeyLogEntries = [destEntry, intermediateEntry]
     }
   }
+
+  @Test
+  @MainActor
+  func testOnAppearPreservesValidDestinationCoordinate() async {
+    let cibuburCoord = CLLocationCoordinate2D(latitude: -6.3725, longitude: 106.9015)
+    let dest = SavedPlace(
+      name: "Kopi Kenangan Cibubur Drive Thru",
+      subtitle: "Cibubur, East Jakarta",
+      iconName: "cup.and.saucer.fill",
+      coordinate: cibuburCoord
+    )
+    let origin = CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
+    let sampleRouteInfo = WalkingRouteInfo(
+      travelTimeString: "4 hr 20 min",
+      etaString: "15.20 ETA",
+      distanceString: "22.0 km",
+      rawTravelTime: 16000,
+      rawDistanceMeters: 22000,
+      route: nil,
+      fallbackPolyline: nil
+    )
+
+    let store = TestStore(initialState: MapDirectionSheetFeature.State(destination: dest)) {
+      MapDirectionSheetFeature()
+    } withDependencies: {
+      $0.uuid = .incrementing
+      $0.directionRoute.reverseGeocode = { _ in "Sudirman, Central Jakarta" }
+      $0.directionRoute.calculateWalkingRoute = { _, _ in sampleRouteInfo }
+    }
+    store.exhaustivity = .off
+
+    await store.send(MapDirectionSheetFeature.Action.onAppear(currentLocation: origin))
+
+    await store.receive(\.destinationResolved) {
+      #expect($0.destination.coordinate?.latitude == cibuburCoord.latitude)
+      #expect($0.destination.coordinate?.longitude == cibuburCoord.longitude)
+    }
+
+    await store.receive(\.routeCalculated)
+  }
 }

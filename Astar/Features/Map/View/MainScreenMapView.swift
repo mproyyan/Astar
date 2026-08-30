@@ -202,7 +202,9 @@ struct MainScreenMapView: View {
 
   private func fitRoute(route: MKRoute) {
     withAnimation(.easeInOut(duration: 0.8)) {
-      cameraPosition = .rect(route.polyline.boundingMapRect)
+      let rect = route.polyline.boundingMapRect
+      let paddedRect = rect.insetBy(dx: -rect.width * 0.25, dy: -rect.height * 0.35)
+      cameraPosition = .rect(paddedRect)
     }
   }
 
