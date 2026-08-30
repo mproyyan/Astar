@@ -16,7 +16,7 @@ struct MapSheetMainContent: View {
     var onSelectPerson: ((Person) -> Void)? = nil
 
     private var people: [Person] { store.people }
-    private let savedPlaces = MapSampleData.savedPlaces
+    private var savedPlaces: [SavedPlace] { store.map.savedPlaces }
 
     var body: some View {
         WithPerceptionTracking {

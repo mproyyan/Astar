@@ -6,6 +6,7 @@
 //
 
 import ComposableArchitecture
+import CoreLocation
 import SwiftUI
 
 struct SavedPlacesView: View {
@@ -36,61 +37,65 @@ struct SavedPlacesView: View {
                         }
                         .padding(.top, 8)
 
-                        // Circular Icons Grid
+                        // Circular Icons Grid (Screen 1 & 4)
                         LazyVGrid(columns: columns, spacing: 28) {
                             // 1. Home Item
                             CircularPlaceCard(
-                                title: store.homePlace?.name ?? "Set Home",
-                                subtitle: store.homePlace != nil ? "Change" : "Set",
+                                title: store.homePlace?.label ?? store.homePlace?.name ?? "Home",
+                                subtitle: "Change",
                                 iconName: "house.fill",
-                                categoryColor: Color(red: 0.15, green: 0.75, blue: 0.85)
-                            ) {
-                                if let home = store.homePlace {
-                                    store.send(.editPlaceTapped(home, .home))
-                                } else {
-                                    store.send(.addPlaceButtonTapped(.home))
+                                categoryColor: Color(red: 0.15, green: 0.75, blue: 0.85),
+                                onAction: {
+                                    if let home = store.homePlace {
+                                        store.send(.changeLocationTapped(home, .home))
+                                    } else {
+                                        store.send(.addPlaceButtonTapped(.home))
+                                    }
                                 }
-                            }
+                            )
 
                             // 2. Office Item
                             CircularPlaceCard(
-                                title: store.officePlace?.name ?? "Set Office",
-                                subtitle: store.officePlace != nil ? "Change" : "Set",
+                                title: store.officePlace?.label ?? store.officePlace?.name ?? "Office",
+                                subtitle: "Change",
                                 iconName: "briefcase.fill",
-                                categoryColor: Color(red: 0.65, green: 0.48, blue: 0.35)
-                            ) {
-                                if let office = store.officePlace {
-                                    store.send(.editPlaceTapped(office, .office))
-                                } else {
-                                    store.send(.addPlaceButtonTapped(.office))
-                                }
-                            }
-
-                            // 3. Custom Places (Yellow circles with key icon)
-                            ForEach(store.customPlaces) { place in
-                                CircularPlaceCard(
-                                    title: place.name,
-                                    subtitle: "Change",
-                                    iconName: place.iconName.isEmpty ? "key.fill" : place.iconName,
-                                    categoryColor: place.categoryColor
-                                ) {
-                                    store.send(.editPlaceTapped(place, .custom))
-                                } contextMenu: {
-                                    Button(role: .destructive) {
-                                        store.send(.deletePlaceById(place.id))
-                                    } label: {
-                                        Label("Delete Place", systemImage: "trash")
+                                categoryColor: Color(red: 0.65, green: 0.48, blue: 0.35),
+                                onAction: {
+                                    if let office = store.officePlace {
+                                        store.send(.changeLocationTapped(office, .office))
+                                    } else {
+                                        store.send(.addPlaceButtonTapped(.office))
                                     }
                                 }
+                            )
+
+                            // 3. Custom Places (Golden yellow circles with map pin icon)
+                            ForEach(store.customPlaces) { place in
+                                CircularPlaceCard(
+                                    title: place.label ?? place.name,
+                                    subtitle: "Change",
+                                    iconName: place.iconName.isEmpty ? "mappin.fill" : place.iconName,
+                                    categoryColor: place.categoryColor,
+                                    onAction: {
+                                        store.send(.changeLocationTapped(place, .custom))
+                                    },
+                                    contextMenu: {
+                                        Button(role: .destructive) {
+                                            store.send(.deletePlaceById(place.id))
+                                        } label: {
+                                            Label("Delete Place", systemImage: "trash")
+                                        }
+                                    }
+                                )
                             }
 
-                            // 4. Add Button (Light cyan circle with blue +)
+                            // 4. Add Button (Light blue circle with blue +, no subtitle)
                             VStack(spacing: 8) {
                                 Button {
-                                    store.send(.addPlaceButtonTapped(nil))
+                                    store.send(.addPlaceButtonTapped(.custom))
                                 } label: {
                                     Circle()
-                                        .fill(Color(red: 0.88, green: 0.96, blue: 0.99))
+                                        .fill(Color(red: 0.88, green: 0.95, blue: 1.0))
                                         .frame(width: 80, height: 80)
                                         .overlay {
                                             Image(systemName: "plus")
@@ -145,180 +150,254 @@ struct SavedPlacesView: View {
     }
 }
 
-// MARK: - Circular Place Card Component (Figma Design)
+// MARK: - Circular Place Card Component
 private struct CircularPlaceCard<MenuContent: View>: View {
     let title: String
-    let subtitle: String
+    let subtitle: String?
     let iconName: String
     let categoryColor: Color
-    let action: () -> Void
+    let onAction: () -> Void
     @ViewBuilder let contextMenu: () -> MenuContent
 
     init(
         title: String,
-        subtitle: String,
+        subtitle: String? = nil,
         iconName: String,
         categoryColor: Color,
-        action: @escaping () -> Void,
+        onAction: @escaping () -> Void,
         @ViewBuilder contextMenu: @escaping () -> MenuContent = { EmptyView() }
     ) {
         self.title = title
         self.subtitle = subtitle
         self.iconName = iconName
         self.categoryColor = categoryColor
-        self.action = action
+        self.onAction = onAction
         self.contextMenu = contextMenu
     }
 
     var body: some View {
-        VStack(spacing: 6) {
-            Button(action: action) {
+        Button(action: onAction) {
+            VStack(spacing: 6) {
                 Circle()
                     .fill(categoryColor)
                     .frame(width: 80, height: 80)
                     .overlay {
                         Image(systemName: iconName)
-                            .font(.system(size: 36, weight: .semibold))
+                            .font(.system(size: 34, weight: .semibold))
                             .foregroundStyle(.white)
                     }
-            }
-            .buttonStyle(.plain)
 
-            VStack(spacing: 2) {
-                Text(title)
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .multilineTextAlignment(.center)
+                VStack(spacing: 2) {
+                    Text(title)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .multilineTextAlignment(.center)
 
-                Text(subtitle)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    if let subtitle = subtitle {
+                        Text(subtitle)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
         }
+        .buttonStyle(.plain)
         .contextMenu(menuItems: contextMenu)
     }
 }
 
-// MARK: - Figma "Pin Place" Sheet Component
+// MARK: - Figma "Pin Place" Sheet Component (Screens 2 & 3)
 private struct PinPlaceSheet: View {
     @Bindable var store: StoreOf<SavedPlacesFeature>
+    @FocusState private var isSearchFocused: Bool
+    @FocusState private var isNameFocused: Bool
+
+    private var searchTextBinding: Binding<String> {
+        Binding(
+            get: { store.searchQuery },
+            set: { store.send(.searchQueryChanged($0)) }
+        )
+    }
+
+    private var displayedPlaces: [SavedPlace] {
+        store.searchResults
+    }
+
+    private var categoryColor: Color {
+        if let preset = store.targetPresetForAdd {
+            switch preset {
+            case .home: return Color(red: 0.15, green: 0.75, blue: 0.85)
+            case .office: return Color(red: 0.65, green: 0.48, blue: 0.35)
+            case .custom: return Color(red: 0.98, green: 0.78, blue: 0.12)
+            }
+        }
+        if store.customLabel.lowercased() == "home" {
+            return Color(red: 0.15, green: 0.75, blue: 0.85)
+        } else if store.customLabel.lowercased() == "office" || store.customLabel.lowercased() == "work" {
+            return Color(red: 0.65, green: 0.48, blue: 0.35)
+        }
+        return Color(red: 0.98, green: 0.78, blue: 0.12)
+    }
+
+    private var categoryIcon: String {
+        if let preset = store.targetPresetForAdd {
+            switch preset {
+            case .home: return "house.fill"
+            case .office: return "briefcase.fill"
+            case .custom: return "mappin.fill"
+            }
+        }
+        if store.customLabel.lowercased() == "home" {
+            return "house.fill"
+        } else if store.customLabel.lowercased() == "office" || store.customLabel.lowercased() == "work" {
+            return "briefcase.fill"
+        }
+        return "mappin.fill"
+    }
 
     var body: some View {
         WithPerceptionTracking {
             VStack(spacing: 0) {
-                if store.pinStep == .search {
-                    // Search Step
+                if store.pinStep == .chooseLocation {
+                    // SCREEN 2: "Choose Home/Office Location"
                     VStack(spacing: 16) {
                         // Search Bar
-                        HStack(spacing: 10) {
-                            Image(systemName: "magnifyingglass")
-                                .foregroundStyle(.secondary)
-                            TextField("Search", text: $store.searchQuery.sending(\.searchQueryChanged))
-                                .textFieldStyle(.plain)
-                            Image(systemName: "mic.fill")
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 12)
-                        .background(Color(red: 0.95, green: 0.95, blue: 0.97), in: .rect(cornerRadius: 14))
+                        ActiveSearchBarView(
+                            searchText: searchTextBinding,
+                            isFocused: $isSearchFocused
+                        )
                         .padding(.horizontal, 16)
                         .padding(.top, 8)
 
-                        // Search Results List
-                        ScrollView {
-                            LazyVStack(spacing: 12) {
-                                ForEach(store.searchResults) { place in
-                                    Button {
-                                        store.send(.selectPlaceSearchResult(place))
-                                    } label: {
-                                        HStack(spacing: 14) {
-                                            // Red Pin Circle
-                                            Circle()
-                                                .fill(Color(red: 0.92, green: 0.25, blue: 0.20))
-                                                .frame(width: 36, height: 36)
-                                                .overlay {
-                                                    Image(systemName: "mappin.fill")
-                                                        .font(.system(size: 18, weight: .semibold))
-                                                        .foregroundStyle(.white)
+                        if store.isLoading && store.searchResults.isEmpty {
+                            VStack(spacing: 12) {
+                                ProgressView()
+                                    .padding(.top, 24)
+                                Text("Searching places...")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .frame(maxWidth: .infinity)
+                            Spacer()
+                        } else if !displayedPlaces.isEmpty {
+                            // Search Results List Card with Landmark Red Pin Icons
+                            ScrollView {
+                                VStack(spacing: 0) {
+                                    ForEach(displayedPlaces) { place in
+                                        Button {
+                                            store.send(.selectPlaceSearchResult(place))
+                                            isSearchFocused = false
+                                        } label: {
+                                            HStack(spacing: 14) {
+                                                // Landmark Red Pin Circle
+                                                Circle()
+                                                    .fill(Color(red: 0.95, green: 0.25, blue: 0.22))
+                                                    .frame(width: 36, height: 36)
+                                                    .overlay {
+                                                        Image(systemName: "mappin.fill")
+                                                            .font(.system(size: 18, weight: .semibold))
+                                                            .foregroundStyle(.white)
+                                                    }
+
+                                                VStack(alignment: .leading, spacing: 2) {
+                                                    Text(place.name)
+                                                        .font(.subheadline.weight(.semibold))
+                                                        .foregroundStyle(.primary)
+
+                                                    Text(formattedSubtitle(for: place))
+                                                        .font(.caption)
+                                                        .foregroundStyle(.secondary)
+                                                        .lineLimit(1)
                                                 }
 
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text(place.name)
-                                                    .font(.subheadline.weight(.semibold))
-                                                    .foregroundStyle(.primary)
-                                                Text(place.subtitle)
-                                                    .font(.caption)
-                                                    .foregroundStyle(.secondary)
-                                                    .lineLimit(1)
+                                                Spacer()
                                             }
-
-                                            Spacer()
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 12)
                                         }
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 10)
-                                        .background(Color.white, in: .rect(cornerRadius: 16))
-                                        .overlay {
-                                            RoundedRectangle(cornerRadius: 16)
-                                                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+                                        .buttonStyle(.plain)
+
+                                        if place.id != displayedPlaces.last?.id {
+                                            Divider()
+                                                .padding(.leading, 66)
                                         }
                                     }
-                                    .buttonStyle(.plain)
                                 }
+                                .background(Color.white, in: .rect(cornerRadius: 18))
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 18)
+                                        .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 20)
                             }
-                            .padding(.horizontal, 16)
+                        } else {
+                            Spacer()
                         }
                     }
                 } else {
-                    // Configure Place Name Step (Step 2)
+                    // SCREEN 3: "Rename home if you want to"
                     VStack(alignment: .leading, spacing: 16) {
-                        VStack(alignment: .leading, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 14) {
+                            // Top Section: Category Circle + Rename TextField
                             HStack(spacing: 12) {
                                 Circle()
-                                    .fill(Color(red: 0.92, green: 0.25, blue: 0.20))
+                                    .fill(categoryColor)
                                     .frame(width: 36, height: 36)
                                     .overlay {
-                                        Image(systemName: "mappin.fill")
+                                        Image(systemName: categoryIcon)
                                             .font(.system(size: 18, weight: .semibold))
                                             .foregroundStyle(.white)
                                     }
 
-                                TextField("Place Name (e.g. Rumah Awan)", text: $store.customLabel.sending(\.customLabelChanged))
-                                    .font(.headline.weight(.bold))
+                                TextField("Home", text: $store.customLabel.sending(\.customLabelChanged))
+                                    .font(.headline.weight(.semibold))
                                     .textFieldStyle(.plain)
+                                    .focused($isNameFocused)
                             }
 
                             Divider()
 
-                            VStack(alignment: .leading, spacing: 2) {
+                            // Bottom Section: Selected Location Name & Address
+                            VStack(alignment: .leading, spacing: 3) {
                                 Text(store.selectedPlaceForLabel?.name ?? "")
-                                    .font(.subheadline.weight(.medium))
+                                    .font(.subheadline.weight(.semibold))
                                     .foregroundStyle(.primary)
 
                                 Text(store.selectedPlaceForLabel?.subtitle ?? "")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
+                                    .lineLimit(2)
                             }
                         }
                         .padding(16)
-                        .background(Color.white, in: .rect(cornerRadius: 20))
-                        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 4)
+                        .background(Color.white, in: .rect(cornerRadius: 18))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 18)
+                                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
 
                         Spacer()
                     }
-                    .padding(16)
                 }
             }
+            .background(Color(red: 0.96, green: 0.96, blue: 0.98).ignoresSafeArea())
             .navigationTitle("Pin Place")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    if store.pinStep == .configureLabel {
+                    if store.pinStep == .renamePlace {
                         Button {
-                            store.send(.backToSearchStep)
+                            store.send(.backToChooseLocationTapped)
                         } label: {
                             Image(systemName: "chevron.left")
                                 .font(.body.weight(.semibold))
+                                .foregroundStyle(.primary)
+                                .frame(width: 32, height: 32)
+                                .background(Color.primary.opacity(0.06), in: Circle())
                         }
                     } else {
                         Button("Cancel") {
@@ -328,9 +407,22 @@ private struct PinPlaceSheet: View {
                 }
 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    if store.pinStep == .configureLabel {
+                    if store.pinStep == .renamePlace {
                         Button {
                             store.send(.confirmSavePlace)
+                        } label: {
+                            Circle()
+                                .fill(Color(red: 0.00, green: 0.55, blue: 0.95))
+                                .frame(width: 32, height: 32)
+                                .overlay {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 16, weight: .bold))
+                                        .foregroundStyle(.white)
+                                }
+                        }
+                    } else if let first = displayedPlaces.first {
+                        Button {
+                            store.send(.selectPlaceSearchResult(first))
                         } label: {
                             Circle()
                                 .fill(Color(red: 0.00, green: 0.55, blue: 0.95))
@@ -344,6 +436,20 @@ private struct PinPlaceSheet: View {
                     }
                 }
             }
+            .onAppear {
+                if store.pinStep == .chooseLocation {
+                    isSearchFocused = true
+                } else {
+                    isNameFocused = true
+                }
+            }
         }
+    }
+
+    private func formattedSubtitle(for place: SavedPlace) -> String {
+        if let distance = place.distance, !distance.isEmpty {
+            return "\(distance) • \(place.subtitle)"
+        }
+        return place.subtitle
     }
 }

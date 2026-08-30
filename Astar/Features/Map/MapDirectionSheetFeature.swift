@@ -48,7 +48,7 @@ struct MapDirectionSheetFeature {
     case delegate(Delegate)
     
     enum Delegate: Equatable {
-      case routeChanged(MKRoute?)
+      case routeChanged(MKRoute?, MKPolyline?)
       case navigationStarted(sessionID: String?)
       case navigationEnded
     }
@@ -140,7 +140,7 @@ struct MapDirectionSheetFeature {
         if let destCoord = routeInfo.route?.polyline.points() {
           // coordinate is preserved on destination
         }
-        return .send(.delegate(.routeChanged(routeInfo.route)))
+        return .send(.delegate(.routeChanged(routeInfo.route, routeInfo.polyline)))
 
       case let .startNavigationTapped(currentLocation):
         state.isNavigating = true

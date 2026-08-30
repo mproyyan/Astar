@@ -58,7 +58,6 @@ struct SavedPlace: Identifiable, Equatable, Sendable, Codable {
     let subtitle: String
     let iconName: String
     let distance: String?
-    // let coordinate: CLLocationCoordinate2D?
     let latitude: Double?
     let longitude: Double?
     var label: String?
@@ -69,7 +68,7 @@ struct SavedPlace: Identifiable, Equatable, Sendable, Codable {
         subtitle: String,
         iconName: String,
         distance: String? = nil,
-        // coordinate: CLLocationCoordinate2D? = nil
+        coordinate: CLLocationCoordinate2D? = nil,
         latitude: Double? = nil,
         longitude: Double? = nil,
         label: String? = nil
@@ -79,9 +78,8 @@ struct SavedPlace: Identifiable, Equatable, Sendable, Codable {
         self.subtitle = subtitle
         self.iconName = iconName
         self.distance = distance
-        // self.coordinate = coordinate
-        self.latitude = latitude
-        self.longitude = longitude
+        self.latitude = coordinate?.latitude ?? latitude
+        self.longitude = coordinate?.longitude ?? longitude
         self.label = label
     }
 
@@ -93,8 +91,27 @@ struct SavedPlace: Identifiable, Equatable, Sendable, Codable {
 
 
 extension SavedPlace {
+    var isHome: Bool {
+        label?.lowercased() == "home" || iconName == "house.fill" || name.lowercased() == "home"
+    }
+
+    var isOffice: Bool {
+        label?.lowercased() == "office" || iconName == "briefcase.fill" || iconName == "building.2.fill" || name.lowercased() == "office"
+    }
+
+    var isCustom: Bool {
+        !isHome && !isOffice
+    }
+
     var categoryColor: Color {
-        SavedPlace.categoryColor(for: iconName)
+        if isHome {
+            return Color(red: 0.15, green: 0.75, blue: 0.85)
+        } else if isOffice {
+            return Color(red: 0.65, green: 0.48, blue: 0.35)
+        } else if isCustom && (iconName == "mappin.fill" || iconName == "key.fill" || label != nil) {
+            return Color(red: 0.98, green: 0.78, blue: 0.05)
+        }
+        return SavedPlace.categoryColor(for: iconName)
     }
 
     static func categoryColor(for iconName: String) -> Color {
@@ -379,6 +396,7 @@ enum MockDoeWalkSimulation {
     }
 
     static let completedTripID = UUID(uuidString: "00000000-0000-0000-0002-000000000099")!
+    static let returnCompletedTripID = UUID(uuidString: "00000000-0000-0000-0002-000000000098")!
     static let currentLocEntryID = UUID(uuidString: "00000000-0000-0000-0002-000000000000")!
     static let destinationEntryID = UUID(uuidString: "00000000-0000-0000-0002-000000000001")!
     static let benhilEntryID = UUID(uuidString: "00000000-0000-0000-0002-000000000002")!
@@ -394,7 +412,7 @@ enum MockDoeWalkSimulation {
         isReturnTrip: Bool = false
     ) -> WalkerHistoryTrip {
         let finalLog = completedJourneyLog(isReturnTrip: isReturnTrip, now: now)
-        let resolvedID = id ?? UUID()
+        let resolvedID = id ?? (isReturnTrip ? returnCompletedTripID : completedTripID)
         let destName = isReturnTrip ? "Office" : "Home"
         let destIcon = isReturnTrip ? "building.2.fill" : "house.fill"
         let iconColor: Color = isReturnTrip ? Color(red: 0.35, green: 0.34, blue: 0.84) : .blue

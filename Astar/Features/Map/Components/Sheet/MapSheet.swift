@@ -254,7 +254,10 @@ struct MapSheet: View {
                         }
                     },
                     onSelectPlace: { place in
-                        store.send(.map(.sheet(.presented(.search(.selectPlace(place))))))
+                        store.send(.map(.selectSavedPlace(place)))
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            selectedDetent = .fraction(0.52)
+                        }
                     },
                     onSelectPerson: { person in
                         store.send(.map(.selectPerson(person)))

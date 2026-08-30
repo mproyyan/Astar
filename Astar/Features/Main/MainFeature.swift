@@ -122,6 +122,12 @@ struct MainFeature {
       case .path(.element(id: _, action: .profile(.delegate(.signedOut)))):
         return .send(.login(.signOutButtonTapped))
 
+      case let .path(.element(id: _, action: .profile(.delegate(.savedPlacesUpdated(places))))):
+        return .send(.map(.savedPlacesUpdated(places)))
+
+      case .login(.delegate(.loggedIn)):
+        return .send(.onAppear)
+
       case .login:
         return .none
 

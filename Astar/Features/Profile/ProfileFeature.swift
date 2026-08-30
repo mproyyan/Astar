@@ -23,6 +23,7 @@ struct ProfileFeature {
     case setRouteGuide(Bool)
     case setDoeWalkingMock(Bool)
     case resetDoeWalkingSimulation
+    case savedPlacesUpdated([SavedPlace])
     case delegate(Delegate)
 
     enum Delegate: Equatable {
@@ -31,6 +32,7 @@ struct ProfileFeature {
       case routeGuideChanged(Bool)
       case doeWalkingMockChanged(Bool)
       case restartDoeWalkingSimulation
+      case savedPlacesUpdated([SavedPlace])
     }
   }
 
@@ -58,6 +60,9 @@ struct ProfileFeature {
 
       case .resetDoeWalkingSimulation:
         return .send(.delegate(.restartDoeWalkingSimulation))
+
+      case let .savedPlacesUpdated(places):
+        return .send(.delegate(.savedPlacesUpdated(places)))
 
       case .delegate:
         return .none

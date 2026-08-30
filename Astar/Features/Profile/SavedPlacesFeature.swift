@@ -6,6 +6,7 @@
 //
 
 import ComposableArchitecture
+import CoreLocation
 import Foundation
 import MapKit
 import SwiftUI
@@ -14,20 +15,21 @@ import SwiftUI
 struct SavedPlacesFeature {
     @ObservableState
     struct State: Equatable {
-        var userId: String
+        var userId: String = SavedPlacesStorage.defaultUserId
         var places: [SavedPlace] = []
         var isAddingPlace: Bool = false
         var targetPresetForAdd: CategoryPreset? = nil
-        var pinStep: PinStep = .search
+        var pinStep: PinStep = .chooseLocation
         var searchQuery: String = ""
         var searchResults: [SavedPlace] = []
+        var isLoading: Bool = false
         var selectedPlaceForLabel: SavedPlace? = nil
         var customLabel: String = ""
         var editingPlaceId: UUID? = nil
 
         enum PinStep: Equatable {
-            case search
-            case configureLabel
+            case chooseLocation
+            case renamePlace
         }
 
         enum CategoryPreset: String, CaseIterable, Equatable, Identifiable {
@@ -41,23 +43,21 @@ struct SavedPlacesFeature {
                 switch self {
                 case .home: return "house.fill"
                 case .office: return "briefcase.fill"
-                case .custom: return "key.fill"
+                case .custom: return "mappin.fill"
                 }
             }
         }
 
         var homePlace: SavedPlace? {
-            places.first(where: { $0.iconName == "house.fill" || $0.label?.lowercased() == "home" || $0.name.lowercased() == "home" })
+            places.first(where: { $0.isHome })
         }
 
         var officePlace: SavedPlace? {
-            places.first(where: { $0.iconName == "briefcase.fill" || $0.iconName == "building.2.fill" || $0.label?.lowercased() == "office" || $0.name.lowercased() == "office" })
+            places.first(where: { $0.isOffice })
         }
 
         var customPlaces: [SavedPlace] {
-            places.filter { place in
-                place.id != homePlace?.id && place.id != officePlace?.id
-            }
+            places.filter { $0.isCustom }
         }
     }
 
@@ -65,18 +65,27 @@ struct SavedPlacesFeature {
         case onAppear
         case placesLoaded([SavedPlace])
         case addPlaceButtonTapped(State.CategoryPreset?)
+        case changeLocationTapped(SavedPlace, State.CategoryPreset?)
         case dismissAddSheetTapped
         case searchQueryChanged(String)
         case searchResponse([SavedPlace])
+        case clearSearchTapped
         case selectPlaceSearchResult(SavedPlace)
-        case backToSearchStep
+        case backToChooseLocationTapped
         case customLabelChanged(String)
-        case editPlaceTapped(SavedPlace, State.CategoryPreset?)
         case confirmSavePlace
         case deletePlaceById(UUID)
+        case delegate(Delegate)
+
+        enum Delegate: Equatable {
+            case savedPlacesUpdated([SavedPlace])
+        }
     }
 
     @Dependency(\.savedPlacesRepository) var repository
+    @Dependency(\.placeSearch) var placeSearch
+    @Dependency(\.locationManager) var locationManager
+    @Dependency(\.continuousClock) var clock
 
     var body: some Reducer<State, Action> {
         Reduce { state, action in
@@ -95,151 +104,182 @@ struct SavedPlacesFeature {
             case let .addPlaceButtonTapped(preset):
                 state.targetPresetForAdd = preset
                 state.isAddingPlace = true
-                state.pinStep = .search
+                state.pinStep = .chooseLocation
                 state.searchQuery = ""
                 state.searchResults = []
+                state.isLoading = false
                 state.selectedPlaceForLabel = nil
-                state.customLabel = ""
+                state.customLabel = preset == .home ? "Home" : (preset == .office ? "Office" : "")
                 state.editingPlaceId = nil
+                return .none
+
+            case let .changeLocationTapped(place, preset):
+                state.targetPresetForAdd = preset ?? (place.isHome ? .home : (place.isOffice ? .office : .custom))
+                state.isAddingPlace = true
+                state.pinStep = .chooseLocation
+                state.searchQuery = ""
+                state.searchResults = []
+                state.isLoading = false
+                state.selectedPlaceForLabel = place
+                state.customLabel = place.label ?? place.name
+                state.editingPlaceId = place.id
                 return .none
 
             case .dismissAddSheetTapped:
                 state.isAddingPlace = false
-                state.pinStep = .search
+                state.pinStep = .chooseLocation
+                state.searchQuery = ""
+                state.searchResults = []
                 state.selectedPlaceForLabel = nil
                 state.editingPlaceId = nil
-                return .none
+                state.isLoading = false
+                return .cancel(id: "savedPlacesSearchDebounce")
 
             case let .searchQueryChanged(query):
                 state.searchQuery = query
-                guard !query.trimmingCharacters(in: .whitespaces).isEmpty else {
+                let cleanQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !cleanQuery.isEmpty else {
                     state.searchResults = []
-                    return .none
+                    state.isLoading = false
+                    return .cancel(id: "savedPlacesSearchDebounce")
                 }
-                let currentQuery = query
+                state.isLoading = true
                 return .run { send in
-                    let results = await performMapSearch(query: currentQuery)
+                    try await clock.sleep(for: .milliseconds(300))
+                    let userLoc = await locationManager.getCurrentLocation()
+                    let results = await placeSearch.searchPlaces(query: cleanQuery, userLocation: userLoc)
                     await send(.searchResponse(results))
                 }
+                .cancellable(id: "savedPlacesSearchDebounce", cancelInFlight: true)
 
             case let .searchResponse(results):
+                state.isLoading = false
                 state.searchResults = results
                 return .none
 
+            case .clearSearchTapped:
+                state.searchQuery = ""
+                state.searchResults = []
+                state.isLoading = false
+                return .cancel(id: "savedPlacesSearchDebounce")
+
             case let .selectPlaceSearchResult(place):
                 state.selectedPlaceForLabel = place
-                state.pinStep = .configureLabel
-                if let preset = state.targetPresetForAdd {
-                    switch preset {
-                    case .home: state.customLabel = "Home"
-                    case .office: state.customLabel = "Office"
-                    case .custom: state.customLabel = place.name
+                if state.customLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    if state.targetPresetForAdd == .home {
+                        state.customLabel = "Home"
+                    } else if state.targetPresetForAdd == .office {
+                        state.customLabel = "Office"
+                    } else {
+                        state.customLabel = place.name
                     }
-                } else {
-                    state.customLabel = place.name
                 }
+                state.pinStep = .renamePlace
                 return .none
 
-            case .backToSearchStep:
-                state.pinStep = .search
+            case .backToChooseLocationTapped:
+                state.pinStep = .chooseLocation
                 return .none
 
             case let .customLabelChanged(label):
                 state.customLabel = label
                 return .none
 
-            case let .editPlaceTapped(place, preset):
-                state.targetPresetForAdd = preset
-                state.isAddingPlace = true
-                state.pinStep = .configureLabel
-                state.selectedPlaceForLabel = place
-                state.customLabel = place.label ?? place.name
-                state.editingPlaceId = place.id
-                return .none
-
             case .confirmSavePlace:
                 guard var targetPlace = state.selectedPlaceForLabel else { return .none }
-                let labelText = state.customLabel.trimmingCharacters(in: .whitespaces)
+                let labelText = state.customLabel.trimmingCharacters(in: .whitespacesAndNewlines)
+                let finalName = labelText.isEmpty ? (state.targetPresetForAdd == .home ? "Home" : (state.targetPresetForAdd == .office ? "Office" : targetPlace.name)) : labelText
+
                 let iconName: String
+                let categoryLabel: String?
                 if let preset = state.targetPresetForAdd {
-                    iconName = preset.iconName
-                } else if labelText.lowercased() == "home" {
+                    switch preset {
+                    case .home:
+                        iconName = "house.fill"
+                        categoryLabel = "Home"
+                    case .office:
+                        iconName = "briefcase.fill"
+                        categoryLabel = "Office"
+                    case .custom:
+                        iconName = "mappin.fill"
+                        categoryLabel = finalName
+                    }
+                } else if finalName.lowercased() == "home" {
                     iconName = "house.fill"
-                } else if labelText.lowercased() == "office" || labelText.lowercased() == "work" {
+                    categoryLabel = "Home"
+                } else if finalName.lowercased() == "office" || finalName.lowercased() == "work" {
                     iconName = "briefcase.fill"
+                    categoryLabel = "Office"
                 } else {
-                    iconName = "key.fill"
+                    iconName = "mappin.fill"
+                    categoryLabel = finalName
                 }
 
                 let targetId = state.editingPlaceId ?? targetPlace.id
 
                 // Remove existing place if replacing Home/Office preset OR if we are updating an existing place by ID
-                if iconName == "house.fill" {
-                    state.places.removeAll { $0.iconName == "house.fill" || $0.label?.lowercased() == "home" || $0.id == targetId }
-                } else if iconName == "briefcase.fill" || iconName == "building.2.fill" {
-                    state.places.removeAll { $0.iconName == "briefcase.fill" || $0.iconName == "building.2.fill" || $0.label?.lowercased() == "office" || $0.id == targetId }
+                if iconName == "house.fill" || categoryLabel == "Home" {
+                    state.places.removeAll { $0.isHome || $0.id == targetId }
+                } else if iconName == "briefcase.fill" || iconName == "building.2.fill" || categoryLabel == "Office" {
+                    state.places.removeAll { $0.isOffice || $0.id == targetId }
                 } else {
                     state.places.removeAll { $0.id == targetId }
                 }
 
                 targetPlace = SavedPlace(
                     id: targetId,
-                    name: labelText.isEmpty ? targetPlace.name : labelText,
+                    name: finalName,
                     subtitle: targetPlace.subtitle,
                     iconName: iconName,
                     distance: targetPlace.distance,
-                    latitude: targetPlace.latitude,
-                    longitude: targetPlace.longitude,
-                    label: labelText.isEmpty ? "Saved" : labelText
+                    coordinate: targetPlace.coordinate,
+                    label: categoryLabel
                 )
 
-                state.places.append(targetPlace)
+                // Place Home & Office at the beginning if appropriate
+                if iconName == "house.fill" || categoryLabel == "Home" {
+                    state.places.insert(targetPlace, at: 0)
+                } else if iconName == "briefcase.fill" || iconName == "building.2.fill" || categoryLabel == "Office" {
+                    if let homeIdx = state.places.firstIndex(where: { $0.isHome }) {
+                        state.places.insert(targetPlace, at: homeIdx + 1)
+                    } else {
+                        state.places.insert(targetPlace, at: 0)
+                    }
+                } else {
+                    state.places.append(targetPlace)
+                }
+
                 let userId = state.userId
                 let updatedPlaces = state.places
                 state.isAddingPlace = false
+                state.pinStep = .chooseLocation
                 state.selectedPlaceForLabel = nil
                 state.editingPlaceId = nil
+                state.searchQuery = ""
+                state.searchResults = []
 
-                return .run { _ in
-                    await repository.save(updatedPlaces, for: userId)
-                }
+                return .merge(
+                    .send(.delegate(.savedPlacesUpdated(updatedPlaces))),
+                    .run { _ in
+                        await repository.save(updatedPlaces, for: userId)
+                    }
+                )
 
             case let .deletePlaceById(id):
                 state.places.removeAll { $0.id == id }
                 let userId = state.userId
-                return .run { send in
-                    let updated = await repository.delete(id: id, for: userId)
-                    await send(.placesLoaded(updated))
-                }
+                let updated = state.places
+                return .merge(
+                    .send(.delegate(.savedPlacesUpdated(updated))),
+                    .run { send in
+                        let saved = await repository.delete(id: id, for: userId)
+                        await send(.placesLoaded(saved))
+                    }
+                )
+
+            case .delegate:
+                return .none
             }
         }
-    }
-}
-
-// MARK: - Map Search Helper
-private func performMapSearch(query: String) async -> [SavedPlace] {
-    let request = MKLocalSearch.Request()
-    request.naturalLanguageQuery = query
-    let search = MKLocalSearch(request: request)
-
-    guard let response = try? await search.start() else { return [] }
-    return response.mapItems.compactMap { item in
-        guard let name = item.name else { return nil }
-        let placemark = item.placemark
-        let addressParts = [
-            placemark.thoroughfare,
-            placemark.subLocality,
-            placemark.locality,
-            placemark.administrativeArea
-        ].compactMap { $0 }.filter { !$0.isEmpty }
-        let subtitle = addressParts.isEmpty ? (placemark.title ?? "Location") : addressParts.joined(separator: ", ")
-
-        return SavedPlace(
-            name: name,
-            subtitle: subtitle,
-            iconName: "mappin.fill",
-            latitude: placemark.coordinate.latitude,
-            longitude: placemark.coordinate.longitude
-        )
     }
 }

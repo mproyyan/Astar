@@ -56,8 +56,9 @@ struct MainMapFeatureTests {
       MainMapFeature()
     }
 
+    let saved = store.state.savedPlaces
     await store.send(.searchTapped) {
-      $0.sheet = .search(MapSearchSheetFeature.State(userLocation: location))
+      $0.sheet = .search(MapSearchSheetFeature.State(userLocation: location, savedPlaces: saved))
     }
   }
 
@@ -151,7 +152,6 @@ struct MainMapFeatureTests {
   @Test
   @MainActor
   func testStartAlwaysHomeNavigation() async {
-    let homePlace = MapSampleData.savedPlaces.first(where: { $0.name == "Home" })!
     let mockCoord = CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
     let mockRouteInfo = WalkingRouteInfo(
       travelTimeString: "15 min",
@@ -171,6 +171,8 @@ struct MainMapFeatureTests {
       $0.directionRoute.reverseGeocode = { _ in "Jl. Sudirman, Central Jakarta" }
       $0.directionRoute.calculateWalkingRoute = { _, _ in mockRouteInfo }
     }
+
+    let homePlace = store.state.savedPlaces.first(where: { $0.isHome })!
 
     await store.send(.startAlwaysHomeNavigation) {
       $0.isFollowingUser = true
@@ -229,7 +231,8 @@ struct MainMapFeatureTests {
         subtitle: homePlace.subtitle,
         iconName: homePlace.iconName,
         distance: mockRouteInfo.distanceString,
-        coordinate: homePlace.coordinate
+        coordinate: homePlace.coordinate,
+        label: homePlace.label
       )
       $0.sheet = .direction(MapDirectionSheetFeature.State(
         destination: expectedDest,
@@ -248,7 +251,6 @@ struct MainMapFeatureTests {
   @Test
   @MainActor
   func testStartDirectNavigationOffice() async {
-    let autographPlace = MapSampleData.allSearchablePlaces.first(where: { $0.name == "Autograph Tower" })!
     let mockCoord = CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
     let mockRouteInfo = WalkingRouteInfo(
       travelTimeString: "12 min",
@@ -269,11 +271,13 @@ struct MainMapFeatureTests {
       $0.directionRoute.calculateWalkingRoute = { _, _ in mockRouteInfo }
     }
 
+    let officePlace = store.state.savedPlaces.first(where: { $0.isOffice })!
+
     await store.send(.startDirectNavigation(destinationQuery: "Office")) {
       $0.isFollowingUser = true
       $0.isNavigating = true
       $0.sheet = .direction(MapDirectionSheetFeature.State(
-        destination: autographPlace,
+        destination: officePlace,
         mode: .progress,
         originPlace: SavedPlace(
           id: UUID(0),
@@ -321,12 +325,13 @@ struct MainMapFeatureTests {
         coordinate: mockCoord
       )
       let expectedDest = SavedPlace(
-        id: autographPlace.id,
-        name: autographPlace.name,
-        subtitle: autographPlace.subtitle,
-        iconName: autographPlace.iconName,
+        id: officePlace.id,
+        name: officePlace.name,
+        subtitle: officePlace.subtitle,
+        iconName: officePlace.iconName,
         distance: mockRouteInfo.distanceString,
-        coordinate: autographPlace.coordinate
+        coordinate: officePlace.coordinate,
+        label: officePlace.label
       )
       $0.sheet = .direction(MapDirectionSheetFeature.State(
         destination: expectedDest,

@@ -10,13 +10,18 @@ struct WalkingRouteInfo: Equatable, Sendable {
   var rawTravelTime: TimeInterval
   var rawDistanceMeters: Double
   var route: MKRoute?
+  var fallbackPolyline: MKPolyline?
+
+  var polyline: MKPolyline? {
+    route?.polyline ?? fallbackPolyline
+  }
 }
 
 @DependencyClient
 struct DirectionRouteClient: Sendable {
   var reverseGeocode: @Sendable (_ coordinate: CLLocationCoordinate2D) async -> String = { _ in "Current Location" }
   var calculateWalkingRoute: @Sendable (_ origin: CLLocationCoordinate2D, _ destination: CLLocationCoordinate2D) async -> WalkingRouteInfo = { _, _ in
-    WalkingRouteInfo(travelTimeString: "12 min", etaString: "11.00 ETA", distanceString: "850 m", rawTravelTime: 720, rawDistanceMeters: 850, route: nil)
+    WalkingRouteInfo(travelTimeString: "12 min", etaString: "11.00 ETA", distanceString: "850 m", rawTravelTime: 720, rawDistanceMeters: 850, route: nil, fallbackPolyline: nil)
   }
 }
 
@@ -66,37 +71,61 @@ private enum DirectionRouteEngine {
     from origin: CLLocationCoordinate2D,
     to destination: CLLocationCoordinate2D
   ) async -> WalkingRouteInfo {
+    // 1. First, attempt walking directions
     let request = MKDirections.Request()
     request.source = MKMapItem(placemark: MKPlacemark(coordinate: origin))
     request.destination = MKMapItem(placemark: MKPlacemark(coordinate: destination))
     request.transportType = .walking
 
-    do {
-      let directions = MKDirections(request: request)
-      let response = try await directions.calculate()
-      if let route = response.routes.first {
-        return formatRouteInfo(
-          travelTime: route.expectedTravelTime,
-          distanceMeters: route.distance,
-          route: route
-        )
-      }
-    } catch {
-      // Fallback
+    if let directions = try? await MKDirections(request: request).calculate(),
+       let route = directions.routes.first {
+      return formatRouteInfo(
+        travelTime: route.expectedTravelTime,
+        distanceMeters: route.distance,
+        route: route
+      )
     }
 
+    // 2. Walking route unavailable (e.g. distance > 10 km like Cibubur, or highways).
+    // Attempt automobile directions to get the real road polyline from Apple Maps.
+    let autoRequest = MKDirections.Request()
+    autoRequest.source = MKMapItem(placemark: MKPlacemark(coordinate: origin))
+    autoRequest.destination = MKMapItem(placemark: MKPlacemark(coordinate: destination))
+    autoRequest.transportType = .automobile
+
+    if let autoResponse = try? await MKDirections(request: autoRequest).calculate(),
+       let autoRoute = autoResponse.routes.first {
+      // Estimate realistic walking time based on the actual road route distance (approx 1.25 m/s)
+      let walkTime = autoRoute.distance / 1.25
+      return formatRouteInfo(
+        travelTime: walkTime,
+        distanceMeters: autoRoute.distance,
+        route: autoRoute
+      )
+    }
+
+    // 3. Fallback if Apple Maps has no network or completely fails:
     let originCL = CLLocation(latitude: origin.latitude, longitude: origin.longitude)
     let destCL = CLLocation(latitude: destination.latitude, longitude: destination.longitude)
     let dist = originCL.distance(from: destCL)
-    let estTime = (dist * 1.25) / 1.25
+    let estTime = dist / 1.25
 
-    return formatRouteInfo(travelTime: estTime, distanceMeters: dist, route: nil)
+    var coords = [origin, destination]
+    let fallbackPolyline = MKPolyline(coordinates: &coords, count: coords.count)
+
+    return formatRouteInfo(
+      travelTime: estTime,
+      distanceMeters: dist,
+      route: nil,
+      fallbackPolyline: fallbackPolyline
+    )
   }
 
   private static func formatRouteInfo(
     travelTime: TimeInterval,
     distanceMeters: Double,
-    route: MKRoute?
+    route: MKRoute?,
+    fallbackPolyline: MKPolyline? = nil
   ) -> WalkingRouteInfo {
     let minutes = Int(ceil(travelTime / 60.0))
     let timeString: String
@@ -126,7 +155,8 @@ private enum DirectionRouteEngine {
       distanceString: distanceString,
       rawTravelTime: travelTime,
       rawDistanceMeters: distanceMeters,
-      route: route
+      route: route,
+      fallbackPolyline: fallbackPolyline
     )
   }
 }

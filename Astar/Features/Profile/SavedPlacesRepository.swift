@@ -18,31 +18,23 @@ protocol SavedPlacesRepositoryProtocol: Sendable {
 struct UserDefaultsSavedPlacesRepository: SavedPlacesRepositoryProtocol {
     init() {}
 
-    private func key(for userId: String) -> String {
-        "saved_places_\(userId)"
-    }
-
     func load(for userId: String) async -> [SavedPlace] {
-        let userKey = key(for: userId)
-        guard let data = UserDefaults.standard.data(forKey: userKey) else { return [] }
-        return (try? JSONDecoder().decode([SavedPlace].self, from: data)) ?? []
+        SavedPlacesStorage.load(for: userId)
     }
 
     func save(_ places: [SavedPlace], for userId: String) async {
-        let userKey = key(for: userId)
-        guard let data = try? JSONEncoder().encode(places) else { return }
-        UserDefaults.standard.set(data, forKey: userKey)
+        SavedPlacesStorage.save(places, for: userId)
     }
 
     func delete(id: UUID, for userId: String) async -> [SavedPlace] {
-        var places = await load(for: userId)
+        var places = SavedPlacesStorage.load(for: userId)
         places.removeAll { $0.id == id }
-        await save(places, for: userId)
+        SavedPlacesStorage.save(places, for: userId)
         return places
     }
 
     func updateLabel(id: UUID, newLabel: String, for userId: String) async -> [SavedPlace] {
-        var places = await load(for: userId)
+        var places = SavedPlacesStorage.load(for: userId)
         if let index = places.firstIndex(where: { $0.id == id }) {
             let existing = places[index]
             let trimmedLabel = newLabel.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -62,7 +54,7 @@ struct UserDefaultsSavedPlacesRepository: SavedPlacesRepositoryProtocol {
                 longitude: existing.longitude,
                 label: trimmedLabel.isEmpty ? existing.label : trimmedLabel
             )
-            await save(places, for: userId)
+            SavedPlacesStorage.save(places, for: userId)
         }
         return places
     }

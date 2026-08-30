@@ -90,6 +90,13 @@ struct MainScreenMapView: View {
         store.send(.map(.onAppear))
         store.send(.onAppear)
       }
+      .onReceive(NotificationCenter.default.publisher(for: SavedPlacesStorage.savedPlacesDidChangeNotification)) { notification in
+        if let places = notification.object as? [SavedPlace] {
+          store.send(.map(.savedPlacesUpdated(places)))
+        } else {
+          store.send(.map(.reloadSavedPlaces))
+        }
+      }
       .onChange(of: store.map.isSearchActive) { _, isSearching in
         if isSearching {
           withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
@@ -276,10 +283,23 @@ struct MainScreenMapView: View {
     }
   }
 
+  private var previewPolyline: MKPolyline? {
+    if let route = store.map.activeRoute {
+      return route.polyline
+    }
+    if let polyline = store.map.activePolyline {
+      return polyline
+    }
+    if let sheet = store.map.sheet, case let .direction(d) = sheet {
+      return d.activeRoute?.polyline ?? d.walkingRouteInfo?.polyline
+    }
+    return nil
+  }
+
   @MapContentBuilder
   private var activeRoutePart: some MapContent {
-    if store.map.isShowRouteGuide, let route = store.map.activeRoute {
-      MapPolyline(route.polyline)
+    if store.map.isShowRouteGuide, let polyline = previewPolyline {
+      MapPolyline(polyline)
         .stroke(Color.blue, lineWidth: 5)
     }
   }

@@ -15,6 +15,7 @@ struct MainMapFeature {
     var isFollowingUser: Bool = true
 
     var activeRoute: MKRoute?
+    var activePolyline: MKPolyline? = nil
     var isNavigating: Bool = false
     var isShowRouteGuide: Bool = DeveloperSettingsStorage.isShowRouteGuide
     var userWalkSessionID: String? = nil
@@ -34,6 +35,7 @@ struct MainMapFeature {
     var lastLoggedCoordinate: CLLocationCoordinate2D?
     var lastLoggedStreet: String = ""
     var lastLoggedIcon: String = "figure.walk"
+    var savedPlaces: [SavedPlace] = SavedPlacesStorage.load()
 
     @Presents var sheet: MapSheetFeature.State?
 
@@ -57,6 +59,10 @@ struct MainMapFeature {
     case searchTapped
     case dismissSearch
     case selectPerson(Person)
+
+    case savedPlacesUpdated([SavedPlace])
+    case reloadSavedPlaces
+    case selectSavedPlace(SavedPlace)
 
     case startAlwaysHomeNavigation
     case startDirectNavigation(destinationQuery: String)
@@ -98,6 +104,7 @@ struct MainMapFeature {
     Reduce { (state: inout State, action: Action) -> Effect<Action> in
       switch action {
       case .onAppear:
+        state.savedPlaces = SavedPlacesStorage.load()
         return .merge(
           .send(.requestLocation),
           .run { send in
@@ -116,6 +123,19 @@ struct MainMapFeature {
             }
           }
         )
+
+      case let .savedPlacesUpdated(places):
+        state.savedPlaces = places
+        return .none
+
+      case .reloadSavedPlaces:
+        state.savedPlaces = SavedPlacesStorage.load()
+        return .none
+
+      case let .selectSavedPlace(place):
+        state.sheet = .direction(MapDirectionSheetFeature.State(destination: place))
+        let currentLoc = state.currentLocation ?? CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
+        return .send(.sheet(.presented(.direction(.onAppear(currentLocation: currentLoc)))))
 
       case .requestLocation:
         return .run { _ in
@@ -164,7 +184,7 @@ struct MainMapFeature {
         return .none
 
       case .searchTapped:
-        state.sheet = .search(MapSearchSheetFeature.State(userLocation: state.currentLocation))
+        state.sheet = .search(MapSearchSheetFeature.State(userLocation: state.currentLocation, savedPlaces: state.savedPlaces))
         return .none
 
       case .dismissSearch:
@@ -210,7 +230,7 @@ struct MainMapFeature {
         return .none
 
       case .startAlwaysHomeNavigation:
-        let homePlace = MapSampleData.savedPlaces.first(where: {
+        let homePlace = state.savedPlaces.first(where: { $0.isHome }) ?? MapSampleData.savedPlaces.first(where: {
           $0.name.caseInsensitiveCompare("Home") == .orderedSame
         }) ?? SavedPlace(
           id: uuid(),
@@ -280,23 +300,34 @@ struct MainMapFeature {
         let cleanQuery = destinationQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         let lowerQuery = cleanQuery.lowercased()
 
-        let targetQuery: String
+        let matchedPlace: SavedPlace
         if lowerQuery == "office" || lowerQuery == "work" {
-          targetQuery = "Autograph Tower"
+          matchedPlace = state.savedPlaces.first(where: { $0.isOffice }) ?? MapSampleData.savedPlaces.first(where: { $0.name == "Office" }) ?? SavedPlace(
+            name: "Office",
+            subtitle: "Autograph Tower, Thamrin Nine, Central Jakarta",
+            iconName: "building.2.fill",
+            coordinate: CLLocationCoordinate2D(latitude: -6.1991, longitude: 106.8212)
+          )
+        } else if lowerQuery == "home" {
+          matchedPlace = state.savedPlaces.first(where: { $0.isHome }) ?? MapSampleData.savedPlaces.first(where: { $0.name == "Home" }) ?? SavedPlace(
+            name: "Home",
+            subtitle: "Bendungan Hilir, South Jakarta",
+            iconName: "house.fill",
+            coordinate: CLLocationCoordinate2D(latitude: -6.2125, longitude: 106.8166)
+          )
         } else {
-          targetQuery = cleanQuery
+          matchedPlace = state.savedPlaces.first(where: {
+            $0.name.caseInsensitiveCompare(cleanQuery) == .orderedSame ||
+            $0.name.localizedCaseInsensitiveContains(cleanQuery)
+          }) ?? MapSampleData.allSearchablePlaces.first(where: {
+            $0.name.caseInsensitiveCompare(cleanQuery) == .orderedSame ||
+            $0.name.localizedCaseInsensitiveContains(cleanQuery)
+          }) ?? SavedPlace(
+            name: cleanQuery,
+            subtitle: "Jakarta, Indonesia",
+            iconName: "mappin.and.ellipse"
+          )
         }
-
-        let matchedPlace = MapSampleData.allSearchablePlaces.first(where: {
-          $0.name.caseInsensitiveCompare(targetQuery) == .orderedSame ||
-          $0.name.localizedCaseInsensitiveContains(targetQuery)
-        }) ?? MapSampleData.savedPlaces.first(where: {
-          $0.name.caseInsensitiveCompare(targetQuery) == .orderedSame
-        }) ?? SavedPlace(
-          name: targetQuery,
-          subtitle: "Jakarta, Indonesia",
-          iconName: "mappin.and.ellipse"
-        )
 
         state.isFollowingUser = true
         state.isNavigating = true
@@ -398,7 +429,8 @@ struct MainMapFeature {
           subtitle: destination.subtitle,
           iconName: destination.iconName,
           distance: routeInfo.distanceString,
-          coordinate: destCoord
+          coordinate: destCoord,
+          label: destination.label
         )
 
         let originPlace = SavedPlace(
@@ -495,10 +527,8 @@ struct MainMapFeature {
 
       case let .sheet(.presented(.search(.selectPlace(place)))):
          state.sheet = .direction(MapDirectionSheetFeature.State(destination: place))
-         if let currentLoc = state.currentLocation {
-            return .send(.sheet(.presented(.direction(.onAppear(currentLocation: currentLoc)))))
-         }
-         return .none
+         let currentLoc = state.currentLocation ?? CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
+         return .send(.sheet(.presented(.direction(.onAppear(currentLocation: currentLoc)))))
 
       case let .setShowRouteGuide(isEnabled):
         state.isShowRouteGuide = isEnabled
@@ -506,8 +536,9 @@ struct MainMapFeature {
 
       case let .sheet(.presented(.direction(.delegate(delegateAction)))):
          switch delegateAction {
-         case let .routeChanged(route):
+         case let .routeChanged(route, polyline):
             state.activeRoute = route
+            state.activePolyline = polyline ?? route?.polyline
             return .none
          case let .navigationStarted(sessionID):
             state.isNavigating = true
@@ -519,6 +550,9 @@ struct MainMapFeature {
             if state.activeRoute == nil, let sheetRoute = state.sheet?.direction?.activeRoute {
               state.activeRoute = sheetRoute
             }
+            if state.activePolyline == nil {
+              state.activePolyline = state.activeRoute?.polyline ?? state.sheet?.direction?.walkingRouteInfo?.polyline
+            }
             state.lastLoggedCoordinate = state.sheet?.direction?.journeyLogEntries.last?.coordinate ?? state.currentLocation
             state.lastLoggedStreet = "Current Area"
             state.lastLoggedIcon = "figure.walk"
@@ -528,6 +562,7 @@ struct MainMapFeature {
             state.userWalkSessionID = nil
             state.activeWalkSessionID = nil
             state.activeRoute = nil
+            state.activePolyline = nil
             state.sheet = nil
             return .none
          }

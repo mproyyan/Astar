@@ -10,6 +10,7 @@ struct MapSearchSheetFeature {
     var searchResults: [SavedPlace] = []
     var isLoading: Bool = false
     var userLocation: CLLocationCoordinate2D?
+    var savedPlaces: [SavedPlace] = SavedPlacesStorage.load()
   }
 
   enum Action: Equatable {
