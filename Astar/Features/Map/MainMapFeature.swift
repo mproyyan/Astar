@@ -159,21 +159,27 @@ struct MainMapFeature {
         return .none
 
       case let .locationManager(.didUpdateLocation(coordinate)):
+        print("[CloudKit Debug] didUpdateLocation lat=\(coordinate.latitude), lon=\(coordinate.longitude), isNavigating=\(state.isNavigating), userWalkSessionID=\(state.userWalkSessionID ?? "nil")")
         state.currentLocation = coordinate
         if state.isNavigating {
-          // If we are actively walking, push location ping!
+          // If we are actively walking, push location ping.
           let optionalSessionID = state.userWalkSessionID
           return .merge(
             .send(.delegate(.locationUpdated(coordinate))),
             .send(.updateTrackingLocation(coordinate)),
-            .run { send in
-                 if let sessionID = optionalSessionID {
-                    // NOTE: Real implementation uses batching, but we push latest directly for simplicity based on prompt if no batched buffer
-                    // Need to format Data correctly
-                    let coordStruct = [coordinate.latitude, coordinate.longitude]
-                    if let data = try? JSONEncoder().encode(coordStruct) {
-                        try? await trackingClient.pushLocationPing(sessionID, data)
-                    }
+            .run { _ in
+                 guard let sessionID = optionalSessionID else {
+                    print("[CloudKit Debug] Skipping LocationPing upload because userWalkSessionID is nil.")
+                    return
+                 }
+
+                 let coordStruct = [coordinate.latitude, coordinate.longitude]
+                 do {
+                    let data = try JSONEncoder().encode(coordStruct)
+                    try await trackingClient.pushLocationPing(sessionID, data)
+                    print("[CloudKit Debug] LocationPing upload finished for sessionID=\(sessionID)")
+                 } catch {
+                    print("[CloudKit Debug] LocationPing upload failed for sessionID=\(sessionID): \(error)")
                  }
             }
           )
@@ -541,6 +547,7 @@ struct MainMapFeature {
             state.activePolyline = polyline ?? route?.polyline
             return .none
          case let .navigationStarted(sessionID):
+            print("[CloudKit Debug] navigationStarted received sessionID=\(sessionID ?? "nil")")
             state.isNavigating = true
             state.userWalkSessionID = sessionID
             state.activeWalkSessionID = nil
@@ -558,13 +565,23 @@ struct MainMapFeature {
             state.lastLoggedIcon = "figure.walk"
             return .none
          case .navigationEnded:
+            let endedSessionID = state.userWalkSessionID
+            print("[CloudKit Debug] navigationEnded received. Ending WalkSession sessionID=\(endedSessionID ?? "nil")")
             state.isNavigating = false
             state.userWalkSessionID = nil
             state.activeWalkSessionID = nil
             state.activeRoute = nil
             state.activePolyline = nil
             state.sheet = nil
-            return .none
+            guard let endedSessionID else { return .none }
+            return .run { [trackingClient] _ in
+              do {
+                try await trackingClient.endWalkSession(endedSessionID)
+                print("[CloudKit Debug] WalkSession marked completed sessionID=\(endedSessionID)")
+              } catch {
+                print("[CloudKit Debug] Failed marking WalkSession completed sessionID=\(endedSessionID): \(error)")
+              }
+            }
          }
 
       case .sheet(.presented(.search(.delegate(.dismissed)))):
@@ -661,31 +678,31 @@ struct MainMapFeature {
              }
 
              return .run { send in
-                 print("🔍 Starting tracking for walker. Session ID: \(session.id)")
+                 print("Starting tracking for walker. Session ID: \(session.id)")
                  if let profile = UserProfileStorage.load() {
                      let selfRecordID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"
                          .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
 
                      do {
-                         print("👥 Joining session...")
+                         print("Joining session...")
                          let sessionParticipant = try await trackingClient.joinWalkSession(session.id, selfRecordID)
-                         print("✅ Joined session: \(sessionParticipant.id)")
+                         print("Joined session: \(sessionParticipant.id)")
 
-                         print("🔄 Updating user status to accompany...")
+                         print("Updating user status to accompany...")
                          try await trackingClient.updateUserStatus(selfRecordID, "accompany", nil, session.id)
 
                          // And subscribe
-                         print("🎣 Subscribing to location pings for session \(session.id)")
+                         print("Subscribing to location pings for session \(session.id)")
                          for try await ping in try await trackingClient.subscribeToLocationPings(session.id) {
-                             print("📥 Stream yielded a ping block.")
+                             print("Stream yielded a ping block.")
                              await send(.locationPingReceived(ping))
                          }
-                         print("❌ Stream ended for session \(session.id)")
+                         print("Stream ended for session \(session.id)")
                      } catch {
-                         print("❌ Tracking failed with error: \(error)")
+                         print("Tracking failed with error: \(error)")
                      }
                  } else {
-                     print("❌ User profile is nil. Cannot join tracking session!")
+                     print("User profile is nil. Cannot join tracking session!")
                  }
              }
 
@@ -716,7 +733,7 @@ struct MainMapFeature {
             state.trackedWalkerDestination = nil
             state.trackedWalkerLocation = finalCoord
             let finalLog = MockDoeWalkSimulation.completedJourneyLog(isReturnTrip: isReturn, now: currentNow)
-            print("📝 [Mock Doe] Completed walking session logged with \(finalLog.count) checkpoints.")
+            print("[Mock Doe] Completed walking session logged with \(finalLog.count) checkpoints.")
             let completedTrip = MockDoeWalkSimulation.completedTrip(now: currentNow, isReturnTrip: isReturn)
             if !state.mockDoeHistoryTrips.contains(where: { $0.destinationName == completedTrip.destinationName && $0.dateString == completedTrip.dateString }) {
                state.mockDoeHistoryTrips.insert(completedTrip, at: 0)
@@ -789,21 +806,21 @@ struct MainMapFeature {
            return .none
 
       case let .locationPingReceived(ping):
-          print("📡 LocationPing received: \(ping.id) with \(ping.encodedCoordinates.count) points")
+          print("LocationPing received: \(ping.id) with \(ping.encodedCoordinates.count) points")
           if let firstData = ping.encodedCoordinates.first {
               do {
                   let coordStruct = try JSONDecoder().decode([Double].self, from: firstData)
-                  print("📍 Decoded ping coordinate array: \(coordStruct)")
+                  print("Decoded ping coordinate array: \(coordStruct)")
                   if coordStruct.count >= 2 {
                       // Note ping coordinates are often logged as [lat, lon] or [lon, lat] depending on the backend!
                       let lat = coordStruct[0]
                       let lon = coordStruct[1]
-                      print("🏃 Walker tracking Location -> lat: \(lat), lon: \(lon)")
+                      print("Walker tracking Location -> lat: \(lat), lon: \(lon)")
 
                       state.trackedWalkerLocation = CLLocationCoordinate2D(latitude: lat, longitude: lon)
                   }
               } catch {
-                  print("❌ Failed mapping location ping data: \(error)")
+                  print("Failed mapping location ping data: \(error)")
               }
           }
           return .none

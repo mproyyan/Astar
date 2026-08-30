@@ -179,25 +179,30 @@ struct MapDirectionSheetFeature {
 
         let destinationCopy = state.destination
         return .run { send in
-            // Call TrackingClient to start WalkSession
+            // Call TrackingClient to start WalkSession.
             if let userProfile = UserProfileStorage.load() {
                 let userRecordID = "UserProfile_\(userProfile.appleUserId)_\(userProfile.cloudKitUserId)"
                   .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
 
                 let destLat = destinationCopy.coordinate?.latitude ?? -6.2088
                 let destLon = destinationCopy.coordinate?.longitude ?? 106.8456
+                print("[CloudKit Debug] Starting journey with userRecordID=\(userRecordID), destination=\(destinationCopy.name), lat=\(destLat), lon=\(destLon)")
 
                 do {
                     let session = try await trackingClient.startWalkSession(userRecordID, destinationCopy.name, destLat, destLon, nil)
+                    print("[CloudKit Debug] startWalkSession succeeded with sessionID=\(session.id)")
 
-                    // Update user status
+                    // Update user status.
                     try await trackingClient.updateUserStatus(userRecordID, "walking", session.id, nil)
+                    print("[CloudKit Debug] updateUserStatus walking succeeded for userRecordID=\(userRecordID)")
 
                     await send(.delegate(.navigationStarted(sessionID: session.id)))
                     return
                 } catch {
-                    // Suppress error for now in UI based on design, but it will fail silently if cloudkit dies
+                    print("[CloudKit Debug] Starting journey CloudKit writes failed: \(error)")
                 }
+            } else {
+                print("[CloudKit Debug] Cannot start CloudKit journey because UserProfileStorage.load() returned nil.")
             }
 
             await send(.delegate(.navigationStarted(sessionID: nil)))
@@ -210,9 +215,14 @@ struct MapDirectionSheetFeature {
                   .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
 
                 do {
-                    // Revert status to Idle
+                    // Revert status to Idle.
                     try await trackingClient.updateUserStatus(userRecordID, "idle", nil, nil)
-                } catch { }
+                    print("[CloudKit Debug] updateUserStatus idle succeeded for userRecordID=\(userRecordID)")
+                } catch {
+                    print("[CloudKit Debug] updateUserStatus idle failed for userRecordID=\(userRecordID): \(error)")
+                }
+            } else {
+                print("[CloudKit Debug] Cannot end CloudKit journey because UserProfileStorage.load() returned nil.")
             }
             await send(.delegate(.navigationEnded))
         }

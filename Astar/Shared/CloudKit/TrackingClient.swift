@@ -47,7 +47,10 @@ struct TrackingClient: Sendable {
 extension TrackingClient: DependencyKey {
     static let liveValue = TrackingClient(
         startWalkSession: { walkerRecordID, destName, destLat, destLon, routePolyline in
-            let db = CKContainer.default().publicCloudDatabase
+            let container = CKContainer.default()
+            let db = container.publicCloudDatabase
+            let accountStatus = try? await container.accountStatus()
+            print("[CloudKit Debug] startWalkSession using container=\(container.containerIdentifier ?? "default"), database=public, accountStatus=\(String(describing: accountStatus)), walkerRecordID=\(walkerRecordID), destination=\(destName)")
             let record = CKRecord(recordType: "WalkSession")
             let walkerRef = CKRecord.Reference(recordID: CKRecord.ID(recordName: walkerRecordID), action: .none)
             
@@ -60,7 +63,13 @@ extension TrackingClient: DependencyKey {
             record["startedAt"] = Date()
             record["lastPingAt"] = Date()
             
-            try await db.save(record)
+            do {
+                let savedRecord = try await db.save(record)
+                print("[CloudKit Debug] Saved WalkSession recordID=\(savedRecord.recordID.recordName)")
+            } catch {
+                print("[CloudKit Debug] Failed saving WalkSession: \(error)")
+                throw error
+            }
             
             return WalkSession(
                 id: record.recordID.recordName,
@@ -108,9 +117,18 @@ extension TrackingClient: DependencyKey {
             try await db.deleteRecord(withID: id)
         },
         updateUserStatus: { userRecordID, status, activeSessionID, watchingSessionID in
-            let db = CKContainer.default().publicCloudDatabase
+            let container = CKContainer.default()
+            let db = container.publicCloudDatabase
+            print("[CloudKit Debug] updateUserStatus using container=\(container.containerIdentifier ?? "default"), database=public, userRecordID=\(userRecordID), status=\(status), activeSessionID=\(activeSessionID ?? "nil"), watchingSessionID=\(watchingSessionID ?? "nil")")
             let id = CKRecord.ID(recordName: userRecordID)
-            let record = try await db.record(for: id)
+            let record: CKRecord
+            do {
+                record = try await db.record(for: id)
+                print("[CloudKit Debug] Found UserProfile before status update: \(userRecordID)")
+            } catch {
+                print("[CloudKit Debug] Failed fetching UserProfile for status update: \(error)")
+                throw error
+            }
             
             record["Status"] = status
             
@@ -126,10 +144,18 @@ extension TrackingClient: DependencyKey {
                 record["watchingSessionRef"] = nil
             }
             
-            try await db.save(record)
+            do {
+                let savedRecord = try await db.save(record)
+                print("[CloudKit Debug] Saved UserProfile status update recordID=\(savedRecord.recordID.recordName)")
+            } catch {
+                print("[CloudKit Debug] Failed saving UserProfile status update: \(error)")
+                throw error
+            }
         },
         pushLocationPing: { sessionID, coordinatesData in
-            let db = CKContainer.default().publicCloudDatabase
+            let container = CKContainer.default()
+            let db = container.publicCloudDatabase
+            print("[CloudKit Debug] pushLocationPing using container=\(container.containerIdentifier ?? "default"), database=public, sessionID=\(sessionID), dataBytes=\(coordinatesData.count)")
             let record = CKRecord(recordType: "LocationPing")
             let sessionRef = CKRecord.Reference(recordID: CKRecord.ID(recordName: sessionID), action: .none)
             
@@ -137,12 +163,24 @@ extension TrackingClient: DependencyKey {
             record["encodedCoordinates"] = [coordinatesData]
             record["recordedAt"] = Date()
             
-            try await db.save(record)
+            do {
+                let savedRecord = try await db.save(record)
+                print("[CloudKit Debug] Saved LocationPing recordID=\(savedRecord.recordID.recordName)")
+            } catch {
+                print("[CloudKit Debug] Failed saving LocationPing: \(error)")
+                throw error
+            }
             
             // Also update WalkSession lastPingAt
-            let sessionRecord = try await db.record(for: CKRecord.ID(recordName: sessionID))
-            sessionRecord["lastPingAt"] = Date()
-            try await db.save(sessionRecord)
+            do {
+                let sessionRecord = try await db.record(for: CKRecord.ID(recordName: sessionID))
+                sessionRecord["lastPingAt"] = Date()
+                let savedSession = try await db.save(sessionRecord)
+                print("[CloudKit Debug] Updated WalkSession lastPingAt recordID=\(savedSession.recordID.recordName)")
+            } catch {
+                print("[CloudKit Debug] Failed updating WalkSession lastPingAt: \(error)")
+                throw error
+            }
         },
         subscribeToLocationPings: { sessionID in
             AsyncStream { (continuation: AsyncStream<LocationPing>.Continuation) in
@@ -157,11 +195,11 @@ extension TrackingClient: DependencyKey {
                         let record = try await db.record(for: id)
                         walkerRefStr = (record["walkerRef"] as? CKRecord.Reference)?.recordID.recordName
                     } catch {
-                        print("📡 [Polling] Failed to get session to determine walkerRef: \(error)")
+                        print("[Polling] Failed to get session to determine walkerRef: \(error)")
                     }
 
                     while !Task.isCancelled {
-                        print("📡 [Polling] Getting pings for \(sessionID)")
+                        print("[Polling] Getting pings for \(sessionID)")
                         let query = CKQuery(recordType: "LocationPing", predicate: NSPredicate(value: true))
                         // Removed sortDescriptors by creationDate to prevent "Field '___createTime' is not marked sortable" error
 
@@ -193,20 +231,20 @@ extension TrackingClient: DependencyKey {
                                     )
                                     continuation.yield(ping)
                                 } else {
-                                    print("📡 [Polling] Record found but fields missing.")
+                                    print("[Polling] Record found but fields missing.")
                                 }
                             }
                         } catch {
-                            print("📡 [Polling] error: \(error)")
+                            print("[Polling] error: \(error)")
                         }
 
                         try? await Task.sleep(nanoseconds: 3_000_000_000) // Poll every 3 seconds
                     }
-                    print("📡 [Polling] Task cancelled loop exit.")
+                    print("[Polling] Task cancelled loop exit.")
                 }
 
                 continuation.onTermination = { @Sendable _ in
-                    print("📡 [Polling] Stream terminated/cancelled.")
+                    print("[Polling] Stream terminated/cancelled.")
                     task.cancel()
                 }
             }

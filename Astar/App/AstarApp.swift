@@ -16,8 +16,10 @@ struct AstarApp: App {
   init() {
     let initial: RootFeature.State
     if let profile = UserProfileStorage.load() {
+      print("[CloudKit Debug] Loaded local user profile: appleUserId=\(profile.appleUserId), cloudKitUserId=\(profile.cloudKitUserId)")
       initial = .main(MainFeature.State(userProfile: profile))
     } else {
+      print("[CloudKit Debug] No local user profile found. Creating local mock profile only; this does not create a CloudKit UserProfile record.")
       let defaultProfile = UserProfile(
         appleUserId: "user-1",
         cloudKitUserId: "ck-1",
@@ -54,3 +56,4 @@ struct AstarApp: App {
     }
   }
 }
+
