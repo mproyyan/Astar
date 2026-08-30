@@ -52,13 +52,16 @@ struct Person: Identifiable, Equatable, Sendable {
     }
 }
 
-struct SavedPlace: Identifiable, Equatable, Sendable {
+struct SavedPlace: Identifiable, Equatable, Sendable, Codable {
     let id: UUID
     let name: String
     let subtitle: String
     let iconName: String
     let distance: String?
-    let coordinate: CLLocationCoordinate2D?
+    // let coordinate: CLLocationCoordinate2D?
+    let latitude: Double?
+    let longitude: Double?
+    var label: String?
 
     init(
         id: UUID = UUID(),
@@ -66,16 +69,28 @@ struct SavedPlace: Identifiable, Equatable, Sendable {
         subtitle: String,
         iconName: String,
         distance: String? = nil,
-        coordinate: CLLocationCoordinate2D? = nil
+        // coordinate: CLLocationCoordinate2D? = nil
+        latitude: Double? = nil,
+        longitude: Double? = nil,
+        label: String? = nil
     ) {
         self.id = id
         self.name = name
         self.subtitle = subtitle
         self.iconName = iconName
         self.distance = distance
-        self.coordinate = coordinate
+        // self.coordinate = coordinate
+        self.latitude = latitude
+        self.longitude = longitude
+        self.label = label
+    }
+
+    var coordinate: CLLocationCoordinate2D? {
+        guard let lat = latitude, let lng = longitude else { return nil }
+        return CLLocationCoordinate2D(latitude: lat, longitude: lng)
     }
 }
+
 
 extension SavedPlace {
     var categoryColor: Color {
@@ -115,7 +130,16 @@ extension SavedPlace {
             return Color(red: 0.20, green: 0.55, blue: 0.95) // Services/Auto: Blue
 
         case "house.fill":
-            return Color(red: 0.25, green: 0.60, blue: 0.95) // Home: Sky Blue
+            return Color(red: 0.15, green: 0.75, blue: 0.85) // Home: Cyan/Teal (Figma)
+
+        case "briefcase.fill", "building.2.fill", "building.fill":
+            return Color(red: 0.65, green: 0.48, blue: 0.35) // Office: Warm Brown (Figma)
+
+        case "key.fill":
+            return Color(red: 0.98, green: 0.78, blue: 0.05) // Custom/Key: Bright Yellow (Figma)
+
+        case "mappin.fill", "mappin.circle.fill", "mappin.and.ellipse":
+            return Color(red: 0.92, green: 0.25, blue: 0.20) // Search Pin: Red (Figma)
 
         case "location.fill":
             return Color.blue // Current Location: Apple Blue

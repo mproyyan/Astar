@@ -35,7 +35,17 @@ struct ProfileView: View {
             }
 
             NavigationLink {
-              Text("Set Default Locations")
+              // [REPLACED WITH DYNAMIC SAVED PLACES]
+              // Text("Set Default Locations")
+              SavedPlacesView(
+                store: Store(
+                  initialState: SavedPlacesFeature.State(
+                    userId: store.userProfile?.appleUserId ?? "default_user"
+                  )
+                ) {
+                  SavedPlacesFeature()
+                }
+              )
             } label: {
               Text("Set Default Locations")
                 .font(.body)

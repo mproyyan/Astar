@@ -20,18 +20,6 @@ struct MainFeature {
 
     init(userProfile: UserProfile? = nil) {
       self.login = LoginFeature.State(userProfile: userProfile)
-      let devMode = DeveloperSettingsStorage.isDevelopmentMode
-      self.isDevelopmentMode = devMode
-      let routeGuide = DeveloperSettingsStorage.isShowRouteGuide
-      self.isShowRouteGuide = routeGuide
-      self.map.isShowRouteGuide = routeGuide
-      let doeWalking = DeveloperSettingsStorage.isDoeWalkingMockEnabled
-      self.isDoeWalkingMock = doeWalking
-      if devMode {
-        self.people = [Person.mockDoe]
-      } else {
-        self.people = []
-      }
     }
   }
 
@@ -133,10 +121,7 @@ struct MainFeature {
 
       case .path(.element(id: _, action: .profile(.delegate(.signedOut)))):
         return .send(.login(.signOutButtonTapped))
-        
-      case let .login(.delegate(.loggedIn(user))):
-        return .send(.onAppear)
-        
+
       case .login:
         return .none
 

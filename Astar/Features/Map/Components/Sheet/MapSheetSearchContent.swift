@@ -50,7 +50,9 @@ struct MapSheetSearchContent: View {
             if store.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 SavedPlacesCard(
                     title: "Saved",
-                    places: MapSampleData.savedPlaces,
+                    // [REPLACED WITH DYNAMIC SAVED PLACES]
+                    // places: MapSampleData.savedPlaces,
+                    places: store.map.userSavedPlaces,
                     onSelectPlace: { place in
                         store.send(.selectPlace(place))
                         onSelectPlace?(place)

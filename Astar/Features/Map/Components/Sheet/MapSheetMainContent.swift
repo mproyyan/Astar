@@ -19,7 +19,8 @@ struct MapSheetMainContent: View {
     private let savedPlaces = MapSampleData.savedPlaces
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        WithPerceptionTracking {
+            VStack(alignment: .leading, spacing: 20) {
             HStack(spacing: 12) {
                 Button(action: onSearchTapped) {
                     SearchBarView()
@@ -44,6 +45,7 @@ struct MapSheetMainContent: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 12)
+        }
     }
 }
 
