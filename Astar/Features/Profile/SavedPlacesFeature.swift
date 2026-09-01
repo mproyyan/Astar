@@ -26,6 +26,24 @@ struct SavedPlacesFeature {
         var selectedPlaceForLabel: SavedPlace? = nil
         var customLabel: String = ""
         var editingPlaceId: UUID? = nil
+        var hasChanges: Bool {
+            guard let editingId = editingPlaceId,
+                  let originalPlace = places.first(where: { $0.id == editingId }) else {
+                // Adding a new place
+                return selectedPlaceForLabel != nil
+            }
+
+            let currentLabel = customLabel.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            let originalLabel = (originalPlace.label ?? originalPlace.name)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            let isLabelChanged = !currentLabel.isEmpty && currentLabel != originalLabel
+
+            let isLocationChanged = selectedPlaceForLabel?.id != originalPlace.id
+
+            return isLabelChanged || isLocationChanged
+        }
 
         enum PinStep: Equatable {
             case chooseLocation
@@ -116,7 +134,7 @@ struct SavedPlacesFeature {
             case let .changeLocationTapped(place, preset):
                 state.targetPresetForAdd = preset ?? (place.isHome ? .home : (place.isOffice ? .office : .custom))
                 state.isAddingPlace = true
-                state.pinStep = .chooseLocation
+                state.pinStep = .renamePlace
                 state.searchQuery = ""
                 state.searchResults = []
                 state.isLoading = false
@@ -178,6 +196,9 @@ struct SavedPlacesFeature {
                 return .none
 
             case .backToChooseLocationTapped:
+                if state.editingPlaceId != nil {
+                    return .send(.dismissAddSheetTapped)
+                }
                 state.pinStep = .chooseLocation
                 return .none
 
