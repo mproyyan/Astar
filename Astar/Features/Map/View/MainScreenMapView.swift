@@ -97,6 +97,9 @@ struct MainScreenMapView: View {
           store.send(.map(.reloadSavedPlaces))
         }
       }
+      .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+        store.send(.refreshPeople)
+      }
       .onChange(of: store.map.isSearchActive) { _, isSearching in
         if isSearching {
           withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {

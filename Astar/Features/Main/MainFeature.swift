@@ -25,6 +25,7 @@ struct MainFeature {
 
   enum Action: Equatable {
     case onAppear
+    case refreshPeople
     case fetchPeopleResponse(Result<[Person], FetchUsersError>)
     case profileButtonTapped
     case login(LoginFeature.Action)
@@ -46,29 +47,68 @@ struct MainFeature {
     Reduce { state, action in
       switch action {
       case .onAppear:
+        return .run { send in
+          // 1. Initial fetch
+          await send(.refreshPeople)
+
+          // 2. Periodic background refresh every 6 seconds to keep presence in sync
+          while !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: 6_000_000_000)
+            guard !Task.isCancelled else { break }
+            await send(.refreshPeople)
+          }
+        }
+
+      case .refreshPeople:
         return .run { [currentUser = state.login.userProfile] send in
           do {
             let profiles = try await usersClient.fetchAllUsers()
             let people = profiles
               .filter { $0.appleUserId != currentUser?.appleUserId }
-              .map { Person(id: UUID(), name: $0.name, status: ($0.status == nil || $0.status?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true) ? "Idle" : $0.status!, appleUserId: $0.appleUserId, cloudKitUserId: $0.cloudKitUserId) }
+              .map {
+                Person(
+                  id: UUID(),
+                  name: $0.name,
+                  status: Self.formatStatus($0.status),
+                  appleUserId: $0.appleUserId,
+                  cloudKitUserId: $0.cloudKitUserId
+                )
+              }
             await send(.fetchPeopleResponse(.success(people)))
           } catch {
             await send(.fetchPeopleResponse(.failure(FetchUsersError(error: error))))
           }
-        } // We ignore errors for now, or you can add error handling
+        }
 
-      case let .fetchPeopleResponse(.success(people)):
+      case let .fetchPeopleResponse(.success(incomingPeople)):
+        // Merge or update while preserving existing IDs to avoid SwiftUI list flickering
+        var updatedPeople: [Person] = []
+        for person in incomingPeople {
+          if let existing = state.people.first(where: { ($0.appleUserId != nil && $0.appleUserId == person.appleUserId) || ($0.cloudKitUserId != nil && $0.cloudKitUserId == person.cloudKitUserId) }) {
+            updatedPeople.append(Person(
+              id: existing.id,
+              name: person.name,
+              status: person.status,
+              appleUserId: person.appleUserId,
+              cloudKitUserId: person.cloudKitUserId
+            ))
+          } else {
+            updatedPeople.append(person)
+          }
+        }
+
         if state.isDevelopmentMode {
-          state.people = [Person.mockDoe] + people
+          let doe = state.people.first(where: { $0.id == Person.mockDoeID }) ?? Person.mockDoe
+          state.people = [doe] + updatedPeople.filter { $0.id != Person.mockDoeID }
         } else {
-          state.people = people
+          state.people = updatedPeople.filter { $0.id != Person.mockDoeID }
         }
         return .none
 
       case .fetchPeopleResponse(.failure):
         if state.isDevelopmentMode {
-          state.people = [Person.mockDoe]
+          let doe = state.people.first(where: { $0.id == Person.mockDoeID }) ?? Person.mockDoe
+          state.people = [doe]
         } else {
           state.people = []
         }
@@ -172,6 +212,21 @@ struct MainFeature {
       }
     }
     .forEach(\.path, action: \.path)
+  }
+
+  static func formatStatus(_ raw: String?) -> String {
+    guard let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+      return "Idle"
+    }
+    let lower = trimmed.lowercased()
+    if lower == "walking" {
+      return "Walking"
+    } else if lower == "idle" {
+      return "Idle"
+    } else if lower == "accompany" || lower == "accompanying" {
+      return "Accompanying"
+    }
+    return trimmed.capitalized
   }
 }
 
