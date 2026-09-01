@@ -1,6 +1,7 @@
 import CloudKit
 import ComposableArchitecture
 import Foundation
+import Combine
 
 // Data models
 struct WalkSession: Equatable, Sendable {
@@ -38,8 +39,10 @@ struct TrackingClient: Sendable {
     var leaveWalkSession: @Sendable (_ participantID: String) async throws -> Void
     var updateUserStatus: @Sendable (_ userRecordID: String, _ status: String, _ activeSessionID: String?, _ watchingSessionID: String?) async throws -> Void
     var pushLocationPing: @Sendable (_ sessionID: String, _ coordinatesData: Data) async throws -> Void
+    
+    var setSubscribeWalkSession: @Sendable (_ sessionID: String, _ isSubscribed: Bool) async throws -> Void
     var subscribeToLocationPings: @Sendable (_ sessionID: String) async throws -> AsyncStream<LocationPing>
-
+    
     var getWalkSession: @Sendable (_ sessionID: String) async throws -> WalkSession
     var getWalkerActiveSessionID: @Sendable (_ walkerRecordID: String) async throws -> String?
 }
@@ -144,106 +147,143 @@ extension TrackingClient: DependencyKey {
             sessionRecord["lastPingAt"] = Date()
             try await db.save(sessionRecord)
         },
+        setSubscribeWalkSession: {sessionID,isSubscribed in
+            let container = CKContainer.default()
+            let db = container.publicCloudDatabase
+            
+            let subscriptionID = "walk-session-\(sessionID)"
+            
+            if !isSubscribed {
+                do {
+                    try await db.deleteSubscription(withID: subscriptionID)
+                    print("Unsubscribed from session: \(sessionID)")
+                } catch let error as CKError where error.code == .unknownItem {
+                    
+                } catch {
+                    throw error
+                }
+                return
+            }
+            
+            // Subscribe flow
+            do {
+                _ = try await db.subscription(for: subscriptionID)
+                print("Already subscribed to session: \(sessionID)")
+                return
+            } catch let error as CKError where error.code == .unknownItem {
+                // Subscription does not exist, proceed to create
+            } catch {
+                throw error
+            }
+            
+            let sessionRef = CKRecord.Reference(
+                recordID: CKRecord.ID(recordName: sessionID),
+                action: .none
+            )
+            
+            let predicate = NSPredicate(format: "sessionRef == %@", sessionRef)
+            
+            let subscription = CKQuerySubscription(
+                recordType: "LocationPing",
+                predicate: predicate,
+                subscriptionID: subscriptionID,
+                options: [.firesOnRecordCreation, .firesOnRecordUpdate, .firesOnRecordDeletion]
+            )
+            
+            let info = CKSubscription.NotificationInfo()
+            // 1. triggers silent push to wake the app in background
+            info.shouldSendContentAvailable = true
+            // 2. triggers visual push alert so we can see it during demo
+            info.alertBody = "A location was updated in the public database."
+            info.soundName = "default"
+            
+            subscription.notificationInfo = info
+            
+            try await db.save(subscription)
+        },
+        
+        
         subscribeToLocationPings: { sessionID in
             AsyncStream { (continuation: AsyncStream<LocationPing>.Continuation) in
                 let db = CKContainer.default().publicCloudDatabase
-
+                
                 // We use pure polling so no CKQuerySubscription or Remote Notifications are needed.
                 let task = Task {
                     // Try to fetch the session first to know its walkerRef
-                    var walkerRefStr: String? = nil
-                    do {
-                        let id = CKRecord.ID(recordName: sessionID)
-                        let record = try await db.record(for: id)
-                        walkerRefStr = (record["walkerRef"] as? CKRecord.Reference)?.recordID.recordName
-                    } catch {
-                        print("📡 [Polling] Failed to get session to determine walkerRef: \(error)")
-                    }
-
-                    while !Task.isCancelled {
-                        print("📡 [Polling] Getting pings for \(sessionID)")
-                        let query = CKQuery(recordType: "LocationPing", predicate: NSPredicate(value: true))
-                        // Removed sortDescriptors by creationDate to prevent "Field '___createTime' is not marked sortable" error
-
+                    for await notification in NotificationCenter.default.publisher(for: AppDelegate.locationPingNotification).values {
+                        guard !Task.isCancelled else { break }
+                        
+                        guard let userInfo = notification.userInfo,
+                              let recordID = userInfo["recordID"] as? CKRecord.ID else {continue}
+                        
+                        print("[Push] Fetching ping record: \(recordID.recordName)")
+                        
+                        
+                        
+                        //                    var walkerRefStr: String? = nil
                         do {
-                            let (matchResults, _) = try await db.records(matching: query)
-                            // Filter matches locally! (Inefficient for prod, but good for debug!)
-                            let sortedRecords = matchResults.compactMap { try? $0.1.get() }
-                                .filter { record in
-                                     if let ref = record["sessionRef"] as? CKRecord.Reference {
-                                         let refName = ref.recordID.recordName
-                                         if refName == sessionID { return true }
-                                         if let wRef = walkerRefStr, refName == wRef { return true }
-                                     }
-                                     return false
-                                }
-                                .sorted {
-                                    ($0.creationDate ?? Date.distantPast) > ($1.creationDate ?? Date.distantPast)
-                                }
-
-                            if let record = sortedRecords.first {
-                                if let encodedCoordinates = record["encodedCoordinates"] as? [Data],
-                                   let sessionRef = (record["sessionRef"] as? CKRecord.Reference)?.recordID.recordName {
-
-                                    let ping = LocationPing(
-                                        id: record.recordID.recordName,
-                                        sessionRef: sessionRef,
-                                        encodedCoordinates: encodedCoordinates,
-                                        recordedAt: record.creationDate ?? Date()
-                                    )
-                                    continuation.yield(ping)
-                                } else {
-                                    print("📡 [Polling] Record found but fields missing.")
-                                }
+                            let record = try await db.record(for: recordID)
+                            
+                            
+                            if let encodedCoordinates = record["encodedCoordinates"] as? [Data],
+                               let sessionRef = (record["sessionRef"] as? CKRecord.Reference)?.recordID.recordName, sessionRef == sessionID {
+                                
+                                let ping = LocationPing(
+                                    id: record.recordID.recordName,
+                                    sessionRef: sessionRef,
+                                    encodedCoordinates: encodedCoordinates,
+                                    recordedAt: record.creationDate ?? Date()
+                                )
+                                continuation.yield(ping)
                             }
                         } catch {
-                            print("📡 [Polling] error: \(error)")
+                            print(" [Push] Error fetching ping record: \(error)")
                         }
-
-                        try? await Task.sleep(nanoseconds: 3_000_000_000) // Poll every 3 seconds
+                        
                     }
-                    print("📡 [Polling] Task cancelled loop exit.")
                 }
-
+                
                 continuation.onTermination = { @Sendable _ in
                     print("📡 [Polling] Stream terminated/cancelled.")
                     task.cancel()
                 }
             }
         },
-        getWalkSession: { sessionID in
-            let db = CKContainer.default().publicCloudDatabase
-            let id = CKRecord.ID(recordName: sessionID)
-            let record = try await db.record(for: id)
-            let walkerRef = (record["walkerRef"] as? CKRecord.Reference)?.recordID.recordName ?? ""
-
-            return WalkSession(
-                id: sessionID,
-                walkerRef: walkerRef,
-                status: record["status"] as? String ?? "",
-                destinationName: record["destinationName"] as? String ?? "",
-                destinationLatitude: record["destinationLatitude"] as? Double ?? 0.0,
-                destinationLongitude: record["destinationLongitude"] as? Double ?? 0.0,
-                routePolyline: record["routePolyline"] as? String,
-                startedAt: record["startedAt"] as? Date ?? Date(),
-                endedAt: record["endedAt"] as? Date,
-                lastPingAt: record["lastPingAt"] as? Date ?? Date()
-            )
-        },
-        getWalkerActiveSessionID: { walkerRecordID in
-            let db = CKContainer.default().publicCloudDatabase
-            let id = CKRecord.ID(recordName: walkerRecordID)
-            let record = try await db.record(for: id)
-            return (record["activeWalkSessionRef"] as? CKRecord.Reference)?.recordID.recordName
-        }
-    )
-
-    static let testValue = Self()
-}
-
-extension DependencyValues {
-    var trackingClient: TrackingClient {
-        get { self[TrackingClient.self] }
-        set { self[TrackingClient.self] = newValue }
-    }
-}
+                
+                
+                    getWalkSession: { sessionID in
+                        let db = CKContainer.default().publicCloudDatabase
+                        let id = CKRecord.ID(recordName: sessionID)
+                        let record = try await db.record(for: id)
+                        let walkerRef = (record["walkerRef"] as? CKRecord.Reference)?.recordID.recordName ?? ""
+                        
+                        return WalkSession(
+                            id: sessionID,
+                            walkerRef: walkerRef,
+                            status: record["status"] as? String ?? "",
+                            destinationName: record["destinationName"] as? String ?? "",
+                            destinationLatitude: record["destinationLatitude"] as? Double ?? 0.0,
+                            destinationLongitude: record["destinationLongitude"] as? Double ?? 0.0,
+                            routePolyline: record["routePolyline"] as? String,
+                            startedAt: record["startedAt"] as? Date ?? Date(),
+                            endedAt: record["endedAt"] as? Date,
+                            lastPingAt: record["lastPingAt"] as? Date ?? Date()
+                        )
+                    },
+                getWalkerActiveSessionID: { walkerRecordID in
+                    let db = CKContainer.default().publicCloudDatabase
+                    let id = CKRecord.ID(recordName: walkerRecordID)
+                    let record = try await db.record(for: id)
+                    return (record["activeWalkSessionRef"] as? CKRecord.Reference)?.recordID.recordName
+                }
+                )
+                
+                static let testValue = Self()
+            }
+            
+            extension DependencyValues {
+                var trackingClient: TrackingClient {
+                    get { self[TrackingClient.self] }
+                    set { self[TrackingClient.self] = newValue }
+                }
+            }

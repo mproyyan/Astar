@@ -70,6 +70,7 @@ struct MainMapFeature {
 
     case updateTrackingLocation(CLLocationCoordinate2D)
     case locationPingReceived(LocationPing)
+    case stopTrackingTapped
 
     case sheet(PresentationAction<MapSheetFeature.Action>)
 
@@ -697,11 +698,18 @@ struct MainMapFeature {
                          try await trackingClient.updateUserStatus(selfRecordID, "accompany", nil, session.id)
 
                          // And subscribe
-                         print("🎣 Subscribing to location pings for session \(session.id)")
-                         for try await ping in try await trackingClient.subscribeToLocationPings(session.id) {
-                             print("📥 Stream yielded a ping block.")
+                         print("Registering push subscription for session \(session.id)")
+                         
+                         try await trackingClient.setSubscribeWalkSession( session.id, true)
+                         print("Push subscription registered successfully.")
+                         
+                         
+                         let stream = try await trackingClient.subscribeToLocationPings(session.id)
+                         for await ping in stream {
                              await send(.locationPingReceived(ping))
                          }
+                         
+                         
                          print("❌ Stream ended for session \(session.id)")
                      } catch {
                          print("❌ Tracking failed with error: \(error)")
@@ -829,6 +837,19 @@ struct MainMapFeature {
               }
           }
           return .none
+          
+      case .stopTrackingTapped:
+          
+          guard let sessionID = state.activeWalkSessionID else { return .none }
+              
+              return .run { _ in
+                  do {
+                      try await trackingClient.setSubscribeWalkSession(sessionID, false)
+                      print("Unsubscribed CloudKit push for session \(sessionID)")
+                  } catch {
+                      print("Failed to unsubscribe: \(error)")
+                  }
+          }
 
       case .sheet, .delegate, .updateTrackingLocation:
         return .none
