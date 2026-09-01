@@ -22,7 +22,7 @@ struct SavedPlaceRow: View {
                     Circle()
                         .fill(place.categoryColor)
                         .overlay {
-                            Image(systemName: place.iconName)
+                            Image(systemName: place.resolvedIconName)
                                 .font(.body.weight(.semibold))
                                 .foregroundStyle(.white)
                         }

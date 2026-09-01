@@ -39,5 +39,11 @@ struct MapSheetDirectionContent: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 12)
+        .onAppear {
+            if store.walkingRouteInfo == nil && !store.isCalculatingRoute {
+                let origin = currentLocation ?? CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
+                store.send(.onAppear(currentLocation: origin))
+            }
+        }
     }
 }

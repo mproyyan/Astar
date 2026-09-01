@@ -23,10 +23,12 @@ struct DirectionProgress: View {
 
     var isDone: Bool = false
     var isLoading: Bool = false
+    var isDevelopmentMode: Bool = DeveloperSettingsStorage.isDevelopmentMode
 
     var onJourneyLog: (() -> Void)? = nil
     var onEndJourney: (() -> Void)? = nil
     var onDone: (() -> Void)? = nil
+    var onSimulateArrival: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -97,30 +99,32 @@ struct DirectionProgress: View {
                         }
                     }
 
-                    Button {
-                        onJourneyLog?()
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "list.bullet")
-                                .resizable()
-                                .scaledToFit()
-                                .fontWeight(.semibold)
-                                .frame(width: 24, height: 24)
+                    if isDone {
+                        Button {
+                            onJourneyLog?()
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "list.bullet")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .fontWeight(.semibold)
+                                    .frame(width: 24, height: 24)
 
-                            Text("Journey Log")
-                                .font(.subheadline.weight(.semibold))
+                                Text("Journey Log")
+                                    .font(.subheadline.weight(.semibold))
+                            }
+                            .foregroundStyle(.primary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(Color.primary.opacity(0.06), in: .capsule)
                         }
-                        .foregroundStyle(.primary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(Color.primary.opacity(0.06), in: .capsule)
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Journey Log")
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Journey Log")
                 }
-                .padding(.top, 20)
-                .padding(.bottom, 16)
-                .padding(.horizontal, 2)
+//                .padding(.top, 20)
+//                .padding(.bottom, 0)
+//                .padding(.horizontal, 2)
 
                 if !isDone {
                     Divider()
@@ -155,6 +159,26 @@ struct DirectionProgress: View {
                 Divider()
                     .opacity(0.5)
 
+                if !isDone && isDevelopmentMode {
+                    Button {
+                        onSimulateArrival?()
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "flag.checkered")
+                                .font(.subheadline.weight(.semibold))
+                            Text("Simulate Arrival (Mock)")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .foregroundStyle(.blue)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.blue.opacity(0.1), in: .capsule)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Simulate arrival")
+                    .padding(.top, 8)
+                }
+
                 Button {
                     if isDone {
                         onDone?() ?? onEndJourney?()
@@ -172,7 +196,7 @@ struct DirectionProgress: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(isDone ? "Done" : "End journey")
-                .padding(.top, 16)
+                .padding(.top, isDone ? 16 : 8)
                 .padding(.bottom, 20)
             }
         }

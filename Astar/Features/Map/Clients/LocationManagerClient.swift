@@ -5,8 +5,8 @@ import ComposableArchitecture
 @DependencyClient
 struct LocationManagerClient {
   var authorizationStatus: () async -> AsyncStream<CLAuthorizationStatus> = { .finished }
-  var requestWhenInUseAuthorization: () async -> Void
-  var requestLocation: () async -> Void
+  var requestWhenInUseAuthorization: () async -> Void = { }
+  var requestLocation: () async -> Void = { }
   var locationUpdates: () async -> AsyncStream<CLLocationCoordinate2D> = { .finished }
   var errorUpdates: () async -> AsyncStream<Error> = { .finished }
   var getCurrentLocation: () async -> CLLocationCoordinate2D? = { nil }
@@ -14,6 +14,14 @@ struct LocationManagerClient {
 
 extension LocationManagerClient: DependencyKey {
   static let liveValue = Self.live()
+  static let testValue = Self(
+    authorizationStatus: { .finished },
+    requestWhenInUseAuthorization: { },
+    requestLocation: { },
+    locationUpdates: { .finished },
+    errorUpdates: { .finished },
+    getCurrentLocation: { nil }
+  )
 
   static func live() -> Self {
     let managerActor = LocationManagerActor()

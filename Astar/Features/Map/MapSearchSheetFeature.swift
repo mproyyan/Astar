@@ -10,6 +10,7 @@ struct MapSearchSheetFeature {
     var searchResults: [SavedPlace] = []
     var isLoading: Bool = false
     var userLocation: CLLocationCoordinate2D?
+    var savedPlaces: [SavedPlace] = SavedPlacesStorage.load()
   }
 
   enum Action: Equatable {
@@ -17,6 +18,12 @@ struct MapSearchSheetFeature {
     case searchResponse([SavedPlace])
     case clearSearchTapped
     case selectPlace(SavedPlace)
+    case delegate(Delegate)
+
+    @CasePathable
+    enum Delegate: Equatable {
+      case dismissed
+    }
   }
 
   @Dependency(\.placeSearch) var placeSearch
@@ -53,10 +60,16 @@ struct MapSearchSheetFeature {
         state.searchQuery = ""
         state.searchResults = []
         state.isLoading = false
-        return .cancel(id: "searchDebounce")
+        return .concatenate(
+          .cancel(id: "searchDebounce"),
+          .send(.delegate(.dismissed))
+        )
 
       case .selectPlace:
         // Handled by parent
+        return .none
+
+      case .delegate:
         return .none
       }
     }

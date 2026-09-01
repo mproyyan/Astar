@@ -22,7 +22,8 @@ struct MapDirectionSheetFeature {
     
     var isNavigating: Bool = false
     var isDestinationReached: Bool = false
-    
+    var isDevelopmentMode: Bool = DeveloperSettingsStorage.isDevelopmentMode
+
     var journeyLogEntries: [JourneyLogEntry] = []
   }
 
@@ -38,7 +39,8 @@ struct MapDirectionSheetFeature {
     
     case journeyLogTapped
     case dismissJourneyLogTapped
-    
+    case simulateArrivalTapped
+
     // Updates from parent
     case updateLocation(CLLocationCoordinate2D, newMilestones: [JourneyLogEntry])
     case destinationReached(finalEntry: JourneyLogEntry)
@@ -46,7 +48,7 @@ struct MapDirectionSheetFeature {
     case delegate(Delegate)
     
     enum Delegate: Equatable {
-      case routeChanged(MKRoute?)
+      case routeChanged(MKRoute?, MKPolyline?)
       case navigationStarted(sessionID: String?)
       case navigationEnded
     }
@@ -76,28 +78,53 @@ struct MapDirectionSheetFeature {
 
           var destCoord = destination.coordinate
           if destCoord == nil {
-            let query: String
             let lowerName = destination.name.lowercased()
             if lowerName == "home" {
-              query = "Bendungan Hilir, Central Jakarta"
+              destCoord = SavedPlacesStorage.load().first(where: { $0.isHome })?.coordinate
+                ?? CLLocationCoordinate2D(latitude: -6.2125, longitude: 106.8166)
             } else if lowerName == "office" || lowerName == "work" {
-              query = "Autograph Tower, Thamrin Nine, Central Jakarta"
-            } else if lowerName == "gym" {
-              query = "Agora Mall, Thamrin Nine, Central Jakarta"
+              destCoord = SavedPlacesStorage.load().first(where: { $0.isOffice })?.coordinate
+                ?? CLLocationCoordinate2D(latitude: -6.1991, longitude: 106.8212)
             } else {
-              query = "\(destination.name) \(destination.subtitle)"
-            }
+              // 1. Regional search for destination name
+              let searchReq = MKLocalSearch.Request()
+              searchReq.naturalLanguageQuery = destination.name
+              let jabodetabekRegion = MKCoordinateRegion(
+                center: originCoord,
+                span: MKCoordinateSpan(latitudeDelta: 1.5, longitudeDelta: 1.5)
+              )
+              searchReq.region = jabodetabekRegion
 
-            let searchReq = MKLocalSearch.Request()
-            searchReq.naturalLanguageQuery = query
-            if let resp = try? await MKLocalSearch(request: searchReq).start(),
-               let firstItem = resp.mapItems.first {
-              destCoord = firstItem.placemark.coordinate
-            } else {
-              destCoord = CLLocationCoordinate2D(latitude: -6.2125, longitude: 106.8166)
+              if let resp = try? await MKLocalSearch(request: searchReq).start(),
+                 let firstItem = resp.mapItems.first {
+                destCoord = firstItem.placemark.coordinate
+              } else {
+                // 2. Detailed search with name + subtitle
+                let detailedReq = MKLocalSearch.Request()
+                let cleanSub = destination.subtitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                detailedReq.naturalLanguageQuery = cleanSub.isEmpty ? destination.name : "\(destination.name) \(cleanSub)"
+                detailedReq.region = jabodetabekRegion
+
+                if let resp = try? await MKLocalSearch(request: detailedReq).start(),
+                   let firstItem = resp.mapItems.first {
+                  destCoord = firstItem.placemark.coordinate
+                } else {
+                  // 3. CoreLocation forward geocoding on name/subtitle
+                  let geocoder = CLGeocoder()
+                  let queryAddr = cleanSub.isEmpty ? destination.name : "\(destination.name), \(cleanSub)"
+                  if let placemarks = try? await geocoder.geocodeAddressString(queryAddr),
+                     let loc = placemarks.first?.location?.coordinate {
+                    destCoord = loc
+                  } else if !cleanSub.isEmpty,
+                            let placemarks = try? await geocoder.geocodeAddressString(cleanSub),
+                            let loc = placemarks.first?.location?.coordinate {
+                    destCoord = loc
+                  }
+                }
+              }
             }
           }
-          let resolvedDest = destCoord ?? CLLocationCoordinate2D(latitude: -6.2125, longitude: 106.8166)
+          let resolvedDest = destCoord ?? originCoord
 
           async let routeInfo = directionRoute.calculateWalkingRoute(origin: originCoord, destination: resolvedDest)
 
@@ -138,12 +165,14 @@ struct MapDirectionSheetFeature {
         if let destCoord = routeInfo.route?.polyline.points() {
           // coordinate is preserved on destination
         }
-        return .send(.delegate(.routeChanged(routeInfo.route)))
+        return .send(.delegate(.routeChanged(routeInfo.route, routeInfo.polyline)))
 
       case let .startNavigationTapped(currentLocation):
         state.isNavigating = true
         state.isDestinationReached = false
-        state.activeRoute = nil
+        if state.activeRoute == nil {
+          state.activeRoute = state.walkingRouteInfo?.route
+        }
         state.mode = .progress
 
         let originCoord = currentLocation ?? CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
@@ -189,7 +218,6 @@ struct MapDirectionSheetFeature {
                     // Update user status
                     try await trackingClient.updateUserStatus(userRecordID, "walking", session.id, nil)
 
-                    await send(.delegate(.routeChanged(nil)))
                     await send(.delegate(.navigationStarted(sessionID: session.id)))
                     return
                 } catch {
@@ -197,7 +225,6 @@ struct MapDirectionSheetFeature {
                 }
             }
 
-            await send(.delegate(.routeChanged(nil)))
             await send(.delegate(.navigationStarted(sessionID: nil)))
         }
 
@@ -237,7 +264,37 @@ struct MapDirectionSheetFeature {
         state.journeyLogEntries.removeAll(where: { $0.entryType == .currentLocation })
         state.journeyLogEntries.insert(finalEntry, at: 0)
         return .none
-        
+
+      case .simulateArrivalTapped:
+        state.isDestinationReached = true
+        state.journeyLogEntries.removeAll(where: { $0.entryType == .currentLocation })
+        let destName = state.destination.name
+        let destSubtitle = state.destination.subtitle
+        let destTime = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .short)
+        let destEntry = JourneyLogEntry(
+          id: uuid(),
+          landmarkName: "Destination: \(destName)",
+          address: destSubtitle,
+          timeString: destTime,
+          iconName: state.destination.iconName.isEmpty ? "house.fill" : state.destination.iconName,
+          entryType: .destination,
+          coordinate: state.destination.coordinate
+        )
+        if state.journeyLogEntries.count <= 1 {
+          let intermediateEntry = JourneyLogEntry(
+            id: uuid(),
+            landmarkName: "Passed Jl. M.H. Thamrin",
+            address: "Central Jakarta",
+            timeString: destTime,
+            iconName: "figure.walk",
+            entryType: .checkpoint,
+            coordinate: nil
+          )
+          state.journeyLogEntries.insert(intermediateEntry, at: 0)
+        }
+        state.journeyLogEntries.insert(destEntry, at: 0)
+        return .none
+
       case .delegate:
         return .none
       }

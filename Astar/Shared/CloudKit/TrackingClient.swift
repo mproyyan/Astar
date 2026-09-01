@@ -237,6 +237,8 @@ extension TrackingClient: DependencyKey {
             return (record["activeWalkSessionRef"] as? CKRecord.Reference)?.recordID.recordName
         }
     )
+
+    static let testValue = Self()
 }
 
 extension DependencyValues {

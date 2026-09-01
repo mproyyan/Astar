@@ -3,6 +3,7 @@ import Testing
 import CoreLocation
 @testable import Astar
 
+@Suite(.serialized)
 struct MapSearchSheetFeatureTests {
   @Test
   @MainActor
@@ -34,5 +35,7 @@ struct MapSearchSheetFeatureTests {
       $0.searchResults = []
       $0.isLoading = false
     }
+
+    await store.receive(.delegate(.dismissed))
   }
 }
