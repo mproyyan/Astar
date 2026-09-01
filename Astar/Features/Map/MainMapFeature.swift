@@ -160,22 +160,40 @@ struct MainMapFeature {
         return .none
 
       case let .locationManager(.didUpdateLocation(coordinate)):
-        state.currentLocation = coordinate
+          state.currentLocation = coordinate
+          print("[didUpdateLocation] isNavigating: \(state.isNavigating)")
         if state.isNavigating {
           // If we are actively walking, push location ping!
           let optionalSessionID = state.userWalkSessionID
           return .merge(
             .send(.delegate(.locationUpdated(coordinate))),
             .send(.updateTrackingLocation(coordinate)),
-            .run { send in
-                 if let sessionID = optionalSessionID {
-                    // NOTE: Real implementation uses batching, but we push latest directly for simplicity based on prompt if no batched buffer
-                    // Need to format Data correctly
-                    let coordStruct = [coordinate.latitude, coordinate.longitude]
-                    if let data = try? JSONEncoder().encode(coordStruct) {
-                        try? await trackingClient.pushLocationPing(sessionID, data)
+//            .run { send in
+//                 if let sessionID = optionalSessionID {
+//                    // NOTE: Real implementation uses batching, but we push latest directly for simplicity based on prompt if no batched buffer
+//                    // Need to format Data correctly
+//                    let coordStruct = [coordinate.latitude, coordinate.longitude]
+//                    if let data = try? JSONEncoder().encode(coordStruct) {
+//                        try? await trackingClient.pushLocationPing(sessionID, data)
+//                    }
+//                 }
+                .run { send in
+                    print("[didUpdateLocation] isNavigating check passed, sessionID: \(optionalSessionID ?? "nil")")
+                    guard let sessionID = optionalSessionID else {
+                        print("[didUpdateLocation] No active sessionID — skipping ping")
+                        return
                     }
-                 }
+                    let coordStruct = [coordinate.latitude, coordinate.longitude]
+                    guard let data = try? JSONEncoder().encode(coordStruct) else {
+                        print("[didUpdateLocation] Failed to encode coordinate")
+                        return
+                    }
+                    do {
+                        try await trackingClient.pushLocationPing(sessionID, data)
+                        print("[didUpdateLocation] pushLocationPing succeeded for session \(sessionID)")
+                    } catch {
+                        print("[didUpdateLocation] pushLocationPing FAILED: \(error)")
+                    }
             }
           )
         }

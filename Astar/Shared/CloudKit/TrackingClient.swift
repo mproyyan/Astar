@@ -133,19 +133,24 @@ extension TrackingClient: DependencyKey {
         },
         pushLocationPing: { sessionID, coordinatesData in
             let db = CKContainer.default().publicCloudDatabase
-            let record = CKRecord(recordType: "LocationPing")
+            let pingRecord = CKRecord(recordType: "LocationPing")
             let sessionRef = CKRecord.Reference(recordID: CKRecord.ID(recordName: sessionID), action: .none)
             
-            record["sessionRef"] = sessionRef
-            record["encodedCoordinates"] = [coordinatesData]
-            record["recordedAt"] = Date()
+            pingRecord["sessionRef"] = sessionRef
+            pingRecord["encodedCoordinates"] = [coordinatesData]
+            pingRecord["recordedAt"] = Date()
             
-            try await db.save(record)
+            try await db.save(pingRecord)
             
             // Also update WalkSession lastPingAt
-            let sessionRecord = try await db.record(for: CKRecord.ID(recordName: sessionID))
-            sessionRecord["lastPingAt"] = Date()
-            try await db.save(sessionRecord)
+            do {
+                let sessionRecordID = CKRecord.ID(recordName: sessionID)
+                let sessionRecord = try await db.record(for: sessionRecordID)
+                sessionRecord["lastPingAt"] = Date()
+                try await db.save(sessionRecord)
+            } catch {
+                print("Failed to update lastPingAt on WalkSession: \(error)")
+            }
         },
         setSubscribeWalkSession: {sessionID,isSubscribed in
             let container = CKContainer.default()
@@ -154,6 +159,7 @@ extension TrackingClient: DependencyKey {
             let subscriptionID = "walk-session-\(sessionID)"
             
             if !isSubscribed {
+                print("[TrackingClient] Attempting to unsubscribe: \(subscriptionID)")
                 do {
                     try await db.deleteSubscription(withID: subscriptionID)
                     print("Unsubscribed from session: \(sessionID)")
@@ -166,13 +172,16 @@ extension TrackingClient: DependencyKey {
             }
             
             // Subscribe flow
+            print("[TrackingClient] Checking existing subscription: \(subscriptionID)")
             do {
                 _ = try await db.subscription(for: subscriptionID)
                 print("Already subscribed to session: \(sessionID)")
                 return
             } catch let error as CKError where error.code == .unknownItem {
+                print("[TrackingClient] Subscription missing, creating new one...")
                 // Subscription does not exist, proceed to create
             } catch {
+                print("[TrackingClient] Subscription check error: \(error.localizedDescription)")
                 throw error
             }
             
@@ -199,7 +208,9 @@ extension TrackingClient: DependencyKey {
             
             subscription.notificationInfo = info
             
+            print("📤 [TrackingClient] Saving CKQuerySubscription for recordType WalkSession...")
             try await db.save(subscription)
+            print("✅ [TrackingClient] Subscribed successfully to WalkSession: \(sessionID)")
         },
         
         
@@ -213,17 +224,28 @@ extension TrackingClient: DependencyKey {
                     for await notification in NotificationCenter.default.publisher(for: AppDelegate.locationPingNotification).values {
                         guard !Task.isCancelled else { break }
                         
+                        print("[TrackingClient] Push notification received in NotificationCenter!")
+                        
                         guard let userInfo = notification.userInfo,
-                              let recordID = userInfo["recordID"] as? CKRecord.ID else {continue}
+                              let recordID = userInfo["recordID"] as? CKRecord.ID else {
+                            print("[TrackingClient] Notification missing recordID in userInfo")
+                            continue
+                        }
+                        
+                        
+                        print("[TrackingClient] RecordID in push: \(recordID.recordName) | Target SessionID: \(sessionID)")
+                        
+                        guard recordID.recordName == sessionID else {
+                            print("[TrackingClient] Ignored notification for non-matching sessionID: \(recordID.recordName)")
+                            continue
+                        }
                         
                         print("[Push] Fetching ping record: \(recordID.recordName)")
                         
                         
-                        
-                        //                    var walkerRefStr: String? = nil
                         do {
                             let record = try await db.record(for: recordID)
-                            
+                            print("[TrackingClient] Successfully fetched record: \(record.recordID.recordName)")
                             
                             if let encodedCoordinates = record["encodedCoordinates"] as? [Data],
                                let sessionRef = (record["sessionRef"] as? CKRecord.Reference)?.recordID.recordName, sessionRef == sessionID {
@@ -232,9 +254,13 @@ extension TrackingClient: DependencyKey {
                                     id: record.recordID.recordName,
                                     sessionRef: sessionRef,
                                     encodedCoordinates: encodedCoordinates,
-                                    recordedAt: record.creationDate ?? Date()
+                                    recordedAt: record["recordedAt"] as? Date ?? Date()
                                 )
+                                
+                                print("[TrackingClient] Yielding ping with \(encodedCoordinates.count) coordinates at \(ping.recordedAt)")
                                 continuation.yield(ping)
+                            } else {
+                                print("[TrackingClient] 'encodedCoordinates' is nil or invalid in CloudKit record")
                             }
                         } catch {
                             print(" [Push] Error fetching ping record: \(error)")
@@ -244,46 +270,45 @@ extension TrackingClient: DependencyKey {
                 }
                 
                 continuation.onTermination = { @Sendable _ in
-                    print("📡 [Polling] Stream terminated/cancelled.")
+                    print("[Polling] Stream terminated/cancelled.")
                     task.cancel()
                 }
             }
         },
-                
-                
-                    getWalkSession: { sessionID in
-                        let db = CKContainer.default().publicCloudDatabase
-                        let id = CKRecord.ID(recordName: sessionID)
-                        let record = try await db.record(for: id)
-                        let walkerRef = (record["walkerRef"] as? CKRecord.Reference)?.recordID.recordName ?? ""
-                        
-                        return WalkSession(
-                            id: sessionID,
-                            walkerRef: walkerRef,
-                            status: record["status"] as? String ?? "",
-                            destinationName: record["destinationName"] as? String ?? "",
-                            destinationLatitude: record["destinationLatitude"] as? Double ?? 0.0,
-                            destinationLongitude: record["destinationLongitude"] as? Double ?? 0.0,
-                            routePolyline: record["routePolyline"] as? String,
-                            startedAt: record["startedAt"] as? Date ?? Date(),
-                            endedAt: record["endedAt"] as? Date,
-                            lastPingAt: record["lastPingAt"] as? Date ?? Date()
-                        )
-                    },
-                getWalkerActiveSessionID: { walkerRecordID in
-                    let db = CKContainer.default().publicCloudDatabase
-                    let id = CKRecord.ID(recordName: walkerRecordID)
-                    let record = try await db.record(for: id)
-                    return (record["activeWalkSessionRef"] as? CKRecord.Reference)?.recordID.recordName
-                }
-                )
-                
-                static let testValue = Self()
-            }
+        
+        getWalkSession: { sessionID in
+            let db = CKContainer.default().publicCloudDatabase
+            let id = CKRecord.ID(recordName: sessionID)
+            let record = try await db.record(for: id)
+            let walkerRef = (record["walkerRef"] as? CKRecord.Reference)?.recordID.recordName ?? ""
             
-            extension DependencyValues {
-                var trackingClient: TrackingClient {
-                    get { self[TrackingClient.self] }
-                    set { self[TrackingClient.self] = newValue }
-                }
-            }
+            return WalkSession(
+                id: sessionID,
+                walkerRef: walkerRef,
+                status: record["status"] as? String ?? "",
+                destinationName: record["destinationName"] as? String ?? "",
+                destinationLatitude: record["destinationLatitude"] as? Double ?? 0.0,
+                destinationLongitude: record["destinationLongitude"] as? Double ?? 0.0,
+                routePolyline: record["routePolyline"] as? String,
+                startedAt: record["startedAt"] as? Date ?? Date(),
+                endedAt: record["endedAt"] as? Date,
+                lastPingAt: record["lastPingAt"] as? Date ?? Date()
+            )
+        },
+        getWalkerActiveSessionID: { walkerRecordID in
+            let db = CKContainer.default().publicCloudDatabase
+            let id = CKRecord.ID(recordName: walkerRecordID)
+            let record = try await db.record(for: id)
+            return (record["activeWalkSessionRef"] as? CKRecord.Reference)?.recordID.recordName
+        }
+    )
+    
+    static let testValue = Self()
+}
+
+extension DependencyValues {
+    var trackingClient: TrackingClient {
+        get { self[TrackingClient.self] }
+        set { self[TrackingClient.self] = newValue }
+    }
+}
