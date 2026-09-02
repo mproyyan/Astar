@@ -41,7 +41,7 @@ struct SavedPlacesView: View {
                         LazyVGrid(columns: columns, spacing: 28) {
                             // 1. Home Item
                             CircularPlaceCard(
-                                title: store.homePlace?.label ?? store.homePlace?.name ?? "Home",
+                                title: store.homePlace?.displayTitle ?? "Home",
                                 subtitle: "Change",
                                 iconName: "house.fill",
                                 categoryColor: Color(red: 0.15, green: 0.75, blue: 0.85),
@@ -56,7 +56,7 @@ struct SavedPlacesView: View {
 
                             // 2. Office Item
                             CircularPlaceCard(
-                                title: store.officePlace?.label ?? store.officePlace?.name ?? "Office",
+                                title: store.officePlace?.displayTitle ?? "Office",
                                 subtitle: "Change",
                                 iconName: "briefcase.fill",
                                 categoryColor: Color(red: 0.65, green: 0.48, blue: 0.35),
@@ -72,7 +72,7 @@ struct SavedPlacesView: View {
                             // 3. Custom Places (Golden yellow circles with map pin icon)
                             ForEach(store.customPlaces) { place in
                                 CircularPlaceCard(
-                                    title: place.label ?? place.name,
+                                    title: place.displayTitle,
                                     subtitle: "Change",
                                     iconName: place.resolvedIconName,
                                     categoryColor: place.categoryColor,
@@ -89,7 +89,7 @@ struct SavedPlacesView: View {
                                 )
                             }
 
-                            // 4. Add Button (Light blue circle with blue +, no subtitle)
+
                             VStack(spacing: 8) {
                                 Button {
                                     store.send(.addPlaceButtonTapped(.custom))
@@ -117,20 +117,20 @@ struct SavedPlacesView: View {
                     .padding(.horizontal, 20)
                 }
             }
-            .navigationBarBackButtonHidden(true)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.body.weight(.semibold))
-                            .foregroundStyle(.primary)
-                            .frame(width: 36, height: 36)
-                            .background(Color.primary.opacity(0.06), in: Circle())
-                    }
-                }
-            }
+//            .navigationBarBackButtonHidden(true)
+//            .toolbar {
+//                ToolbarItem(placement: .navigationBarLeading) {
+//                    Button {
+//                        dismiss()
+//                    } label: {
+//                        Image(systemName: "chevron.left")
+//                            .font(.body.weight(.semibold))
+//                            .foregroundStyle(.primary)
+//                            .frame(width: 36, height: 36)
+//                            .background(Color.primary.opacity(0.06), in: Circle())
+//                    }
+//                }
+//            }
             .sheet(isPresented: Binding(
                 get: { store.isAddingPlace },
                 set: { isPresented in
@@ -325,6 +325,12 @@ private struct PinPlaceSheet: View {
                                                 }
 
                                                 Spacer()
+                                                
+                                                if store.selectedPlaceForLabel?.id == place.id {
+                                                    Image(systemName: "checkmark")
+                                                        .font(.body.weight(.bold))
+                                                        .foregroundStyle(Color(red: 0.00, green: 0.55, blue: 0.95))
+                                                }
                                             }
                                             .padding(.horizontal, 16)
                                             .padding(.vertical, 12)
@@ -408,9 +414,6 @@ private struct PinPlaceSheet: View {
                         } label: {
                             Image(systemName: "chevron.left")
                                 .font(.body.weight(.semibold))
-                                .foregroundStyle(.primary)
-                                .frame(width: 32, height: 32)
-                                .background(Color.primary.opacity(0.06), in: Circle())
                         }
                     } else {
                         Button("Cancel") {
@@ -424,25 +427,25 @@ private struct PinPlaceSheet: View {
                         Button {
                             store.send(.confirmSavePlace)
                         } label: {
-                            Circle()
-                                .fill(Color(red: 0.00, green: 0.55, blue: 0.95))
-                                .frame(width: 32, height: 32)
-                                .overlay {
-                                    Image(systemName: "checkmark")
-                                        .font(.system(size: 16, weight: .bold))
-                                        .foregroundStyle(.white)
-                                }
+                            Image(systemName: "checkmark")
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(
+                                    store.hasChanges
+                                        ? Color(red: 0.00, green: 0.55, blue: 0.95)
+                                        : Color.gray.opacity(0.4)
+                                )
                         }
-                    } else if let first = displayedPlaces.first {
+                        .disabled(!store.hasChanges)
+                    } else if let selected = store.selectedPlaceForLabel {
                         Button {
-                            store.send(.selectPlaceSearchResult(first))
+                            store.send(.selectPlaceSearchResult(selected))
                         } label: {
                             Circle()
                                 .fill(Color(red: 0.00, green: 0.55, blue: 0.95))
                                 .frame(width: 32, height: 32)
                                 .overlay {
                                     Image(systemName: "checkmark")
-                                        .font(.system(size: 16, weight: .bold))
+                                        .font(.body.weight(.semibold))
                                         .foregroundStyle(.white)
                                 }
                         }

@@ -12,7 +12,7 @@ enum SavedPlacesStorage {
         [
             SavedPlace(
                 id: defaultHomeId,
-                name: "Home",
+                name: "Bendungan Hilir",
                 subtitle: "Bendungan Hilir, South Jakarta",
                 iconName: "house.fill",
                 distance: "350 m",
@@ -21,8 +21,8 @@ enum SavedPlacesStorage {
             ),
             SavedPlace(
                 id: defaultOfficeId,
-                name: "Office",
-                subtitle: "Autograph Tower, Thamrin Nine, Central Jakarta",
+                name: "Autograph Tower",
+                subtitle: "Thamrin Nine, Central Jakarta",
                 iconName: "building.2.fill",
                 distance: "250 m",
                 coordinate: CLLocationCoordinate2D(latitude: -6.1991, longitude: 106.8212),

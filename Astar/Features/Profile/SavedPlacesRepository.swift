@@ -46,7 +46,7 @@ struct UserDefaultsSavedPlacesRepository: SavedPlacesRepositoryProtocol {
             }
             places[index] = SavedPlace(
                 id: existing.id,
-                name: trimmedLabel.isEmpty ? existing.name : trimmedLabel,
+                name: existing.name,
                 subtitle: existing.subtitle,
                 iconName: iconName,
                 distance: existing.distance,

@@ -220,7 +220,7 @@ struct ProfileFeatureTests {
     await store.send(SavedPlacesFeature.Action.changeLocationTapped(homePlace, .home)) {
       $0.targetPresetForAdd = .home
       $0.isAddingPlace = true
-      $0.pinStep = .chooseLocation
+      $0.pinStep = .renamePlace
       $0.selectedPlaceForLabel = homePlace
       $0.customLabel = "Jl Kebon Sirih 1"
       $0.editingPlaceId = homePlace.id
@@ -246,18 +246,18 @@ struct ProfileFeatureTests {
       $0.places = [
         SavedPlace(
           id: homePlace.id,
-          name: "Jl Kebon Sirih 1",
+          name: "Jl Kebon Sirih 2",
           subtitle: "Bendungan Hilir, South Jakarta",
           iconName: "house.fill",
           distance: nil,
           coordinate: newHomePlace.coordinate,
-          label: "Home"
+          label: "Jl Kebon Sirih 1"
         )
       ]
     }
 
     await store.receive(SavedPlacesFeature.Action.delegate(.savedPlacesUpdated(store.state.places)))
-    #expect(store.state.homePlace?.name == "Jl Kebon Sirih 1")
+    #expect(store.state.homePlace?.name == "Jl Kebon Sirih 2")
     #expect(store.state.homePlace?.coordinate?.latitude == -6.2130)
     #expect(store.state.homePlace?.isHome == true)
   }

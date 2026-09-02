@@ -15,17 +15,10 @@ struct AstarApp: App {
 
   init() {
     let initial: RootFeature.State
-    if let profile = UserProfileStorage.load() {
+    if let profile = UserProfileStorage.load(), !profile.appleUserId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
       initial = .main(MainFeature.State(userProfile: profile))
     } else {
-      let defaultProfile = UserProfile(
-        appleUserId: "user-1",
-        cloudKitUserId: "ck-1",
-        name: "Awan",
-        email: "awan@example.com"
-      )
-      UserProfileStorage.save(defaultProfile)
-      initial = .main(MainFeature.State(userProfile: defaultProfile))
+      initial = .onboarding(OnboardingFeature.State())
     }
     self.store = Store(initialState: initial) {
       RootFeature()

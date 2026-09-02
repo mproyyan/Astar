@@ -29,19 +29,10 @@ struct RootFeature {
   }
 
   var body: some Reducer<State, Action> {
-    Scope(state: \.onboarding, action: \.onboarding) {
-      OnboardingFeature()
-    }
-    
-    Scope(state: \.main, action: \.main) {
-      MainFeature()
-        ._printChanges()
-    }
-
     Reduce { state, action in
       switch action {
       case .appDelegate(.didFinishLaunching):
-        guard let profile = UserProfileStorage.load() else { return .none }
+        guard let profile = UserProfileStorage.load(), !profile.appleUserId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return .none }
         state = .main(MainFeature.State(userProfile: profile))
         return .none
 
@@ -72,33 +63,32 @@ struct RootFeature {
           }
         }
 
-      case let .onboarding(.delegate(.appleSignInCompleted(credential))):
+      case let .onboarding(.delegate(.loggedIn(profile))):
         let pending: DeepLink? = if case let .onboarding(onboardingState) = state { onboardingState.pendingDeepLink } else { nil }
-        state = .main(MainFeature.State())
-        if case .alwaysHome = pending {
-          return .merge(
-            .send(.main(.login(.appleSignInCompleted(credential)))),
-            .send(.main(.map(.startAlwaysHomeNavigation)))
-          )
-        } else if case let .navigate(destination) = pending {
-          return .merge(
-            .send(.main(.login(.appleSignInCompleted(credential)))),
-            .send(.main(.map(.startDirectNavigation(destinationQuery: destination))))
-          )
-        }
-        return .send(.main(.login(.appleSignInCompleted(credential))))
-
-      case let .main(.login(.delegate(.loggedIn(profile)))):
         state = .main(MainFeature.State(userProfile: profile))
+        if case .alwaysHome = pending {
+          return .send(.main(.map(.startAlwaysHomeNavigation)))
+        } else if case let .navigate(destination) = pending {
+          return .send(.main(.map(.startDirectNavigation(destinationQuery: destination))))
+        }
         return .none
 
-      case .main(.login(.delegate(.signedOut))):
+      case .main(.delegate(.signedOut)),
+           .main(.login(.delegate(.signedOut))),
+           .main(.path(.element(id: _, action: .profile(.delegate(.signedOut))))):
         state = .onboarding(OnboardingFeature.State())
         return .none
 
       case .onboarding, .main:
         return .none
       }
+    }
+    .ifCaseLet(\.onboarding, action: \.onboarding) {
+      OnboardingFeature()
+    }
+    .ifCaseLet(\.main, action: \.main) {
+      MainFeature()
+        ._printChanges()
     }
   }
 }

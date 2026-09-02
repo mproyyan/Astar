@@ -24,10 +24,15 @@ struct MapWalkerSheetFeature {
     var journeyLogEntries: [JourneyLogEntry] = []
     var trips: [WalkerHistoryTrip] = WalkerSampleData.defaultTrips
 
+    // var isIdleOrAccompany: Bool {
+    //   status.caseInsensitiveCompare("Idle") == .orderedSame
+    //     || status.caseInsensitiveCompare("accompany") == .orderedSame
+    // }
     var isIdleOrAccompany: Bool {
-      status.caseInsensitiveCompare("Idle") == .orderedSame
-        || status.caseInsensitiveCompare("accompany") == .orderedSame
-    }
+    let lower = status.lowercased()
+    return lower == "idle" || lower == "accompany" || lower == "accompanying"
+}
+
   }
 
   enum Action: Equatable {
