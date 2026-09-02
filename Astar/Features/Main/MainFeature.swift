@@ -31,6 +31,11 @@ struct MainFeature {
     case login(LoginFeature.Action)
     case map(MainMapFeature.Action)
     case path(StackActionOf<Path>)
+    case delegate(Delegate)
+
+    enum Delegate: Equatable {
+      case signedOut
+    }
   }
 
   @Dependency(\.usersClient) var usersClient
@@ -160,15 +165,27 @@ struct MainFeature {
         return .send(.map(.resetDoeWalking))
 
       case .path(.element(id: _, action: .profile(.delegate(.signedOut)))):
-        return .send(.login(.signOutButtonTapped))
+        state.path.removeAll()
+        state.login.userProfile = nil
+        UserProfileStorage.clear()
+        return .none
 
       case let .path(.element(id: _, action: .profile(.delegate(.savedPlacesUpdated(places))))):
         return .send(.map(.savedPlacesUpdated(places)))
+
+      case .login(.delegate(.signedOut)):
+        state.path.removeAll()
+        state.login.userProfile = nil
+        UserProfileStorage.clear()
+        return .none
 
       case .login(.delegate(.loggedIn)):
         return .send(.onAppear)
 
       case .login:
+        return .none
+
+      case .delegate:
         return .none
 
       case let .map(.delegate(.walkerStatusChanged(id, newStatus))):

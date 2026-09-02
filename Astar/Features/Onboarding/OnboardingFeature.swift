@@ -9,7 +9,7 @@ import ComposableArchitecture
 import Foundation
 
 struct GlossaryItem: Equatable, Identifiable {
-    let id = UUID()
+    var id: String { term }
     let term: String
     let definition: String
 }
@@ -20,10 +20,9 @@ enum PageBody: Equatable {
 }
 
 struct OnboardingContent: Equatable, Identifiable {
-  let id = UUID()
+  var id: String { title }
   let title: String
-//  let description: String
-    let body: PageBody
+  let body: PageBody
   let imageName: String
 }
 
@@ -33,6 +32,7 @@ struct OnboardingFeature {
   struct State: Equatable {
     var currentIndex = 0
     var pendingDeepLink: DeepLink? = nil
+    var login: LoginFeature.State = .init()
     var contents: [OnboardingContent] = [
       OnboardingContent(
         title: "WalkGuard",
@@ -60,17 +60,21 @@ struct OnboardingFeature {
     case onDisappear
     case timerTicked
     case setIndex(Int)
-    case appleSignInCompleted(AppleSignInCredential)
+    case login(LoginFeature.Action)
     case delegate(Delegate)
 
     enum Delegate: Equatable {
-      case appleSignInCompleted(AppleSignInCredential)
+      case loggedIn(UserProfile)
     }
   }
 
   @Dependency(\.continuousClock) var clock
 
   var body: some Reducer<State, Action> {
+    Scope(state: \.login, action: \.login) {
+      LoginFeature()
+    }
+
     Reduce { state, action in
       switch action {
       case .onAppear:
@@ -100,8 +104,11 @@ struct OnboardingFeature {
           .cancellable(id: "cancel_timer", cancelInFlight: true)
         )
 
-      case let .appleSignInCompleted(credential):
-        return .send(.delegate(.appleSignInCompleted(credential)))
+      case let .login(.delegate(.loggedIn(profile))):
+        return .send(.delegate(.loggedIn(profile)))
+
+      case .login:
+        return .none
 
       case .delegate:
         return .none
