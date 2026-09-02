@@ -31,8 +31,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable : Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
 
+        let receiveTime = Date()
         guard let notification = CKNotification(fromRemoteNotificationDictionary: userInfo) else {
-            completionHandler(.newData)
+            print("⚠️ [AppDelegate] Received remote notification but could not parse CKNotification at \(receiveTime)")
+            completionHandler(.noData)
             return
         }
 
@@ -41,14 +43,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
             // Post local notification to be picked up by map view tracking
             if let recordID = queryNotification.recordID {
+                let reasonStr = queryNotification.queryNotificationReason == .recordCreated ? "recordCreated" : "recordUpdated"
+                print("📬 [AppDelegate] APNs Remote Notification received at \(receiveTime) | Reason: \(reasonStr) | RecordID: \(recordID.recordName)")
+
                 NotificationCenter.default.post(
                     name: AppDelegate.locationPingNotification,
                     object: nil,
-                    userInfo: ["recordID": recordID]
+                    userInfo: ["recordID": recordID, "receivedAt": receiveTime]
                 )
             }
             completionHandler(.newData)
         } else {
+            print("ℹ️ [AppDelegate] Remote notification ignored (non-query or unhandled reason) at \(receiveTime)")
             completionHandler(.noData)
         }
     }

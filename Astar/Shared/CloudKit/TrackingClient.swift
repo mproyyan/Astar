@@ -143,10 +143,17 @@ extension TrackingClient: DependencyKey {
             let pingRecordID = CKRecord.ID(recordName: "LocationPing_\(sessionID)")
             let pingRecord = CKRecord(recordType: "LocationPing", recordID: pingRecordID)
             let sessionRef = CKRecord.Reference(recordID: CKRecord.ID(recordName: sessionID), action: .none)
+            let pingTime = Date()
 
             pingRecord["sessionRef"] = sessionRef
             pingRecord["encodedCoordinates"] = [coordinatesData]
-            pingRecord["recordedAt"] = Date()
+            pingRecord["recordedAt"] = pingTime
+
+            if let coords = try? JSONDecoder().decode([Double].self, from: coordinatesData), coords.count >= 2 {
+                print("📤 [TrackingClient.pushLocationPing] Pushing location at \(pingTime) for session \(sessionID) | Lat: \(coords[0]), Lon: \(coords[1])")
+            } else {
+                print("📤 [TrackingClient.pushLocationPing] Pushing location ping at \(pingTime) for session \(sessionID)")
+            }
 
             // Save single deterministic record with changedKeys policy
             let (saveResults, _) = try await db.modifyRecords(
@@ -157,7 +164,7 @@ extension TrackingClient: DependencyKey {
             )
             for (_, result) in saveResults {
                 if case .failure(let error) = result {
-                    print("[pushLocationPing] LocationPing save failed: \(error)")
+                    print("❌ [pushLocationPing] LocationPing save failed at \(Date()): \(error)")
                     throw error
                 }
             }
@@ -166,7 +173,7 @@ extension TrackingClient: DependencyKey {
             do {
                 let sessionRecordID = CKRecord.ID(recordName: sessionID)
                 let sessionRecord = CKRecord(recordType: "WalkSession", recordID: sessionRecordID)
-                sessionRecord["lastPingAt"] = Date()
+                sessionRecord["lastPingAt"] = pingTime
 
                 let (sessionSaveResults, _) = try await db.modifyRecords(
                     saving: [sessionRecord],
@@ -176,11 +183,11 @@ extension TrackingClient: DependencyKey {
                 )
                 for (_, result) in sessionSaveResults {
                     if case .failure(let error) = result {
-                        print("[pushLocationPing] lastPingAt update failed: \(error)")
+                        print("⚠️ [pushLocationPing] lastPingAt update failed at \(Date()): \(error)")
                     }
                 }
             } catch {
-                print("[pushLocationPing] lastPingAt update threw: \(error)")
+                print("⚠️ [pushLocationPing] lastPingAt update threw at \(Date()): \(error)")
             }
         },
         setSubscribeWalkSession: { sessionID, isSubscribed in
@@ -250,52 +257,56 @@ extension TrackingClient: DependencyKey {
                 let task = Task {
                     for await notification in NotificationCenter.default.publisher(for: AppDelegate.locationPingNotification).values {
                         guard !Task.isCancelled else { break }
-                        
-                        print("[TrackingClient] Push notification received in NotificationCenter!")
+                        let receiveTime = (notification.userInfo?["receivedAt"] as? Date) ?? Date()
                         
                         guard let userInfo = notification.userInfo,
                               let recordID = userInfo["recordID"] as? CKRecord.ID else {
-                            print("[TrackingClient] Notification missing recordID in userInfo")
+                            print("⚠️ [TrackingClient] Notification missing recordID in userInfo at \(receiveTime)")
                             continue
                         }
                         
-                        print("[TrackingClient] RecordID in push: \(recordID.recordName) | Target SessionID: \(sessionID)")
+                        print("🔔 [TrackingClient] Notification received | Record: \(recordID.recordName) | Target Session: \(sessionID) | Time: \(receiveTime)")
                         
                         guard recordID.recordName == expectedPingRecordName || recordID.recordName == sessionID else {
-                            print("[TrackingClient] Ignored notification for non-matching record: \(recordID.recordName) (expected: \(expectedPingRecordName))")
+                            print("ℹ️ [TrackingClient] Ignored notification for non-matching record: \(recordID.recordName) (expected: \(expectedPingRecordName))")
                             continue
                         }
                         
-                        print("[Push] Fetching ping record: \(recordID.recordName)")
+                        print("⚡️ [TrackingClient] Fetching ping record \(recordID.recordName) from CloudKit...")
                         
                         do {
                             let record = try await db.record(for: recordID)
-                            print("[TrackingClient] Successfully fetched record: \(record.recordID.recordName)")
-                            
                             let refSessionID = (record["sessionRef"] as? CKRecord.Reference)?.recordID.recordName ?? sessionID
                             if let encodedCoordinates = record["encodedCoordinates"] as? [Data],
                                refSessionID == sessionID {
                                 
+                                let recordedAt = record["recordedAt"] as? Date ?? Date()
                                 let ping = LocationPing(
                                     id: record.recordID.recordName,
                                     sessionRef: refSessionID,
                                     encodedCoordinates: encodedCoordinates,
-                                    recordedAt: record["recordedAt"] as? Date ?? Date()
+                                    recordedAt: recordedAt
                                 )
                                 
-                                print("[TrackingClient] Yielding ping with \(encodedCoordinates.count) coordinates at \(ping.recordedAt)")
+                                var coordInfo = "raw points: \(encodedCoordinates.count)"
+                                if let first = encodedCoordinates.first,
+                                   let coords = try? JSONDecoder().decode([Double].self, from: first), coords.count >= 2 {
+                                    coordInfo = "Lat: \(coords[0]), Lon: \(coords[1])"
+                                }
+                                
+                                print("📍 [APNs -> TrackingClient] Yielding Ping: \(ping.id) | \(coordInfo) | RecordedAt: \(recordedAt) | ReceivedAt: \(receiveTime)")
                                 continuation.yield(ping)
                             } else {
-                                print("[TrackingClient] 'encodedCoordinates' is nil or invalid in CloudKit record")
+                                print("⚠️ [TrackingClient] 'encodedCoordinates' is nil or invalid in CloudKit record at \(receiveTime)")
                             }
                         } catch {
-                            print("[Push] Error fetching ping record: \(error)")
+                            print("❌ [TrackingClient] Error fetching ping record \(recordID.recordName): \(error)")
                         }
                     }
                 }
                 
                 continuation.onTermination = { @Sendable _ in
-                    print("[Stream] Stream terminated/cancelled.")
+                    print("[Stream] Stream terminated/cancelled at \(Date()).")
                     task.cancel()
                 }
             }

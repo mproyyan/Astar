@@ -841,22 +841,22 @@ struct MainMapFeature {
            return .none
 
       case let .locationPingReceived(ping):
-          print("📡 LocationPing received: \(ping.id) with \(ping.encodedCoordinates.count) points")
+          let receiveTime = Date()
           if let firstData = ping.encodedCoordinates.first {
               do {
                   let coordStruct = try JSONDecoder().decode([Double].self, from: firstData)
-                  print("📍 Decoded ping coordinate array: \(coordStruct)")
                   if coordStruct.count >= 2 {
-                      // Note ping coordinates are often logged as [lat, lon] or [lon, lat] depending on the backend!
                       let lat = coordStruct[0]
                       let lon = coordStruct[1]
-                      print("🏃 Walker tracking Location -> lat: \(lat), lon: \(lon)")
+                      print("🏃 [MainMapFeature] APNs Location Ping Applied | Lat: \(lat), Lon: \(lon) | RecordedAt: \(ping.recordedAt) | ReceivedAt: \(receiveTime) | Session: \(ping.sessionRef)")
 
                       state.trackedWalkerLocation = CLLocationCoordinate2D(latitude: lat, longitude: lon)
                   }
               } catch {
-                  print("❌ Failed mapping location ping data: \(error)")
+                  print("❌ [MainMapFeature] Failed mapping location ping data: \(error) at \(receiveTime)")
               }
+          } else {
+              print("⚠️ [MainMapFeature] LocationPing \(ping.id) had empty coordinates data at \(receiveTime)")
           }
           return .none
           
