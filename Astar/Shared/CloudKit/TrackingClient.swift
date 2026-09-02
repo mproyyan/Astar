@@ -14,6 +14,7 @@ struct WalkSession: Equatable, Sendable {
     let routePolyline: String?
     let startedAt: Date
     let endedAt: Date?
+    let currentCoordinate: Data?
     let lastPingAt: Date
 }
 
@@ -24,24 +25,17 @@ struct SessionParticipant: Equatable, Sendable {
     let joinedAt: Date
 }
 
-struct LocationPing: Equatable, Sendable {
-    let id: String
-    let sessionRef: String
-    let encodedCoordinates: [Data]
-    let recordedAt: Date
-}
-
 @DependencyClient
 struct TrackingClient: Sendable {
-    var startWalkSession: @Sendable (_ walkerRecordID: String, _ destinationName: String, _ destLat: Double, _ destLon: Double, _ routePolyline: String?) async throws -> WalkSession
+    var startWalkSession: @Sendable (_ walkerRecordID: String, _ destinationName: String, _ destLat: Double, _ destLon: Double, _ routePolyline: String?, _ initialCoordinateData: Data) async throws -> WalkSession
     var endWalkSession: @Sendable (_ sessionID: String) async throws -> Void
     var joinWalkSession: @Sendable (_ sessionID: String, _ companionRecordID: String) async throws -> SessionParticipant
     var leaveWalkSession: @Sendable (_ participantID: String) async throws -> Void
     var updateUserStatus: @Sendable (_ userRecordID: String, _ status: String, _ activeSessionID: String?, _ watchingSessionID: String?) async throws -> Void
-    var pushLocationPing: @Sendable (_ sessionID: String, _ coordinatesData: Data) async throws -> Void
+    var pushLocationUpdate: @Sendable (_ sessionID: String, _ coordinatesData: Data) async throws -> Void
     
     var setSubscribeWalkSession: @Sendable (_ sessionID: String, _ isSubscribed: Bool) async throws -> Void
-    var subscribeToLocationPings: @Sendable (_ sessionID: String) async throws -> AsyncStream<LocationPing>
+    var subscribeToWalkSession: @Sendable (_ sessionID: String) async throws -> AsyncStream<WalkSession>
     
     var getWalkSession: @Sendable (_ sessionID: String) async throws -> WalkSession
     var getWalkerActiveSessionID: @Sendable (_ walkerRecordID: String) async throws -> String?
@@ -49,7 +43,7 @@ struct TrackingClient: Sendable {
 
 extension TrackingClient: DependencyKey {
     static let liveValue = TrackingClient(
-        startWalkSession: { walkerRecordID, destName, destLat, destLon, routePolyline in
+        startWalkSession: { walkerRecordID, destName, destLat, destLon, routePolyline, initialCoordinateData in
             let db = CKContainer.default().publicCloudDatabase
             let record = CKRecord(recordType: "WalkSession")
             let walkerRef = CKRecord.Reference(recordID: CKRecord.ID(recordName: walkerRecordID), action: .none)
@@ -62,6 +56,7 @@ extension TrackingClient: DependencyKey {
             if let poly = routePolyline { record["routePolyline"] = poly }
             record["startedAt"] = Date()
             record["lastPingAt"] = Date()
+            record["currentCoordinate"] = initialCoordinateData
             
             try await db.save(record)
             
@@ -75,6 +70,7 @@ extension TrackingClient: DependencyKey {
                 routePolyline: routePolyline,
                 startedAt: record["startedAt"] as? Date ?? Date(),
                 endedAt: nil,
+                currentCoordinate: initialCoordinateData,
                 lastPingAt: record["lastPingAt"] as? Date ?? Date()
             )
         },
@@ -82,11 +78,24 @@ extension TrackingClient: DependencyKey {
             print("[endWalkSession] called for session: \(sessionID)")
             let db = CKContainer.default().publicCloudDatabase
             let id = CKRecord.ID(recordName: sessionID)
+            
+            let sessionRecord = CKRecord(recordType: "WalkSession", recordID: id)
+            sessionRecord["status"] = "completed"
+            sessionRecord["endedAt"] = Date()
+            
             do {
-                let record = try await db.record(for: id)
-                record["status"] = "completed"
-                record["endedAt"] = Date()
-                try await db.save(record)
+                let (saveResults, _) = try await db.modifyRecords(
+                    saving: [sessionRecord],
+                    deleting: [],
+                    savePolicy: .changedKeys,
+                    atomically: false
+                )
+                for (_, result) in saveResults {
+                    if case .failure(let error) = result {
+                        print("❌ [endWalkSession] WalkSession save failed: \(error)")
+                        throw error
+                    }
+                }
                 print("[endWalkSession] status set to completed for \(sessionID)")
             } catch {
                 print("[endWalkSession] FAILED: \(error)")
@@ -138,43 +147,22 @@ extension TrackingClient: DependencyKey {
             
             try await db.save(record)
         },
-        pushLocationPing: { sessionID, coordinatesData in
+        pushLocationUpdate: { sessionID, coordinatesData in
             let db = CKContainer.default().publicCloudDatabase
-            let pingRecordID = CKRecord.ID(recordName: "LocationPing_\(sessionID)")
-            let pingRecord = CKRecord(recordType: "LocationPing", recordID: pingRecordID)
-            let sessionRef = CKRecord.Reference(recordID: CKRecord.ID(recordName: sessionID), action: .none)
             let pingTime = Date()
-
-            pingRecord["sessionRef"] = sessionRef
-            pingRecord["encodedCoordinates"] = [coordinatesData]
-            pingRecord["recordedAt"] = pingTime
-
+            
+            let sessionRecordID = CKRecord.ID(recordName: sessionID)
+            let sessionRecord = CKRecord(recordType: "WalkSession", recordID: sessionRecordID)
+            sessionRecord["currentCoordinate"] = coordinatesData
+            sessionRecord["lastPingAt"] = pingTime
+            
             if let coords = try? JSONDecoder().decode([Double].self, from: coordinatesData), coords.count >= 2 {
-                print("📤 [TrackingClient.pushLocationPing] Pushing location at \(pingTime) for session \(sessionID) | Lat: \(coords[0]), Lon: \(coords[1])")
+                print("📤 [TrackingClient.pushLocationUpdate] Updating WalkSession at \(pingTime) for session \(sessionID) | Lat: \(coords[0]), Lon: \(coords[1])")
             } else {
-                print("📤 [TrackingClient.pushLocationPing] Pushing location ping at \(pingTime) for session \(sessionID)")
+                print("📤 [TrackingClient.pushLocationUpdate] Updating WalkSession location at \(pingTime) for session \(sessionID)")
             }
-
-            // Save single deterministic record with changedKeys policy
-            let (saveResults, _) = try await db.modifyRecords(
-                saving: [pingRecord],
-                deleting: [],
-                savePolicy: .changedKeys,
-                atomically: false
-            )
-            for (_, result) in saveResults {
-                if case .failure(let error) = result {
-                    print("❌ [pushLocationPing] LocationPing save failed at \(Date()): \(error)")
-                    throw error
-                }
-            }
-
-            // Update WalkSession lastPingAt without a fetch-then-save race
+            
             do {
-                let sessionRecordID = CKRecord.ID(recordName: sessionID)
-                let sessionRecord = CKRecord(recordType: "WalkSession", recordID: sessionRecordID)
-                sessionRecord["lastPingAt"] = pingTime
-
                 let (sessionSaveResults, _) = try await db.modifyRecords(
                     saving: [sessionRecord],
                     deleting: [],
@@ -183,11 +171,13 @@ extension TrackingClient: DependencyKey {
                 )
                 for (_, result) in sessionSaveResults {
                     if case .failure(let error) = result {
-                        print("⚠️ [pushLocationPing] lastPingAt update failed at \(Date()): \(error)")
+                        print("⚠️ [pushLocationUpdate] WalkSession update failed at \(Date()): \(error)")
+                        throw error
                     }
                 }
             } catch {
-                print("⚠️ [pushLocationPing] lastPingAt update threw at \(Date()): \(error)")
+                print("⚠️ [pushLocationUpdate] WalkSession update threw at \(Date()): \(error)")
+                throw error
             }
         },
         setSubscribeWalkSession: { sessionID, isSubscribed in
@@ -202,14 +192,12 @@ extension TrackingClient: DependencyKey {
                     try await db.deleteSubscription(withID: subscriptionID)
                     print("Unsubscribed from session: \(sessionID)")
                 } catch let error as CKError where error.code == .unknownItem {
-                    
                 } catch {
                     throw error
                 }
                 return
             }
             
-            // Subscribe flow
             print("[TrackingClient] Checking existing subscription: \(subscriptionID)")
             do {
                 _ = try await db.subscription(for: subscriptionID)
@@ -217,90 +205,87 @@ extension TrackingClient: DependencyKey {
                 return
             } catch let error as CKError where error.code == .unknownItem {
                 print("[TrackingClient] Subscription missing, creating new one...")
-                // Subscription does not exist, proceed to create
             } catch {
                 print("[TrackingClient] Subscription check error: \(error.localizedDescription)")
                 throw error
             }
             
-            let pingRecordID = CKRecord.ID(recordName: "LocationPing_\(sessionID)")
-            let predicate = NSPredicate(format: "recordID == %@", pingRecordID)
+            let sessionRecordID = CKRecord.ID(recordName: sessionID)
+            let predicate = NSPredicate(format: "recordID == %@", sessionRecordID)
             
             let subscription = CKQuerySubscription(
-                recordType: "LocationPing",
+                recordType: "WalkSession",
                 predicate: predicate,
                 subscriptionID: subscriptionID,
-                options: [.firesOnRecordCreation, .firesOnRecordUpdate, .firesOnRecordDeletion]
+                options: [.firesOnRecordUpdate, .firesOnRecordDeletion]
             )
             
             let info = CKSubscription.NotificationInfo()
-            // 1. triggers silent push to wake the app in background
             info.shouldSendContentAvailable = true
-            // 2. triggers visual push alert so we can see it during demo
-            info.alertBody = "A location was updated in the public database."
+            info.alertBody = "Walk session was updated."
             info.soundName = "default"
-            info.desiredKeys = ["encodedCoordinates", "sessionRef", "recordedAt"]
+            info.desiredKeys = ["currentCoordinate", "status", "lastPingAt"]
             
             subscription.notificationInfo = info
             
-            print("📤 [TrackingClient] Saving CKQuerySubscription for LocationPing: \(pingRecordID.recordName)...")
+            print("📤 [TrackingClient] Saving CKQuerySubscription for WalkSession: \(sessionRecordID.recordName)...")
             try await db.save(subscription)
-            print("✅ [TrackingClient] Subscribed successfully to LocationPing for session: \(sessionID)")
+            print("✅ [TrackingClient] Subscribed successfully to WalkSession for session: \(sessionID)")
         },
-        
-        
-        subscribeToLocationPings: { sessionID in
-            AsyncStream { (continuation: AsyncStream<LocationPing>.Continuation) in
+        subscribeToWalkSession: { sessionID in
+            AsyncStream { (continuation: AsyncStream<WalkSession>.Continuation) in
                 let db = CKContainer.default().publicCloudDatabase
-                let expectedPingRecordName = "LocationPing_\(sessionID)"
+                let expectedRecordName = sessionID
                 
                 let task = Task {
-                    for await notification in NotificationCenter.default.publisher(for: AppDelegate.locationPingNotification).values {
+                    var lastCompletedSent = false
+                    for await notification in NotificationCenter.default.publisher(for: Notification.Name("walkSessionUpdateNotification")).values {
                         guard !Task.isCancelled else { break }
                         let receiveTime = (notification.userInfo?["receivedAt"] as? Date) ?? Date()
                         
                         guard let userInfo = notification.userInfo,
                               let recordID = userInfo["recordID"] as? CKRecord.ID else {
-                            print("⚠️ [TrackingClient] Notification missing recordID in userInfo at \(receiveTime)")
                             continue
                         }
                         
-                        print("🔔 [TrackingClient] Notification received | Record: \(recordID.recordName) | Target Session: \(sessionID) | Time: \(receiveTime)")
-                        
-                        guard recordID.recordName == expectedPingRecordName || recordID.recordName == sessionID else {
-                            print("ℹ️ [TrackingClient] Ignored notification for non-matching record: \(recordID.recordName) (expected: \(expectedPingRecordName))")
+                        guard recordID.recordName == expectedRecordName else {
                             continue
                         }
                         
-                        print("⚡️ [TrackingClient] Fetching ping record \(recordID.recordName) from CloudKit...")
+                        print("⚡️ [TrackingClient] Fetching WalkSession record \(recordID.recordName) from CloudKit...")
                         
                         do {
                             let record = try await db.record(for: recordID)
-                            let refSessionID = (record["sessionRef"] as? CKRecord.Reference)?.recordID.recordName ?? sessionID
-                            if let encodedCoordinates = record["encodedCoordinates"] as? [Data],
-                               refSessionID == sessionID {
-                                
-                                let recordedAt = record["recordedAt"] as? Date ?? Date()
-                                let ping = LocationPing(
-                                    id: record.recordID.recordName,
-                                    sessionRef: refSessionID,
-                                    encodedCoordinates: encodedCoordinates,
-                                    recordedAt: recordedAt
-                                )
-                                
-                                var coordInfo = "raw points: \(encodedCoordinates.count)"
-                                if let first = encodedCoordinates.first,
-                                   let coords = try? JSONDecoder().decode([Double].self, from: first), coords.count >= 2 {
-                                    coordInfo = "Lat: \(coords[0]), Lon: \(coords[1])"
+                            let walkerRef = (record["walkerRef"] as? CKRecord.Reference)?.recordID.recordName ?? ""
+                            
+                            let walkSession = WalkSession(
+                                id: sessionID,
+                                walkerRef: walkerRef,
+                                status: record["status"] as? String ?? "",
+                                destinationName: record["destinationName"] as? String ?? "",
+                                destinationLatitude: record["destinationLatitude"] as? Double ?? 0.0,
+                                destinationLongitude: record["destinationLongitude"] as? Double ?? 0.0,
+                                routePolyline: record["routePolyline"] as? String,
+                                startedAt: record["startedAt"] as? Date ?? Date(),
+                                endedAt: record["endedAt"] as? Date,
+                                currentCoordinate: record["currentCoordinate"] as? Data,
+                                lastPingAt: record["lastPingAt"] as? Date ?? Date()
+                            )
+                            
+                            print("📍 [APNs -> TrackingClient] Yielding WalkSession Update: \(walkSession.status) | ReceivedAt: \(receiveTime)")
+                            continuation.yield(walkSession)
+                            
+                            if walkSession.status == "completed" || walkSession.status == "arrived" {
+                                print("🏁 [TrackingClient] session completed, terminating stream.")
+                                if !lastCompletedSent {
+                                    lastCompletedSent = true
+                                    continuation.finish()
                                 }
-                                
-                                print("📍 [APNs -> TrackingClient] Yielding Ping: \(ping.id) | \(coordInfo) | RecordedAt: \(recordedAt) | ReceivedAt: \(receiveTime)")
-                                continuation.yield(ping)
-                            } else {
-                                print("⚠️ [TrackingClient] 'encodedCoordinates' is nil or invalid in CloudKit record at \(receiveTime)")
+                                break
                             }
+                            
                         } catch {
-                            print("❌ [TrackingClient] Error fetching ping record \(recordID.recordName): \(error)")
+                            print("❌ [TrackingClient] Error fetching walk session record \(recordID.recordName): \(error)")
                         }
                     }
                 }
@@ -311,7 +296,6 @@ extension TrackingClient: DependencyKey {
                 }
             }
         },
-        
         getWalkSession: { sessionID in
             let db = CKContainer.default().publicCloudDatabase
             let id = CKRecord.ID(recordName: sessionID)
@@ -328,6 +312,7 @@ extension TrackingClient: DependencyKey {
                 routePolyline: record["routePolyline"] as? String,
                 startedAt: record["startedAt"] as? Date ?? Date(),
                 endedAt: record["endedAt"] as? Date,
+                currentCoordinate: record["currentCoordinate"] as? Data,
                 lastPingAt: record["lastPingAt"] as? Date ?? Date()
             )
         },

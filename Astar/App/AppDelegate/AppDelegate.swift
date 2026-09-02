@@ -5,7 +5,7 @@ import ComposableArchitecture
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     // We can store a reference to the global store here if needed, or pass notification info via publishers
-    static let locationPingNotification = Notification.Name("locationPingNotification")
+    static let walkSessionUpdateNotification = Notification.Name("walkSessionUpdateNotification")
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
 
@@ -47,7 +47,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                 print("📬 [AppDelegate] APNs Remote Notification received at \(receiveTime) | Reason: \(reasonStr) | RecordID: \(recordID.recordName)")
 
                 NotificationCenter.default.post(
-                    name: AppDelegate.locationPingNotification,
+                    name: AppDelegate.walkSessionUpdateNotification,
                     object: nil,
                     userInfo: ["recordID": recordID, "receivedAt": receiveTime]
                 )
