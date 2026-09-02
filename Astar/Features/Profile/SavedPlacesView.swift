@@ -41,7 +41,7 @@ struct SavedPlacesView: View {
                         LazyVGrid(columns: columns, spacing: 28) {
                             // 1. Home Item
                             CircularPlaceCard(
-                                title: store.homePlace?.label ?? store.homePlace?.name ?? "Home",
+                                title: store.homePlace?.displayTitle ?? "Home",
                                 subtitle: "Change",
                                 iconName: "house.fill",
                                 categoryColor: Color(red: 0.15, green: 0.75, blue: 0.85),
@@ -56,7 +56,7 @@ struct SavedPlacesView: View {
 
                             // 2. Office Item
                             CircularPlaceCard(
-                                title: store.officePlace?.label ?? store.officePlace?.name ?? "Office",
+                                title: store.officePlace?.displayTitle ?? "Office",
                                 subtitle: "Change",
                                 iconName: "briefcase.fill",
                                 categoryColor: Color(red: 0.65, green: 0.48, blue: 0.35),
@@ -72,7 +72,7 @@ struct SavedPlacesView: View {
                             // 3. Custom Places (Golden yellow circles with map pin icon)
                             ForEach(store.customPlaces) { place in
                                 CircularPlaceCard(
-                                    title: place.label ?? place.name,
+                                    title: place.displayTitle,
                                     subtitle: "Change",
                                     iconName: place.resolvedIconName,
                                     categoryColor: place.categoryColor,
