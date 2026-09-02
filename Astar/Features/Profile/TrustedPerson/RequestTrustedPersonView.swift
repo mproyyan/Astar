@@ -6,11 +6,13 @@
 //
 
 import SwiftUI
+import ComposableArchitecture
 
 struct RequestTrustedPersonView: View {
+    let store: StoreOf<RequestTrustedPersonFeature>
+
     var body: some View {
-        NavigationStack{
-            ScrollView {
+        ScrollView {
                 VStack (spacing: 8) {
                     ForEach(sampleData) { data in
                         if data.status == .accepted {
@@ -34,8 +36,6 @@ struct RequestTrustedPersonView: View {
             
             .navigationTitle("Request")
             .navigationBarTitleDisplayMode(.inline)
-            
-        }
     }
 }
 
@@ -121,5 +121,5 @@ struct RequestButton : View {
 }
 
 #Preview {
-    RequestTrustedPersonView()
+    RequestTrustedPersonView(store: Store(initialState: RequestTrustedPersonFeature.State()) { RequestTrustedPersonFeature() })
 }

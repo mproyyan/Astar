@@ -6,35 +6,34 @@
 //
 
 import SwiftUI
-
+import ComposableArchitecture
 
 struct TrustedPersonView: View {
+    @Bindable var store: StoreOf<TrustedPersonFeature>
+    
     var body: some View {
-        NavigationStack {
+        ScrollView {
+            RequestSection(store: store)
             
-            
-            ScrollView {
-                RequestSection()
-                
-                TrustedPersonList()
-            }
-            .padding(16)
-            
-            
-                .navigationTitle("Trusted Person")
-                .navigationBarTitleDisplayMode(.automatic)
-            
+            TrustedPersonList(store: store)
+        }
+        .padding(16)
+        .navigationTitle("Trusted Person")
+        .navigationBarTitleDisplayMode(.automatic)
+        .sheet(item: $store.scope(state: \.destination?.addParticipant, action: \.destination.addParticipant)) { addParticipantStore in
+            AddTrustedPersonView(store: addParticipantStore)
         }
     }
 }
 
-
 // MARK: Request Section
 
 struct RequestSection: View {
+    @Bindable var store: StoreOf<TrustedPersonFeature>
+
     var body: some View {
-        NavigationLink {
-            Text("Request Section")
+        Button {
+            store.send(.requestSectionTapped)
         } label: {
             
             HStack (spacing: 16) {
@@ -76,10 +75,11 @@ struct RequestSection: View {
     }
 }
 
-
 // MARK: Trusted Person List
 
 struct TrustedPersonList: View {
+    @Bindable var store: StoreOf<TrustedPersonFeature>
+
     var body: some View {
         VStack {
             ForEach(sampleData) { data in
@@ -87,7 +87,7 @@ struct TrustedPersonList: View {
                 Divider()
                     .padding(.leading, 72)
             }
-            AddParticipantButton()
+            AddParticipantButton(store: store)
         }
 
         .padding(.vertical, 16)
@@ -148,9 +148,11 @@ struct TrustedPersonRow: View {
 // MARK: Add participant Button
 
 struct AddParticipantButton: View {
+    @Bindable var store: StoreOf<TrustedPersonFeature>
+
     var body: some View {
         Button {
-            "Add participant"
+            store.send(.addParticipantTapped)
         } label: {
             Text("Add Participant")
                 .padding(.vertical, 8)
@@ -161,5 +163,5 @@ struct AddParticipantButton: View {
 }
 
 #Preview {
-    TrustedPersonView()
+    TrustedPersonView(store: Store(initialState: TrustedPersonFeature.State()) { TrustedPersonFeature() })
 }

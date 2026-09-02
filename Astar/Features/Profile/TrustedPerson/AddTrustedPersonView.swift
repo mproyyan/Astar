@@ -1,4 +1,6 @@
 import SwiftUI
+import ComposableArchitecture
+import Foundation
 
 // MARK: - Wrapping layout for chips (reused)
 
@@ -67,12 +69,9 @@ struct EmailChip: View {
 // MARK: - Add Trusted Person (manual email entry)
 
 struct AddTrustedPersonView: View {
-    @Environment(\.dismiss) private var dismiss
+    @Bindable var store: StoreOf<AddTrustedPersonFeature>
+    @Environment(\.dismiss) private var dismiss // Keep for the cancel button, or we can use store dismiss
     @FocusState private var fieldFocused: Bool
-
-    @State private var addedEmails: [String] = []
-    @State private var draft: String = ""
-    @State private var showInvalidHint = false
 
     var body: some View {
         NavigationStack {
@@ -85,27 +84,19 @@ struct AddTrustedPersonView: View {
                         .padding(.top, 8)
 
                     FlowLayout(spacing: 6) {
-                        ForEach(addedEmails, id: \.self) { email in
+                        ForEach(store.addedEmails, id: \.self) { email in
                             EmailChip(email: email) {
-                                addedEmails.removeAll { $0 == email }
+                                store.send(.removeEmail(email))
                             }
                         }
 
-                        TextField("Type an iCloud email", text: $draft)
+                        TextField("Type an iCloud email", text: $store.draft.sending(\.draftChanged))
                             .keyboardType(.emailAddress)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .focused($fieldFocused)
                             .frame(minWidth: 120)
-                            .onSubmit { commitDraft() }
-                            .onChange(of: draft) { _, newValue in
-                                // Auto-convert as soon as it's valid AND ends with space/comma
-                                if let last = newValue.last, last == " " || last == "," {
-                                    commitDraft()
-                                } else {
-                                    showInvalidHint = false
-                                }
-                            }
+                            .onSubmit { store.send(.commitDraft) }
                     }
                 }
                 .padding(.horizontal, 20)
@@ -115,7 +106,7 @@ struct AddTrustedPersonView: View {
                 .padding(.horizontal, 16)
                 .onTapGesture { fieldFocused = true }
 
-                if showInvalidHint {
+                if store.showInvalidHint {
                     Text("Enter a valid email address")
                         .font(.caption)
                         .foregroundStyle(.red)
@@ -124,7 +115,6 @@ struct AddTrustedPersonView: View {
 
                 Spacer()
             }
-//            .padding(.top, 12)
             .navigationTitle("Add Trusted Person")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -133,37 +123,16 @@ struct AddTrustedPersonView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
-                        commitDraft() // catch anything still typed but not yet submitted
-                        commitSelection()
-                        dismiss()
+                        store.send(.commitDraft) // catch anything still typed but not yet submitted
+                        store.send(.commitSelection)
                     } label: {
                         Image(systemName: "checkmark")
                     }
-                    .disabled(addedEmails.isEmpty && !isValidEmail(draft.trimmingCharacters(in: .whitespaces)))
+                    .disabled(store.addedEmails.isEmpty && !isValidEmail(store.draft.trimmingCharacters(in: .whitespaces)))
                 }
             }
             .onAppear { fieldFocused = true }
         }
-    }
-
-    private func commitDraft() {
-        let candidate = draft.trimmingCharacters(in: .whitespacesAndCommas)
-        guard !candidate.isEmpty else { return }
-
-        if isValidEmail(candidate) {
-            if !addedEmails.contains(candidate) {
-                addedEmails.append(candidate)
-            }
-            draft = ""
-            showInvalidHint = false
-        } else {
-            showInvalidHint = true
-        }
-    }
-
-    private func commitSelection() {
-        // Hook into your model — e.g. append new SampleData entries with status: .invited
-        print("Inviting:", addedEmails)
     }
 }
 
@@ -174,5 +143,9 @@ extension CharacterSet {
 }
 
 #Preview {
-    AddTrustedPersonView()
+    AddTrustedPersonView(
+        store: Store(initialState: AddTrustedPersonFeature.State()) {
+            AddTrustedPersonFeature()
+        }
+    )
 }

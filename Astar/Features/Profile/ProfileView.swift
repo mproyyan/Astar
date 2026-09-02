@@ -26,13 +26,22 @@ struct ProfileView: View {
         // 4 & 5. Profile Options List
         List {
           Section {
-            NavigationLink {
-              Text("Trusted Person")
+            Button {
+              store.send(.trustedPersonTapped)
             } label: {
-              Text("Trusted Person")
-                .font(.body)
-                .padding(.vertical, 8)
+              HStack {
+                Text("Trusted Person")
+                  .font(.body)
+                Spacer()
+                Image(systemName: "chevron.right")
+                  .font(.footnote)
+                  .fontWeight(.semibold)
+                  .foregroundColor(Color(UIColor.tertiaryLabel))
+              }
+              .padding(.vertical, 8)
+              .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
 
             NavigationLink {
               // [REPLACED WITH DYNAMIC SAVED PLACES]
