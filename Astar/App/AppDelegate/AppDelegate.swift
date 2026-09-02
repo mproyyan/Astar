@@ -37,7 +37,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         }
 
         if let queryNotification = notification as? CKQueryNotification,
-           queryNotification.queryNotificationReason == .recordCreated {
+           (queryNotification.queryNotificationReason == .recordCreated || queryNotification.queryNotificationReason == .recordUpdated) {
 
             // Post local notification to be picked up by map view tracking
             if let recordID = queryNotification.recordID {

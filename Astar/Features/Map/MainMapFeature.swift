@@ -810,6 +810,7 @@ struct MainMapFeature {
             )
 
          case .sheet(.presented(.walker(.delegate(.trackingEnded)))):
+            let endingSessionID = state.activeWalkSessionID
             state.activeWalkSessionID = nil
             state.trackedWalkerDestination = nil
             state.trackedWalkerRoute = nil
@@ -817,6 +818,9 @@ struct MainMapFeature {
             return .merge(
                .send(.delegate(.companionStatusChanged(newStatus: "idle"))),
                .run { [trackingClient] _ in
+                  if let sessionID = endingSessionID {
+                     try? await trackingClient.setSubscribeWalkSession(sessionID, false)
+                  }
                   if let profile = UserProfileStorage.load() {
                      let selfRecordID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"
                         .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)

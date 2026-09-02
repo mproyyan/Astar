@@ -67,7 +67,7 @@ final class LocationManagerActor: NSObject, CLLocationManagerDelegate {
     super.init()
     manager.delegate = self
     manager.desiredAccuracy = kCLLocationAccuracyBest
-    manager.distanceFilter = 10
+      manager.distanceFilter = 0.5
   }
 
   func authorizationStream() -> AsyncStream<CLAuthorizationStatus> {

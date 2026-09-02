@@ -448,6 +448,7 @@ struct MainMapFeatureTests {
       MainMapFeature()
     } withDependencies: {
       $0.trackingClient.updateUserStatus = { _, _, _, _ in }
+      $0.trackingClient.setSubscribeWalkSession = { _, _ in }
     }
 
     await store.send(.sheet(.presented(.walker(.delegate(.trackingEnded))))) {
@@ -676,4 +677,49 @@ struct MainMapFeatureTests {
       $0.sheet = nil
     }
   }
+
+  @Test
+  @MainActor
+  func testLocationPingReceivedUpdatesTrackedLocation() async {
+    let store = TestStore(initialState: MainMapFeature.State(
+      activeWalkSessionID: "session-abc"
+    )) {
+      MainMapFeature()
+    }
+
+    let lat = -6.2088
+    let lon = 106.8456
+    let coordData = try! JSONEncoder().encode([lat, lon])
+    let ping = LocationPing(
+      id: "LocationPing_session-abc",
+      sessionRef: "session-abc",
+      encodedCoordinates: [coordData],
+      recordedAt: Date()
+    )
+
+    await store.send(.locationPingReceived(ping)) {
+      $0.trackedWalkerLocation = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+    }
+  }
+
+  @Test
+  @MainActor
+  func testStopTrackingTappedUnsubscribes() async {
+    var unsubscribedSessionID: String? = nil
+    let store = TestStore(initialState: MainMapFeature.State(
+      activeWalkSessionID: "session-xyz"
+    )) {
+      MainMapFeature()
+    } withDependencies: {
+      $0.trackingClient.setSubscribeWalkSession = { sessionID, isSubscribed in
+        if !isSubscribed {
+          unsubscribedSessionID = sessionID
+        }
+      }
+    }
+
+    await store.send(.stopTrackingTapped)
+    #expect(unsubscribedSessionID == "session-xyz")
+  }
 }
+
