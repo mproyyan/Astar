@@ -100,6 +100,7 @@ struct MapWalkerSheetFeature {
             routePolyline: nil,
             startedAt: now,
             endedAt: nil,
+            currentCoordinate: nil,
             lastPingAt: now
           )
           return .send(.WalkSessionLoaded(session))

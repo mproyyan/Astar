@@ -68,6 +68,9 @@ final class LocationManagerActor: NSObject, CLLocationManagerDelegate {
     manager.delegate = self
     manager.desiredAccuracy = kCLLocationAccuracyBest
     manager.distanceFilter = 10
+    manager.allowsBackgroundLocationUpdates = true
+    manager.showsBackgroundLocationIndicator = true
+    manager.pausesLocationUpdatesAutomatically = false
   }
 
   func authorizationStream() -> AsyncStream<CLAuthorizationStatus> {

@@ -203,6 +203,7 @@ struct MapDirectionSheetFeature {
         state.journeyLogEntries = [currentEntry, startEntry]
 
         let destinationCopy = state.destination
+        let originPlaceCopy = state.originPlace
         return .run { send in
             // Call TrackingClient to start WalkSession
             if let userProfile = UserProfileStorage.load() {
@@ -211,9 +212,13 @@ struct MapDirectionSheetFeature {
 
                 let destLat = destinationCopy.coordinate?.latitude ?? -6.2088
                 let destLon = destinationCopy.coordinate?.longitude ?? 106.8456
+                
+                let currentLat = originPlaceCopy?.coordinate?.latitude ?? -6.2088
+                let currentLon = originPlaceCopy?.coordinate?.longitude ?? 106.8456
+                let initialData = (try? JSONEncoder().encode([currentLat, currentLon])) ?? Data()
 
                 do {
-                    let session = try await trackingClient.startWalkSession(userRecordID, destinationCopy.name, destLat, destLon, nil)
+                    let session = try await trackingClient.startWalkSession(userRecordID, destinationCopy.name, destLat, destLon, nil, initialData)
 
                     // Update user status
                     try await trackingClient.updateUserStatus(userRecordID, "walking", session.id, nil)

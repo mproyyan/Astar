@@ -69,7 +69,8 @@ struct MainMapFeature {
     case directNavigationReady(destination: SavedPlace, destCoord: CLLocationCoordinate2D, originCoord: CLLocationCoordinate2D, originAddress: String, routeInfo: WalkingRouteInfo)
 
     case updateTrackingLocation(CLLocationCoordinate2D)
-    case locationPingReceived(LocationPing)
+    case walkSessionUpdated(WalkSession)
+    case stopTrackingTapped
 
     case sheet(PresentationAction<MapSheetFeature.Action>)
 
@@ -159,22 +160,33 @@ struct MainMapFeature {
         return .none
 
       case let .locationManager(.didUpdateLocation(coordinate)):
-        state.currentLocation = coordinate
+          state.currentLocation = coordinate
+          print("[didUpdateLocation] isNavigating: \(state.isNavigating)")
         if state.isNavigating {
-          // If we are actively walking, push location ping!
+          // If we are actively walking, push location update!
           let optionalSessionID = state.userWalkSessionID
           return .merge(
             .send(.delegate(.locationUpdated(coordinate))),
             .send(.updateTrackingLocation(coordinate)),
-            .run { send in
-                 if let sessionID = optionalSessionID {
-                    // NOTE: Real implementation uses batching, but we push latest directly for simplicity based on prompt if no batched buffer
-                    // Need to format Data correctly
-                    let coordStruct = [coordinate.latitude, coordinate.longitude]
-                    if let data = try? JSONEncoder().encode(coordStruct) {
-                        try? await trackingClient.pushLocationPing(sessionID, data)
+//                    }
+//                 }
+                .run { send in
+                    print("[didUpdateLocation] isNavigating check passed, sessionID: \(optionalSessionID ?? "nil")")
+                    guard let sessionID = optionalSessionID else {
+                        print("[didUpdateLocation] No active sessionID — skipping ping")
+                        return
                     }
-                 }
+                    let coordStruct = [coordinate.latitude, coordinate.longitude]
+                    guard let data = try? JSONEncoder().encode(coordStruct) else {
+                        print("[didUpdateLocation] Failed to encode coordinate")
+                        return
+                    }
+                    do {
+                        try await trackingClient.pushLocationUpdate(sessionID, data)
+                        print("[didUpdateLocation] pushLocationUpdate succeeded for session \(sessionID)")
+                    } catch {
+                        print("[didUpdateLocation] pushLocationUpdate FAILED: \(error)")
+                    }
             }
           )
         }
@@ -580,12 +592,19 @@ struct MainMapFeature {
             state.lastLoggedIcon = "figure.walk"
             return .none
          case .navigationEnded:
+            let endingSessionID = state.userWalkSessionID
             state.isNavigating = false
             state.userWalkSessionID = nil
             state.activeWalkSessionID = nil
             state.activeRoute = nil
             state.activePolyline = nil
             state.sheet = nil
+            
+            if let sid = endingSessionID {
+                return .run { [trackingClient] _ in
+                    try? await trackingClient.endWalkSession(sid)
+                }
+            }
             return .none
          }
 
@@ -656,13 +675,20 @@ struct MainMapFeature {
                            await send(.updateMockDoeStep(coordinate: point, journeyLogEntries: currentLog))
 
                            let data = try? JSONEncoder().encode([point.latitude, point.longitude])
-                           let ping = LocationPing(
-                               id: UUID().uuidString,
-                               sessionRef: session.id,
-                               encodedCoordinates: data != nil ? [data!] : [],
-                               recordedAt: Date()
+                           let simulatedSession = WalkSession(
+                               id: session.id,
+                               walkerRef: session.walkerRef,
+                               status: "active",
+                               destinationName: session.destinationName,
+                               destinationLatitude: session.destinationLatitude,
+                               destinationLongitude: session.destinationLongitude,
+                               routePolyline: session.routePolyline,
+                               startedAt: session.startedAt,
+                               endedAt: nil,
+                               currentCoordinate: data,
+                               lastPingAt: Date()
                            )
-                           await send(.locationPingReceived(ping))
+                           await send(.walkSessionUpdated(simulatedSession))
                        }
 
                        // Destination reached!
@@ -697,11 +723,18 @@ struct MainMapFeature {
                          try await trackingClient.updateUserStatus(selfRecordID, "accompany", nil, session.id)
 
                          // And subscribe
-                         print("🎣 Subscribing to location pings for session \(session.id)")
-                         for try await ping in try await trackingClient.subscribeToLocationPings(session.id) {
-                             print("📥 Stream yielded a ping block.")
-                             await send(.locationPingReceived(ping))
+                         print("Registering push subscription for session \(session.id)")
+                         
+                         try await trackingClient.setSubscribeWalkSession( session.id, true)
+                         print("Push subscription registered successfully.")
+                         
+                         
+                         let stream = try await trackingClient.subscribeToWalkSession(session.id)
+                         for await session in stream {
+                             await send(.walkSessionUpdated(session))
                          }
+                         
+                         
                          print("❌ Stream ended for session \(session.id)")
                      } catch {
                          print("❌ Tracking failed with error: \(error)")
@@ -784,6 +817,7 @@ struct MainMapFeature {
             )
 
          case .sheet(.presented(.walker(.delegate(.trackingEnded)))):
+            let endingSessionID = state.activeWalkSessionID
             state.activeWalkSessionID = nil
             state.trackedWalkerDestination = nil
             state.trackedWalkerRoute = nil
@@ -791,6 +825,9 @@ struct MainMapFeature {
             return .merge(
                .send(.delegate(.companionStatusChanged(newStatus: "idle"))),
                .run { [trackingClient] _ in
+                  if let sessionID = endingSessionID {
+                     try? await trackingClient.setSubscribeWalkSession(sessionID, false)
+                  }
                   if let profile = UserProfileStorage.load() {
                      let selfRecordID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"
                         .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
@@ -810,25 +847,58 @@ struct MainMapFeature {
            state.hasFittedTrackedWalker = true
            return .none
 
-      case let .locationPingReceived(ping):
-          print("📡 LocationPing received: \(ping.id) with \(ping.encodedCoordinates.count) points")
-          if let firstData = ping.encodedCoordinates.first {
+      case let .walkSessionUpdated(session):
+          let receiveTime = Date()
+          var effects: [Effect<Action>] = []
+          
+          if session.status == "completed" || session.status == "arrived" {
+              print("🏁 [MainMapFeature] WalkSession \(session.id) completed. Cleaning up tracking.")
+              state.activeWalkSessionID = nil
+              state.trackedWalkerDestination = nil
+              state.trackedWalkerRoute = nil
+              state.trackedWalkerPolyline = nil
+              
+              effects.append(.cancel(id: "TrackWalkerStreamID"))
+              effects.append(.send(.delegate(.companionStatusChanged(newStatus: "idle"))))
+              
+              effects.append(.run { [trackingClient] _ in
+                  try? await trackingClient.setSubscribeWalkSession(session.id, false)
+              })
+              
+              return .merge(effects)
+          }
+          
+          if let coordData = session.currentCoordinate {
               do {
-                  let coordStruct = try JSONDecoder().decode([Double].self, from: firstData)
-                  print("📍 Decoded ping coordinate array: \(coordStruct)")
+                  let coordStruct = try JSONDecoder().decode([Double].self, from: coordData)
                   if coordStruct.count >= 2 {
-                      // Note ping coordinates are often logged as [lat, lon] or [lon, lat] depending on the backend!
                       let lat = coordStruct[0]
                       let lon = coordStruct[1]
-                      print("🏃 Walker tracking Location -> lat: \(lat), lon: \(lon)")
+                      print("🏃 [MainMapFeature] APNs WalkSession Update Applied | Lat: \(lat), Lon: \(lon) | LastPingAt: \(session.lastPingAt) | ReceivedAt: \(receiveTime) | Session: \(session.id)")
 
                       state.trackedWalkerLocation = CLLocationCoordinate2D(latitude: lat, longitude: lon)
                   }
               } catch {
-                  print("❌ Failed mapping location ping data: \(error)")
+                  print("❌ [MainMapFeature] Failed mapping walk session coord data: \(error) at \(receiveTime)")
               }
+          } else {
+              print("⚠️ [MainMapFeature] WalkSession \(session.id) had nil currentCoordinate at \(receiveTime)")
           }
-          return .none
+          
+          return effects.isEmpty ? .none : .merge(effects)
+          
+      case .stopTrackingTapped:
+          
+          guard let sessionID = state.activeWalkSessionID else { return .none }
+              
+              return .run { _ in
+                  do {
+                      try await trackingClient.setSubscribeWalkSession(sessionID, false)
+                      print("Unsubscribed CloudKit push for session \(sessionID)")
+                  } catch {
+                      print("Failed to unsubscribe: \(error)")
+                  }
+          }
 
       case .sheet, .delegate, .updateTrackingLocation:
         return .none
