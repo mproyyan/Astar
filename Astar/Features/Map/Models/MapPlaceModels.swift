@@ -91,6 +91,17 @@ struct SavedPlace: Identifiable, Equatable, Sendable, Codable {
 
 
 extension SavedPlace {
+    var displayTitle: String {
+        if let customLabel = label?.trimmingCharacters(in: .whitespacesAndNewlines), !customLabel.isEmpty {
+            return customLabel
+        }
+        return name
+    }
+
+    var displaySubtitle: String {
+        subtitle
+    }
+
     var isHome: Bool {
         label?.lowercased() == "home" || iconName == "house.fill" || name.lowercased() == "home"
     }
