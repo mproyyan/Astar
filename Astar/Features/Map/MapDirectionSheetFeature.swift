@@ -24,11 +24,13 @@ struct MapDirectionSheetFeature {
     var isDestinationReached: Bool = false
     var isDevelopmentMode: Bool = DeveloperSettingsStorage.isDevelopmentMode
 
+    var watchingPeople: [Person] = []
     var journeyLogEntries: [JourneyLogEntry] = []
   }
 
   enum Action: Equatable {
     case onAppear(currentLocation: CLLocationCoordinate2D?)
+    case setWatchingPeople([Person])
     case routeCalculated(WalkingRouteInfo)
     case originResolved(SavedPlace)
     case destinationResolved(CLLocationCoordinate2D)

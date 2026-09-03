@@ -183,6 +183,8 @@ struct MapSheet: View {
                             WalkerCardIdle(
                                 name: walkerStore.walker.name,
                                 email: userEmail,
+                                avatarImageName: walkerStore.walker.avatarImageName ?? (walkerStore.walker.name == "Awan" ? "AwanAvatar" : "\(walkerStore.walker.name)Avatar"),
+                                avatarData: walkerStore.walker.avatarData,
                                 trips: walkerStore.trips,
                                 onDismiss: {
                                     walkerStore.send(.dismissWalkerTapped)

@@ -11,13 +11,19 @@ struct WalkerCardIdle: View {
     var name: String = "Awan"
     var email: String = "awanmendung@icloud.com"
     var avatarImageName: String = "AwanAvatar"
+    var avatarData: Data? = nil
     var trips: [WalkerHistoryTrip] = WalkerSampleData.defaultTrips
 
     var onDismiss: (() -> Void)? = nil
     var onViewAllHistory: (() -> Void)? = nil
     var onSelectTrip: ((WalkerHistoryTrip) -> Void)? = nil
 
+    @State private var loadedAvatarData: Data?
     private let avatarSize: CGFloat = 52
+
+    private var effectiveAvatarData: Data? {
+        avatarData ?? loadedAvatarData
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -45,7 +51,11 @@ struct WalkerCardIdle: View {
             // Profile Header
             HStack(spacing: 14) {
                 Group {
-                    if let _ = UIImage(named: avatarImageName) {
+                    if let avatarData = effectiveAvatarData, let uiImage = UIImage(data: avatarData) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFill()
+                    } else if let _ = UIImage(named: avatarImageName) {
                         Image(avatarImageName)
                             .resizable()
                             .scaledToFill()
@@ -157,6 +167,15 @@ struct WalkerCardIdle: View {
             .background(Color.white, in: .rect(cornerRadius: 16))
         }
         .padding(.top, 8)
+        .task(id: email) {
+            if loadedAvatarData == nil && avatarData == nil {
+                if let fetched = await ContactPhotoClient.liveValue.fetchContactPhotoByEmail(email) {
+                    loadedAvatarData = fetched
+                } else if let fetched = await ContactPhotoClient.liveValue.fetchContactPhotoByName(name) {
+                    loadedAvatarData = fetched
+                }
+            }
+        }
     }
 }
 

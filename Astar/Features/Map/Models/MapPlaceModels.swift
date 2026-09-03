@@ -25,13 +25,28 @@ struct Person: Identifiable, Equatable, Sendable {
     let status: String
     var appleUserId: String?
     var cloudKitUserId: String?
+    var email: String?
+    var avatarData: Data?
+    var avatarImageName: String?
 
-    init(id: UUID = UUID(), name: String, status: String, appleUserId: String? = nil, cloudKitUserId: String? = nil) {
+    init(
+        id: UUID = UUID(),
+        name: String,
+        status: String,
+        appleUserId: String? = nil,
+        cloudKitUserId: String? = nil,
+        email: String? = nil,
+        avatarData: Data? = nil,
+        avatarImageName: String? = nil
+    ) {
         self.id = id
         self.name = name
         self.status = status
         self.appleUserId = appleUserId
         self.cloudKitUserId = cloudKitUserId
+        self.email = email
+        self.avatarData = avatarData
+        self.avatarImageName = avatarImageName
     }
 
     static let mockJohnDoe = Person(
@@ -576,7 +591,7 @@ enum MockDoeWalkSimulation {
 enum MapSampleData {
     static var people: [Person] {
         let basePeople = [
-            Person(name: "Awan", status: "Walking"),
+            Person(name: "Awan", status: "Walking", avatarImageName: "AwanAvatar"),
             Person(name: "Royyan", status: "Idle"),
             Person(name: "Safa", status: "Idle"),
             Person(name: "Nadia", status: "Idle")
