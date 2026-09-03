@@ -148,14 +148,14 @@ private struct SavedPlaceGroupedRow: View {
             }
             .buttonStyle(.plain)
 
-            Button(action: onSelect) {
-                Image(systemName: "ellipsis")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 34, height: 34)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Options")
+//            Button(action: onSelect) {
+//                Image(systemName: "ellipsis")
+//                    .font(.body.weight(.semibold))
+//                    .foregroundStyle(.secondary)
+//                    .frame(width: 34, height: 34)
+//            }
+//            .buttonStyle(.plain)
+//            .accessibilityLabel("Options")
         }
         .padding(.vertical, 4)
     }
@@ -327,16 +327,30 @@ private struct PinPlaceSheet: View {
 
                             Divider()
 
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(store.selectedPlaceForLabel?.name ?? "")
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(.primary)
+                            Button {
+                                store.send(.changeAddressTapped)
+                            } label: {
+                                HStack(spacing: 8) {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(store.selectedPlaceForLabel?.name ?? "")
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(.primary)
 
-                                Text(store.selectedPlaceForLabel?.subtitle ?? "")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(2)
+                                        Text(store.selectedPlaceForLabel?.subtitle ?? "")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(2)
+                                    }
+
+                                    Spacer()
+
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(.secondary)
+                                }
+                                .contentShape(Rectangle())
                             }
+                            .buttonStyle(.plain)
                         }
                         .padding(16)
                         .background(Color.white, in: .rect(cornerRadius: 18))

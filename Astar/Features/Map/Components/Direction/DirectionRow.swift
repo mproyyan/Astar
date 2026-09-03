@@ -38,15 +38,15 @@ struct DirectionRow: View {
 
             Spacer(minLength: 8)
 
-            Button {
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 34, height: 34)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Options")
+//            Button {
+//            } label: {
+//                Image(systemName: "ellipsis")
+//                    .font(.body.weight(.semibold))
+//                    .foregroundStyle(.secondary)
+//                    .frame(width: 34, height: 34)
+//            }
+//            .buttonStyle(.plain)
+//            .accessibilityLabel("Options")
         }
         .padding(.top, isFirst ? 16 : 8)
         .padding(.bottom, isLast ? 8 : 16)

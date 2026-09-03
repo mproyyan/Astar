@@ -29,7 +29,6 @@ struct SavedPlacesFeature {
         var hasChanges: Bool {
             guard let editingId = editingPlaceId,
                   let originalPlace = places.first(where: { $0.id == editingId }) else {
-                // Adding a new place
                 return selectedPlaceForLabel != nil
             }
 
@@ -90,6 +89,7 @@ struct SavedPlacesFeature {
         case clearSearchTapped
         case selectPlaceSearchResult(SavedPlace)
         case backToChooseLocationTapped
+        case changeAddressTapped
         case customLabelChanged(String)
         case confirmSavePlace
         case deletePlaceById(UUID)
@@ -201,6 +201,13 @@ struct SavedPlacesFeature {
                 }
                 state.pinStep = .chooseLocation
                 return .none
+
+            case .changeAddressTapped:
+                state.pinStep = .chooseLocation
+                state.searchQuery = ""
+                state.searchResults = []
+                state.isLoading = false
+                return .cancel(id: "savedPlacesSearchDebounce")
 
             case let .customLabelChanged(label):
                 state.customLabel = label
