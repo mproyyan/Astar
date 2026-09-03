@@ -123,6 +123,7 @@ struct MainFeature {
         } else {
           state.people = updatedPeople.filter { $0.id != Person.mockDoeID }
         }
+        state.map.people = state.people
         return .none
         
       case .fetchPeopleResponse(.failure):
@@ -132,6 +133,7 @@ struct MainFeature {
         } else {
           state.people = []
         }
+        state.map.people = state.people
         return .none
         
       case .profileButtonTapped:

@@ -36,6 +36,7 @@ struct MainMapFeature {
     var lastLoggedStreet: String = ""
     var lastLoggedIcon: String = "figure.walk"
     var savedPlaces: [SavedPlace] = SavedPlacesStorage.load()
+    var people: [Person] = []
 
     @Presents var sheet: MapSheetFeature.State?
 
@@ -135,7 +136,7 @@ struct MainMapFeature {
         return .none
 
       case let .selectSavedPlace(place):
-        state.sheet = .direction(MapDirectionSheetFeature.State(destination: place))
+        state.sheet = .direction(MapDirectionSheetFeature.State(destination: place, watchingPeople: state.people))
         let currentLoc = state.currentLocation ?? CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
         return .send(.sheet(.presented(.direction(.onAppear(currentLocation: currentLoc)))))
 
@@ -277,7 +278,8 @@ struct MainMapFeature {
           mode: .progress,
           originPlace: defaultOrigin,
           isCalculatingRoute: true,
-          isNavigating: true
+          isNavigating: true,
+          watchingPeople: state.people
         )
         state.sheet = .direction(directionState)
 
@@ -366,7 +368,8 @@ struct MainMapFeature {
           mode: .progress,
           originPlace: defaultOrigin,
           isCalculatingRoute: true,
-          isNavigating: true
+          isNavigating: true,
+          watchingPeople: state.people
         )
         state.sheet = .direction(directionState)
 
@@ -489,6 +492,7 @@ struct MainMapFeature {
           isCalculatingRoute: false,
           isNavigating: true,
           isDestinationReached: false,
+          watchingPeople: state.people,
           journeyLogEntries: [currentEntry, startEntry]
         )
         state.sheet = .direction(directionState)
@@ -565,7 +569,7 @@ struct MainMapFeature {
         return .none
 
       case let .sheet(.presented(.search(.selectPlace(place)))):
-         state.sheet = .direction(MapDirectionSheetFeature.State(destination: place))
+         state.sheet = .direction(MapDirectionSheetFeature.State(destination: place, watchingPeople: state.people))
          let currentLoc = state.currentLocation ?? CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
          return .send(.sheet(.presented(.direction(.onAppear(currentLocation: currentLoc)))))
 

@@ -53,6 +53,7 @@ struct MapSheet: View {
                             estimatedTime: directionStore.walkingRouteInfo?.travelTimeString ?? "12 min",
                             eta: directionStore.walkingRouteInfo?.etaString ?? "11.00 ETA",
                             totalDistance: directionStore.walkingRouteInfo?.distanceString ?? directionStore.destination.distance ?? "850 m",
+                            watchingPeople: directionStore.watchingPeople,
                             isDone: directionStore.isDestinationReached,
                             isLoading: directionStore.isCalculatingRoute,
                             isDevelopmentMode: directionStore.isDevelopmentMode,
