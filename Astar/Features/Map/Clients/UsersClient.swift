@@ -5,6 +5,7 @@ import Foundation
 @DependencyClient
 struct UsersClient {
   var fetchAllUsers: () async throws -> [UserProfile]
+  var fetchUserByEmail: (_ email: String) async throws -> UserProfile?
 }
 
 extension UsersClient: DependencyKey {
@@ -38,6 +39,29 @@ extension UsersClient: DependencyKey {
             }
         }
         return profiles
+      },
+      fetchUserByEmail: { email in
+        let container = CKContainer.default()
+        let database = container.publicCloudDatabase
+        let query = CKQuery(recordType: "UserProfile", predicate: NSPredicate(format: "email == %@", email))
+        let (matchResults, _) = try await database.records(matching: query)
+
+        if let match = matchResults.first,
+           case let .success(record) = match.1,
+           let appleUserId = record["appleUserId"] as? String,
+           let cloudKitUserId = record["cloudKitUserId"] as? String,
+           let name = record["name"] as? String,
+           let recordEmail = record["email"] as? String, recordEmail == email {
+            let status = record["Status"] as? String
+            return UserProfile(
+                appleUserId: appleUserId,
+                cloudKitUserId: cloudKitUserId,
+                name: name,
+                email: recordEmail,
+                status: status
+            )
+        }
+        return nil
       }
     )
   }

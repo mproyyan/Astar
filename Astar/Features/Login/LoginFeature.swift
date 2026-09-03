@@ -22,6 +22,19 @@ struct UserProfile: Codable, Equatable, Sendable {
   let name: String
   let email: String
   var status: String?
+  
+  var recordName: String {
+    "UserProfile_\(appleUserId)_\(cloudKitUserId)"
+      .map { character in
+        character.isLetter || character.isNumber ? character : "_"
+      }
+      .map(String.init)
+      .joined()
+  }
+  
+  var recordID: CKRecord.ID {
+    CKRecord.ID(recordName: recordName)
+  }
 }
 
 struct LoginError: Error, Equatable, Sendable {

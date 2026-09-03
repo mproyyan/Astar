@@ -23,6 +23,7 @@ struct ProfileFeature {
     case setRouteGuide(Bool)
     case setDoeWalkingMock(Bool)
     case resetDoeWalkingSimulation
+    case trustedPersonTapped
     case savedPlacesUpdated([SavedPlace])
     case delegate(Delegate)
 
@@ -31,6 +32,7 @@ struct ProfileFeature {
       case developmentModeChanged(Bool)
       case routeGuideChanged(Bool)
       case doeWalkingMockChanged(Bool)
+      case trustedPersonTapped
       case restartDoeWalkingSimulation
       case savedPlacesUpdated([SavedPlace])
     }
@@ -60,6 +62,9 @@ struct ProfileFeature {
 
       case .resetDoeWalkingSimulation:
         return .send(.delegate(.restartDoeWalkingSimulation))
+
+      case .trustedPersonTapped:
+        return .send(.delegate(.trustedPersonTapped))
 
       case let .savedPlacesUpdated(places):
         return .send(.delegate(.savedPlacesUpdated(places)))

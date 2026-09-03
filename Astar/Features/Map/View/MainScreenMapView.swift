@@ -317,6 +317,10 @@ private struct NavigationDestination: View {
     switch store.case {
     case let .profile(profileStore):
       ProfileView(store: profileStore)
+    case let .trustedPerson(trustedPersonStore):
+      TrustedPersonView(store: trustedPersonStore)
+    case let .requestTrustedPerson(requestTrustedPersonStore):
+      RequestTrustedPersonView(store: requestTrustedPersonStore)
     }
   }
 }
