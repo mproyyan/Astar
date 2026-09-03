@@ -233,6 +233,7 @@ struct WalkerCardHistoryDetail: View {
                             .foregroundStyle(.secondary)
                     }
                     .padding(.horizontal, 16)
+                   
                     .padding(.top, 4)
                     .padding(.bottom, 16)
                 }

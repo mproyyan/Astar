@@ -36,7 +36,9 @@ struct DirectionPersonView: View {
             Text(person.name)
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.primary)
-                .lineLimit(1)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

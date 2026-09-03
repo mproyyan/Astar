@@ -16,7 +16,7 @@ struct PersonView: View {
         Button {
             onSelect?()
         } label: {
-            VStack(spacing: 8) {
+            VStack(spacing: 6) {
                 Circle()
                     .fill(Color(red: 0.77, green: 0.81, blue: 0.96))
                     .overlay {
@@ -41,15 +41,17 @@ struct PersonView: View {
                     Text(person.name)
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(.primary)
+                        .multilineTextAlignment(.center)
                         .lineLimit(1)
+                        .truncationMode(.tail)
 
                     Text(person.status)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
+                .frame(maxWidth: .infinity)
             }
-            .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

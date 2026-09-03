@@ -58,6 +58,7 @@ struct MainMapFeature {
 
     case searchTapped
     case dismissSearch
+    case dismissWalker
     case selectPerson(Person)
 
     case savedPlacesUpdated([SavedPlace])
@@ -200,6 +201,10 @@ struct MainMapFeature {
         return .none
 
       case .dismissSearch:
+        state.sheet = nil
+        return .none
+
+      case .dismissWalker:
         state.sheet = nil
         return .none
 
