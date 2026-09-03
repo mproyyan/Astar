@@ -8,9 +8,45 @@
 
 /* Begin PBXBuildFile section */
 		A640BB71303BDF850064EB80 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = A640BB70303BDF850064EB80 /* ComposableArchitecture */; };
+		A67400293049B25D005AAA4A /* TrailWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = A67400283049B25D005AAA4A /* TrailWatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		A67400133049B25D005AAA4A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A6DE52F2303BDE2F00940469 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A67400053049B25C005AAA4A;
+			remoteInfo = TrailWatch;
+		};
+		A674001D3049B25D005AAA4A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A6DE52F2303BDE2F00940469 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A67400053049B25C005AAA4A;
+			remoteInfo = TrailWatch;
+		};
+		A674002A3049B25D005AAA4A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A6DE52F2303BDE2F00940469 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A67400273049B25D005AAA4A;
+			remoteInfo = "TrailWatch Watch App";
+		};
+		A67400383049B25D005AAA4A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A6DE52F2303BDE2F00940469 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A67400273049B25D005AAA4A;
+			remoteInfo = "TrailWatch Watch App";
+		};
+		A67400423049B25D005AAA4A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A6DE52F2303BDE2F00940469 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A67400273049B25D005AAA4A;
+			remoteInfo = "TrailWatch Watch App";
+		};
 		A6DE5308303BDE3000940469 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = A6DE52F2303BDE2F00940469 /* Project object */;
@@ -27,15 +63,65 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		A674004C3049B25D005AAA4A /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				A67400293049B25D005AAA4A /* TrailWatch Watch App.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		7D64EA68303D68BA00390737 /* RULES.md */ = {isa = PBXFileReference; lastKnownFileType = text.markdown; path = RULES.md; sourceTree = "<group>"; };
 		A640BB81303BE77F0064EB80 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
+		A67400063049B25C005AAA4A /* TrailWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TrailWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A67400123049B25D005AAA4A /* TrailWatchTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TrailWatchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A674001C3049B25D005AAA4A /* TrailWatchUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TrailWatchUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A67400283049B25D005AAA4A /* TrailWatch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "TrailWatch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A67400373049B25D005AAA4A /* TrailWatch Watch AppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "TrailWatch Watch AppTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A67400413049B25D005AAA4A /* TrailWatch Watch AppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "TrailWatch Watch AppUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A6DE52FA303BDE2F00940469 /* Astar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Astar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A6DE5307303BDE3000940469 /* AstarTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AstarTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A6DE5311303BDE3000940469 /* AstarUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AstarUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		A67400073049B25C005AAA4A /* TrailWatch */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = TrailWatch;
+			sourceTree = "<group>";
+		};
+		A67400153049B25D005AAA4A /* TrailWatchTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = TrailWatchTests;
+			sourceTree = "<group>";
+		};
+		A674001F3049B25D005AAA4A /* TrailWatchUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = TrailWatchUITests;
+			sourceTree = "<group>";
+		};
+		A674002C3049B25D005AAA4A /* TrailWatch Watch App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "TrailWatch Watch App";
+			sourceTree = "<group>";
+		};
+		A674003A3049B25D005AAA4A /* TrailWatch Watch AppTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "TrailWatch Watch AppTests";
+			sourceTree = "<group>";
+		};
+		A67400443049B25D005AAA4A /* TrailWatch Watch AppUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "TrailWatch Watch AppUITests";
+			sourceTree = "<group>";
+		};
 		A6DE52FC303BDE2F00940469 /* Astar */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Astar;
@@ -54,6 +140,48 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		A67400033049B25C005AAA4A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A674000F3049B25D005AAA4A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A67400193049B25D005AAA4A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A67400253049B25D005AAA4A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A67400343049B25D005AAA4A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A674003E3049B25D005AAA4A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A6DE52F7303BDE2F00940469 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -94,6 +222,12 @@
 				A6DE52FC303BDE2F00940469 /* Astar */,
 				A6DE530A303BDE3000940469 /* AstarTests */,
 				A6DE5314303BDE3000940469 /* AstarUITests */,
+				A67400073049B25C005AAA4A /* TrailWatch */,
+				A67400153049B25D005AAA4A /* TrailWatchTests */,
+				A674001F3049B25D005AAA4A /* TrailWatchUITests */,
+				A674002C3049B25D005AAA4A /* TrailWatch Watch App */,
+				A674003A3049B25D005AAA4A /* TrailWatch Watch AppTests */,
+				A67400443049B25D005AAA4A /* TrailWatch Watch AppUITests */,
 				A640BB72303BDF8E0064EB80 /* Frameworks */,
 				A6DE52FB303BDE2F00940469 /* Products */,
 			);
@@ -105,6 +239,12 @@
 				A6DE52FA303BDE2F00940469 /* Astar.app */,
 				A6DE5307303BDE3000940469 /* AstarTests.xctest */,
 				A6DE5311303BDE3000940469 /* AstarUITests.xctest */,
+				A67400063049B25C005AAA4A /* TrailWatch.app */,
+				A67400123049B25D005AAA4A /* TrailWatchTests.xctest */,
+				A674001C3049B25D005AAA4A /* TrailWatchUITests.xctest */,
+				A67400283049B25D005AAA4A /* TrailWatch Watch App.app */,
+				A67400373049B25D005AAA4A /* TrailWatch Watch AppTests.xctest */,
+				A67400413049B25D005AAA4A /* TrailWatch Watch AppUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -112,6 +252,144 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		A67400053049B25C005AAA4A /* TrailWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A674004D3049B25D005AAA4A /* Build configuration list for PBXNativeTarget "TrailWatch" */;
+			buildPhases = (
+				A67400023049B25C005AAA4A /* Sources */,
+				A67400033049B25C005AAA4A /* Frameworks */,
+				A67400043049B25C005AAA4A /* Resources */,
+				A674004C3049B25D005AAA4A /* Embed Watch Content */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A674002B3049B25D005AAA4A /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A67400073049B25C005AAA4A /* TrailWatch */,
+			);
+			name = TrailWatch;
+			packageProductDependencies = (
+			);
+			productName = TrailWatch;
+			productReference = A67400063049B25C005AAA4A /* TrailWatch.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A67400113049B25D005AAA4A /* TrailWatchTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A67400503049B25D005AAA4A /* Build configuration list for PBXNativeTarget "TrailWatchTests" */;
+			buildPhases = (
+				A674000E3049B25D005AAA4A /* Sources */,
+				A674000F3049B25D005AAA4A /* Frameworks */,
+				A67400103049B25D005AAA4A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A67400143049B25D005AAA4A /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A67400153049B25D005AAA4A /* TrailWatchTests */,
+			);
+			name = TrailWatchTests;
+			packageProductDependencies = (
+			);
+			productName = TrailWatchTests;
+			productReference = A67400123049B25D005AAA4A /* TrailWatchTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		A674001B3049B25D005AAA4A /* TrailWatchUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A67400533049B25D005AAA4A /* Build configuration list for PBXNativeTarget "TrailWatchUITests" */;
+			buildPhases = (
+				A67400183049B25D005AAA4A /* Sources */,
+				A67400193049B25D005AAA4A /* Frameworks */,
+				A674001A3049B25D005AAA4A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A674001E3049B25D005AAA4A /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A674001F3049B25D005AAA4A /* TrailWatchUITests */,
+			);
+			name = TrailWatchUITests;
+			packageProductDependencies = (
+			);
+			productName = TrailWatchUITests;
+			productReference = A674001C3049B25D005AAA4A /* TrailWatchUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		A67400273049B25D005AAA4A /* TrailWatch Watch App */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A67400493049B25D005AAA4A /* Build configuration list for PBXNativeTarget "TrailWatch Watch App" */;
+			buildPhases = (
+				A67400243049B25D005AAA4A /* Sources */,
+				A67400253049B25D005AAA4A /* Frameworks */,
+				A67400263049B25D005AAA4A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A674002C3049B25D005AAA4A /* TrailWatch Watch App */,
+			);
+			name = "TrailWatch Watch App";
+			packageProductDependencies = (
+			);
+			productName = "TrailWatch Watch App";
+			productReference = A67400283049B25D005AAA4A /* TrailWatch Watch App.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A67400363049B25D005AAA4A /* TrailWatch Watch AppTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A67400563049B25D005AAA4A /* Build configuration list for PBXNativeTarget "TrailWatch Watch AppTests" */;
+			buildPhases = (
+				A67400333049B25D005AAA4A /* Sources */,
+				A67400343049B25D005AAA4A /* Frameworks */,
+				A67400353049B25D005AAA4A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A67400393049B25D005AAA4A /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A674003A3049B25D005AAA4A /* TrailWatch Watch AppTests */,
+			);
+			name = "TrailWatch Watch AppTests";
+			packageProductDependencies = (
+			);
+			productName = "TrailWatch Watch AppTests";
+			productReference = A67400373049B25D005AAA4A /* TrailWatch Watch AppTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		A67400403049B25D005AAA4A /* TrailWatch Watch AppUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A67400593049B25D005AAA4A /* Build configuration list for PBXNativeTarget "TrailWatch Watch AppUITests" */;
+			buildPhases = (
+				A674003D3049B25D005AAA4A /* Sources */,
+				A674003E3049B25D005AAA4A /* Frameworks */,
+				A674003F3049B25D005AAA4A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A67400433049B25D005AAA4A /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A67400443049B25D005AAA4A /* TrailWatch Watch AppUITests */,
+			);
+			name = "TrailWatch Watch AppUITests";
+			packageProductDependencies = (
+			);
+			productName = "TrailWatch Watch AppUITests";
+			productReference = A67400413049B25D005AAA4A /* TrailWatch Watch AppUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		A6DE52F9303BDE2F00940469 /* Astar */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = A6DE531B303BDE3000940469 /* Build configuration list for PBXNativeTarget "Astar" */;
@@ -191,6 +469,28 @@
 				LastSwiftUpdateCheck = 2640;
 				LastUpgradeCheck = 2640;
 				TargetAttributes = {
+					A67400053049B25C005AAA4A = {
+						CreatedOnToolsVersion = 26.4;
+					};
+					A67400113049B25D005AAA4A = {
+						CreatedOnToolsVersion = 26.4;
+						TestTargetID = A67400053049B25C005AAA4A;
+					};
+					A674001B3049B25D005AAA4A = {
+						CreatedOnToolsVersion = 26.4;
+						TestTargetID = A67400053049B25C005AAA4A;
+					};
+					A67400273049B25D005AAA4A = {
+						CreatedOnToolsVersion = 26.4;
+					};
+					A67400363049B25D005AAA4A = {
+						CreatedOnToolsVersion = 26.4;
+						TestTargetID = A67400273049B25D005AAA4A;
+					};
+					A67400403049B25D005AAA4A = {
+						CreatedOnToolsVersion = 26.4;
+						TestTargetID = A67400273049B25D005AAA4A;
+					};
 					A6DE52F9303BDE2F00940469 = {
 						CreatedOnToolsVersion = 26.4;
 					};
@@ -224,11 +524,59 @@
 				A6DE52F9303BDE2F00940469 /* Astar */,
 				A6DE5306303BDE3000940469 /* AstarTests */,
 				A6DE5310303BDE3000940469 /* AstarUITests */,
+				A67400053049B25C005AAA4A /* TrailWatch */,
+				A67400113049B25D005AAA4A /* TrailWatchTests */,
+				A674001B3049B25D005AAA4A /* TrailWatchUITests */,
+				A67400273049B25D005AAA4A /* TrailWatch Watch App */,
+				A67400363049B25D005AAA4A /* TrailWatch Watch AppTests */,
+				A67400403049B25D005AAA4A /* TrailWatch Watch AppUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		A67400043049B25C005AAA4A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A67400103049B25D005AAA4A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A674001A3049B25D005AAA4A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A67400263049B25D005AAA4A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A67400353049B25D005AAA4A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A674003F3049B25D005AAA4A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A6DE52F8303BDE2F00940469 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -253,6 +601,48 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		A67400023049B25C005AAA4A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A674000E3049B25D005AAA4A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A67400183049B25D005AAA4A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A67400243049B25D005AAA4A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A67400333049B25D005AAA4A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A674003D3049B25D005AAA4A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A6DE52F6303BDE2F00940469 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -277,6 +667,31 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		A67400143049B25D005AAA4A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A67400053049B25C005AAA4A /* TrailWatch */;
+			targetProxy = A67400133049B25D005AAA4A /* PBXContainerItemProxy */;
+		};
+		A674001E3049B25D005AAA4A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A67400053049B25C005AAA4A /* TrailWatch */;
+			targetProxy = A674001D3049B25D005AAA4A /* PBXContainerItemProxy */;
+		};
+		A674002B3049B25D005AAA4A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A67400273049B25D005AAA4A /* TrailWatch Watch App */;
+			targetProxy = A674002A3049B25D005AAA4A /* PBXContainerItemProxy */;
+		};
+		A67400393049B25D005AAA4A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A67400273049B25D005AAA4A /* TrailWatch Watch App */;
+			targetProxy = A67400383049B25D005AAA4A /* PBXContainerItemProxy */;
+		};
+		A67400433049B25D005AAA4A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A67400273049B25D005AAA4A /* TrailWatch Watch App */;
+			targetProxy = A67400423049B25D005AAA4A /* PBXContainerItemProxy */;
+		};
 		A6DE5309303BDE3000940469 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = A6DE52F9303BDE2F00940469 /* Astar */;
@@ -290,6 +705,312 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		A674004A3049B25D005AAA4A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L6M39L4GV8;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = TrailWatch;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = mproyyan.TrailWatch;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = mproyyan.TrailWatch.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.4;
+			};
+			name = Debug;
+		};
+		A674004B3049B25D005AAA4A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L6M39L4GV8;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = TrailWatch;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = mproyyan.TrailWatch;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = mproyyan.TrailWatch.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.4;
+			};
+			name = Release;
+		};
+		A674004E3049B25D005AAA4A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L6M39L4GV8;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = TrailWatch;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = mproyyan.TrailWatch;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A674004F3049B25D005AAA4A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L6M39L4GV8;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = TrailWatch;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = mproyyan.TrailWatch;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		A67400513049B25D005AAA4A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L6M39L4GV8;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = mproyyan.TrailWatchTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TrailWatch.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TrailWatch";
+			};
+			name = Debug;
+		};
+		A67400523049B25D005AAA4A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L6M39L4GV8;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = mproyyan.TrailWatchTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TrailWatch.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TrailWatch";
+			};
+			name = Release;
+		};
+		A67400543049B25D005AAA4A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L6M39L4GV8;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = mproyyan.TrailWatchUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = TrailWatch;
+			};
+			name = Debug;
+		};
+		A67400553049B25D005AAA4A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L6M39L4GV8;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = mproyyan.TrailWatchUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = TrailWatch;
+			};
+			name = Release;
+		};
+		A67400573049B25D005AAA4A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L6M39L4GV8;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "mproyyan.TrailWatch-Watch-AppTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TrailWatch Watch App.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TrailWatch Watch App";
+				WATCHOS_DEPLOYMENT_TARGET = 26.4;
+			};
+			name = Debug;
+		};
+		A67400583049B25D005AAA4A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L6M39L4GV8;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "mproyyan.TrailWatch-Watch-AppTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TrailWatch Watch App.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TrailWatch Watch App";
+				WATCHOS_DEPLOYMENT_TARGET = 26.4;
+			};
+			name = Release;
+		};
+		A674005A3049B25D005AAA4A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L6M39L4GV8;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "mproyyan.TrailWatch-Watch-AppUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_TARGET_NAME = "TrailWatch Watch App";
+				WATCHOS_DEPLOYMENT_TARGET = 26.4;
+			};
+			name = Debug;
+		};
+		A674005B3049B25D005AAA4A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = L6M39L4GV8;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "mproyyan.TrailWatch-Watch-AppUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_TARGET_NAME = "TrailWatch Watch App";
+				WATCHOS_DEPLOYMENT_TARGET = 26.4;
+			};
+			name = Release;
+		};
 		A6DE5319303BDE3000940469 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -578,6 +1299,60 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		A67400493049B25D005AAA4A /* Build configuration list for PBXNativeTarget "TrailWatch Watch App" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A674004A3049B25D005AAA4A /* Debug */,
+				A674004B3049B25D005AAA4A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A674004D3049B25D005AAA4A /* Build configuration list for PBXNativeTarget "TrailWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A674004E3049B25D005AAA4A /* Debug */,
+				A674004F3049B25D005AAA4A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A67400503049B25D005AAA4A /* Build configuration list for PBXNativeTarget "TrailWatchTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A67400513049B25D005AAA4A /* Debug */,
+				A67400523049B25D005AAA4A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A67400533049B25D005AAA4A /* Build configuration list for PBXNativeTarget "TrailWatchUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A67400543049B25D005AAA4A /* Debug */,
+				A67400553049B25D005AAA4A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A67400563049B25D005AAA4A /* Build configuration list for PBXNativeTarget "TrailWatch Watch AppTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A67400573049B25D005AAA4A /* Debug */,
+				A67400583049B25D005AAA4A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A67400593049B25D005AAA4A /* Build configuration list for PBXNativeTarget "TrailWatch Watch AppUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A674005A3049B25D005AAA4A /* Debug */,
+				A674005B3049B25D005AAA4A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		A6DE52F5303BDE2F00940469 /* Build configuration list for PBXProject "Astar" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
