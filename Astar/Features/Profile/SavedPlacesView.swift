@@ -13,124 +13,74 @@ struct SavedPlacesView: View {
     @Bindable var store: StoreOf<SavedPlacesFeature>
     @Environment(\.dismiss) private var dismiss
 
-    let columns = [
-        GridItem(.adaptive(minimum: 90, maximum: 110), spacing: 20, alignment: .top)
-    ]
-
     var body: some View {
         WithPerceptionTracking {
             ZStack {
-                Color.white
+                Color(red: 0.95, green: 0.95, blue: 0.97)
                     .ignoresSafeArea()
 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 28) {
-                        // Title & Subtitle
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Places")
-                                .font(.system(size: 34, weight: .bold))
-                                .foregroundStyle(.primary)
+                VStack(alignment: .leading, spacing: 0) {
+                    // Title & Subtitle Header
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Places")
+                            .font(.system(size: 34, weight: .bold))
+                            .foregroundStyle(.primary)
 
-                            Text("Add places you visit often")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.top, 8)
-
-                        // Circular Icons Grid (Screen 1 & 4)
-                        LazyVGrid(columns: columns, spacing: 28) {
-                            // 1. Home Item
-                            CircularPlaceCard(
-                                title: store.homePlace?.displayTitle ?? "Home",
-                                subtitle: "Change",
-                                iconName: "house.fill",
-                                categoryColor: Color(red: 0.15, green: 0.75, blue: 0.85),
-                                onAction: {
-                                    if let home = store.homePlace {
-                                        store.send(.changeLocationTapped(home, .home))
-                                    } else {
-                                        store.send(.addPlaceButtonTapped(.home))
-                                    }
-                                }
-                            )
-
-                            // 2. Office Item
-                            CircularPlaceCard(
-                                title: store.officePlace?.displayTitle ?? "Office",
-                                subtitle: "Change",
-                                iconName: "briefcase.fill",
-                                categoryColor: Color(red: 0.65, green: 0.48, blue: 0.35),
-                                onAction: {
-                                    if let office = store.officePlace {
-                                        store.send(.changeLocationTapped(office, .office))
-                                    } else {
-                                        store.send(.addPlaceButtonTapped(.office))
-                                    }
-                                }
-                            )
-
-                            // 3. Custom Places (Golden yellow circles with map pin icon)
-                            ForEach(store.customPlaces) { place in
-                                CircularPlaceCard(
-                                    title: place.displayTitle,
-                                    subtitle: "Change",
-                                    iconName: place.resolvedIconName,
-                                    categoryColor: place.categoryColor,
-                                    onAction: {
-                                        store.send(.changeLocationTapped(place, .custom))
-                                    },
-                                    contextMenu: {
-                                        Button(role: .destructive) {
-                                            store.send(.deletePlaceById(place.id))
-                                        } label: {
-                                            Label("Delete Place", systemImage: "trash")
-                                        }
-                                    }
-                                )
-                            }
-
-
-                            VStack(spacing: 8) {
-                                Button {
-                                    store.send(.addPlaceButtonTapped(.custom))
-                                } label: {
-                                    Circle()
-                                        .fill(Color(red: 0.88, green: 0.95, blue: 1.0))
-                                        .frame(width: 80, height: 80)
-                                        .overlay {
-                                            Image(systemName: "plus")
-                                                .font(.system(size: 32, weight: .medium))
-                                                .foregroundStyle(Color(red: 0.00, green: 0.55, blue: 0.95))
-                                        }
-                                }
-                                .buttonStyle(.plain)
-
-                                Text("Add")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(.primary)
-                                    .lineLimit(1)
-                            }
-                        }
-
-                        Spacer()
+                        Text("Add places you visit often")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
                     .padding(.horizontal, 20)
+                    .padding(.top, 16)
+                    .padding(.bottom, 8)
+                    
+                    List {
+                        Section {
+                            ForEach(store.places) { place in
+                                SavedPlaceGroupedRow(
+                                    place: place,
+                                    onSelect: {
+                                        let preset: SavedPlacesFeature.State.CategoryPreset? = place.isHome ? .home : (place.isOffice ? .office : .custom)
+                                        store.send(.changeLocationTapped(place, preset))
+                                    }
+                                )
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        store.send(.deletePlaceById(place.id))
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                }
+                            }
+
+                            Button {
+                                store.send(.addPlaceButtonTapped(.custom))
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Circle()
+                                        .fill(Color(red: 0.88, green: 0.95, blue: 1.0))
+                                        .frame(width: 40, height: 40)
+                                        .overlay {
+                                            Image(systemName: "plus")
+                                                .font(.body.weight(.semibold))
+                                                .foregroundStyle(Color(red: 0.00, green: 0.55, blue: 0.95))
+                                        }
+
+                                    Text("Add Place")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(Color(red: 0.00, green: 0.55, blue: 0.95))
+
+                                    Spacer()
+                                }
+                                .padding(.vertical, 4)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .listStyle(.insetGrouped)
+                    .scrollContentBackground(.hidden)
                 }
             }
-//            .navigationBarBackButtonHidden(true)
-//            .toolbar {
-//                ToolbarItem(placement: .navigationBarLeading) {
-//                    Button {
-//                        dismiss()
-//                    } label: {
-//                        Image(systemName: "chevron.left")
-//                            .font(.body.weight(.semibold))
-//                            .foregroundStyle(.primary)
-//                            .frame(width: 36, height: 36)
-//                            .background(Color.primary.opacity(0.06), in: Circle())
-//                    }
-//                }
-//            }
             .sheet(isPresented: Binding(
                 get: { store.isAddingPlace },
                 set: { isPresented in
@@ -150,60 +100,65 @@ struct SavedPlacesView: View {
     }
 }
 
-// MARK: - Circular Place Card Component
-private struct CircularPlaceCard<MenuContent: View>: View {
-    let title: String
-    let subtitle: String?
-    let iconName: String
-    let categoryColor: Color
-    let onAction: () -> Void
-    @ViewBuilder let contextMenu: () -> MenuContent
-
-    init(
-        title: String,
-        subtitle: String? = nil,
-        iconName: String,
-        categoryColor: Color,
-        onAction: @escaping () -> Void,
-        @ViewBuilder contextMenu: @escaping () -> MenuContent = { EmptyView() }
-    ) {
-        self.title = title
-        self.subtitle = subtitle
-        self.iconName = iconName
-        self.categoryColor = categoryColor
-        self.onAction = onAction
-        self.contextMenu = contextMenu
-    }
+private struct SavedPlaceGroupedRow: View {
+    let place: SavedPlace
+    let onSelect: () -> Void
 
     var body: some View {
-        Button(action: onAction) {
-            VStack(spacing: 6) {
-                Circle()
-                    .fill(categoryColor)
-                    .frame(width: 80, height: 80)
-                    .overlay {
-                        Image(systemName: iconName.isEmpty || iconName == "mappin.and.ellipse" ? "mappin.fill" : iconName)
-                            .font(.system(size: 34, weight: .semibold))
-                            .foregroundStyle(.white)
+        HStack(spacing: 12) {
+            Button(action: onSelect) {
+                HStack(spacing: 12) {
+                    Circle()
+                        .fill(place.categoryColor)
+                        .frame(width: 40, height: 40)
+                        .overlay {
+                            Image(systemName: place.resolvedIconName)
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(.white)
+                        }
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(place.displayTitle)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+
+                        if let label = place.label?.trimmingCharacters(in: .whitespacesAndNewlines),
+                           !label.isEmpty,
+                           label.lowercased() != place.name.lowercased() {
+                            Text(place.name)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+
+                            if !place.subtitle.isEmpty && place.subtitle.lowercased() != place.name.lowercased() {
+                                Text(place.subtitle)
+                                    .font(.caption2)
+                                    .foregroundStyle(Color.gray)
+                                    .lineLimit(1)
+                            }
+                        } else {
+                            Text(place.displaySubtitle)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
                     }
 
-                VStack(spacing: 2) {
-                    Text(title)
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                        .multilineTextAlignment(.center)
-
-                    if let subtitle = subtitle {
-                        Text(subtitle)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
+                    Spacer(minLength: 8)
                 }
             }
+            .buttonStyle(.plain)
+
+            Button(action: onSelect) {
+                Image(systemName: "ellipsis")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 34, height: 34)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Options")
         }
-        .buttonStyle(.plain)
-        .contextMenu(menuItems: contextMenu)
+        .padding(.vertical, 4)
     }
 }
 
@@ -274,9 +229,7 @@ private struct PinPlaceSheet: View {
         WithPerceptionTracking {
             VStack(spacing: 0) {
                 if store.pinStep == .chooseLocation {
-                    // SCREEN 2: "Choose Home/Office Location"
                     VStack(spacing: 16) {
-                        // Search Bar
                         ActiveSearchBarView(
                             searchText: searchTextBinding,
                             isFocused: $isSearchFocused
@@ -295,7 +248,6 @@ private struct PinPlaceSheet: View {
                             .frame(maxWidth: .infinity)
                             Spacer()
                         } else if !displayedPlaces.isEmpty {
-                            // Search Results List Card with Landmark Red Pin Icons
                             ScrollView {
                                 VStack(spacing: 0) {
                                     ForEach(displayedPlaces) { place in
@@ -356,10 +308,8 @@ private struct PinPlaceSheet: View {
                         }
                     }
                 } else {
-                    // SCREEN 3: "Rename home if you want to"
                     VStack(alignment: .leading, spacing: 16) {
                         VStack(alignment: .leading, spacing: 14) {
-                            // Top Section: Category Circle + Rename TextField
                             HStack(spacing: 12) {
                                 Circle()
                                     .fill(categoryColor)
@@ -378,7 +328,6 @@ private struct PinPlaceSheet: View {
 
                             Divider()
 
-                            // Bottom Section: Selected Location Name & Address
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(store.selectedPlaceForLabel?.name ?? "")
                                     .font(.subheadline.weight(.semibold))
@@ -457,6 +406,18 @@ private struct PinPlaceSheet: View {
                     isSearchFocused = true
                 } else {
                     isNameFocused = true
+                }
+            }
+            .onChange(of: store.pinStep) { _, newStep in
+                if newStep == .renamePlace {
+                    isSearchFocused = false
+                    Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 50_000_000)
+                        isNameFocused = true
+                    }
+                } else if newStep == .chooseLocation {
+                    isNameFocused = false
+                    isSearchFocused = true
                 }
             }
         }
