@@ -10,7 +10,7 @@ struct UsersClient {
 
 extension UsersClient: DependencyKey {
   static let liveValue = Self.live()
-  static let testValue = Self(fetchAllUsers: { [] })
+  static let testValue = Self(fetchAllUsers: { [] }, fetchUserByEmail: { _ in nil })
 
   static func live() -> Self {
     return Self(
