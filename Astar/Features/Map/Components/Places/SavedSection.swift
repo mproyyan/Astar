@@ -6,22 +6,33 @@
 //
 
 import SwiftUI
+import ComposableArchitecture
 
 struct SavedSection: View {
     let savedPlaces: [SavedPlace]
     var onSelectPlace: ((SavedPlace) -> Void)? = nil
+    var onHeaderTap: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 4) {
-                Text("Saved")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.primary)
+            Button {
+                onHeaderTap?()
+            } label: {
+                HStack(spacing: 4) {
+                    Text("Saved Places")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(.primary)
 
-                Image(systemName: "chevron.right")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    Image(systemName: "chevron.right")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+
 
             VStack(spacing: 0) {
                 ForEach(savedPlaces.enumerated(), id: \.element.id) { index, place in

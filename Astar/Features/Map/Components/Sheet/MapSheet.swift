@@ -24,6 +24,9 @@ struct MapSheet: View {
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                                 selectedDetent = .fraction(0.52)
                             }
+                        },
+                        onSavedPlacesHeaderTapped: {
+                            store.send(.savedPlacesHeaderTapped)
                         }
                     )
                     .transition(.opacity)
@@ -264,6 +267,9 @@ struct MapSheet: View {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                             selectedDetent = .fraction(0.42)
                         }
+                    },
+                    onSavedPlacesHeaderTapped: {
+                        store.send(.savedPlacesHeaderTapped)
                     }
                 )
                 .transition(.opacity)
@@ -271,4 +277,5 @@ struct MapSheet: View {
         }
         .scrollDismissesKeyboard(.interactively)
     }
-}
+    }
+
