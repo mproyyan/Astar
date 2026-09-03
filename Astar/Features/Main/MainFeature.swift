@@ -85,7 +85,8 @@ struct MainFeature {
           } catch {
             await send(.fetchPeopleResponse(.failure(FetchUsersError(error: error))))
           }
-                     
+        }
+
       case let .fetchPeopleResponse(.success(incomingPeople)):
         // Merge or update while preserving existing IDs to avoid SwiftUI list flickering
         var updatedPeople: [Person] = []
