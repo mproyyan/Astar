@@ -30,7 +30,7 @@ struct MapDirectionSheetFeatureTests {
       MapDirectionSheetFeature()
     } withDependencies: {
       $0.uuid = .incrementing
-      $0.trackingClient.startWalkSession = { _, _, _, _, _ in
+      $0.trackingClient.startWalkSession = { _, _, _, _, _, _ in
         WalkSession(
           id: "session-1",
           walkerRef: "ref",
@@ -41,6 +41,7 @@ struct MapDirectionSheetFeatureTests {
           routePolyline: nil,
           startedAt: Date(timeIntervalSince1970: 0),
           endedAt: nil,
+          currentCoordinate: nil,
           lastPingAt: Date(timeIntervalSince1970: 0)
         )
       }

@@ -29,11 +29,11 @@ struct SavedPlaceRow: View {
                         .frame(width: 40, height: 40)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(place.name)
+                        Text(place.displayTitle)
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.primary)
 
-                        Text(place.subtitle)
+                        Text(place.displaySubtitle)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)

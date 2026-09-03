@@ -26,6 +26,24 @@ struct SavedPlacesFeature {
         var selectedPlaceForLabel: SavedPlace? = nil
         var customLabel: String = ""
         var editingPlaceId: UUID? = nil
+        var hasChanges: Bool {
+            guard let editingId = editingPlaceId,
+                  let originalPlace = places.first(where: { $0.id == editingId }) else {
+                // Adding a new place
+                return selectedPlaceForLabel != nil
+            }
+
+            let currentLabel = customLabel.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            let originalLabel = (originalPlace.label ?? originalPlace.name)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            let isLabelChanged = !currentLabel.isEmpty && currentLabel != originalLabel
+
+            let isLocationChanged = selectedPlaceForLabel?.id != originalPlace.id
+
+            return isLabelChanged || isLocationChanged
+        }
 
         enum PinStep: Equatable {
             case chooseLocation
@@ -116,7 +134,7 @@ struct SavedPlacesFeature {
             case let .changeLocationTapped(place, preset):
                 state.targetPresetForAdd = preset ?? (place.isHome ? .home : (place.isOffice ? .office : .custom))
                 state.isAddingPlace = true
-                state.pinStep = .chooseLocation
+                state.pinStep = .renamePlace
                 state.searchQuery = ""
                 state.searchResults = []
                 state.isLoading = false
@@ -178,6 +196,9 @@ struct SavedPlacesFeature {
                 return .none
 
             case .backToChooseLocationTapped:
+                if state.editingPlaceId != nil {
+                    return .send(.dismissAddSheetTapped)
+                }
                 state.pinStep = .chooseLocation
                 return .none
 
@@ -186,81 +207,83 @@ struct SavedPlacesFeature {
                 return .none
 
             case .confirmSavePlace:
-                guard var targetPlace = state.selectedPlaceForLabel else { return .none }
+                guard let selectedPlace = state.selectedPlaceForLabel else { return .none }
                 let labelText = state.customLabel.trimmingCharacters(in: .whitespacesAndNewlines)
-                let finalName = labelText.isEmpty ? (state.targetPresetForAdd == .home ? "Home" : (state.targetPresetForAdd == .office ? "Office" : targetPlace.name)) : labelText
+                let categoryLabel: String
+                if !labelText.isEmpty {
+                    categoryLabel = labelText
+                } else if state.targetPresetForAdd == .home {
+                    categoryLabel = "Home"
+                } else if state.targetPresetForAdd == .office {
+                    categoryLabel = "Office"
+                } else {
+                    categoryLabel = selectedPlace.name
+                }
 
                 let iconName: String
-                let categoryLabel: String?
                 if let preset = state.targetPresetForAdd {
                     switch preset {
                     case .home:
                         iconName = "house.fill"
-                        categoryLabel = "Home"
                     case .office:
                         iconName = "briefcase.fill"
-                        categoryLabel = "Office"
                     case .custom:
-                        let inferred = PlaceSearchEngine.categoryIcon(for: nil, name: finalName, subtitle: targetPlace.subtitle)
-                        if targetPlace.resolvedIconName != "mappin.fill" {
-                            iconName = targetPlace.resolvedIconName
+                        let inferred = PlaceSearchEngine.categoryIcon(for: nil, name: categoryLabel, subtitle: selectedPlace.subtitle)
+                        if selectedPlace.resolvedIconName != "mappin.fill" {
+                            iconName = selectedPlace.resolvedIconName
                         } else if inferred != "mappin.fill" {
                             iconName = inferred
                         } else {
                             iconName = "mappin.fill"
                         }
-                        categoryLabel = finalName
                     }
-                } else if finalName.lowercased() == "home" {
+                } else if categoryLabel.lowercased() == "home" {
                     iconName = "house.fill"
-                    categoryLabel = "Home"
-                } else if finalName.lowercased() == "office" || finalName.lowercased() == "work" {
+                } else if categoryLabel.lowercased() == "office" || categoryLabel.lowercased() == "work" {
                     iconName = "briefcase.fill"
-                    categoryLabel = "Office"
                 } else {
-                    let inferred = PlaceSearchEngine.categoryIcon(for: nil, name: finalName, subtitle: targetPlace.subtitle)
-                    if targetPlace.resolvedIconName != "mappin.fill" {
-                        iconName = targetPlace.resolvedIconName
+                    let inferred = PlaceSearchEngine.categoryIcon(for: nil, name: categoryLabel, subtitle: selectedPlace.subtitle)
+                    if selectedPlace.resolvedIconName != "mappin.fill" {
+                        iconName = selectedPlace.resolvedIconName
                     } else if inferred != "mappin.fill" {
                         iconName = inferred
                     } else {
                         iconName = "mappin.fill"
                     }
-                    categoryLabel = finalName
                 }
 
-                let targetId = state.editingPlaceId ?? targetPlace.id
+                let targetId = state.editingPlaceId ?? selectedPlace.id
 
                 // Remove existing place if replacing Home/Office preset OR if we are updating an existing place by ID
-                if iconName == "house.fill" || categoryLabel == "Home" {
+                if iconName == "house.fill" || categoryLabel.lowercased() == "home" {
                     state.places.removeAll { $0.isHome || $0.id == targetId }
-                } else if iconName == "briefcase.fill" || iconName == "building.2.fill" || categoryLabel == "Office" {
+                } else if iconName == "briefcase.fill" || iconName == "building.2.fill" || categoryLabel.lowercased() == "office" {
                     state.places.removeAll { $0.isOffice || $0.id == targetId }
                 } else {
                     state.places.removeAll { $0.id == targetId }
                 }
 
-                targetPlace = SavedPlace(
+                let savedPlaceToStore = SavedPlace(
                     id: targetId,
-                    name: finalName,
-                    subtitle: targetPlace.subtitle,
+                    name: selectedPlace.name,
+                    subtitle: selectedPlace.subtitle,
                     iconName: iconName,
-                    distance: targetPlace.distance,
-                    coordinate: targetPlace.coordinate,
+                    distance: selectedPlace.distance,
+                    coordinate: selectedPlace.coordinate,
                     label: categoryLabel
                 )
 
                 // Place Home & Office at the beginning if appropriate
-                if iconName == "house.fill" || categoryLabel == "Home" {
-                    state.places.insert(targetPlace, at: 0)
-                } else if iconName == "briefcase.fill" || iconName == "building.2.fill" || categoryLabel == "Office" {
+                if iconName == "house.fill" || categoryLabel.lowercased() == "home" {
+                    state.places.insert(savedPlaceToStore, at: 0)
+                } else if iconName == "briefcase.fill" || iconName == "building.2.fill" || categoryLabel.lowercased() == "office" {
                     if let homeIdx = state.places.firstIndex(where: { $0.isHome }) {
-                        state.places.insert(targetPlace, at: homeIdx + 1)
+                        state.places.insert(savedPlaceToStore, at: homeIdx + 1)
                     } else {
-                        state.places.insert(targetPlace, at: 0)
+                        state.places.insert(savedPlaceToStore, at: 0)
                     }
                 } else {
-                    state.places.append(targetPlace)
+                    state.places.append(savedPlaceToStore)
                 }
 
                 let userId = state.userId

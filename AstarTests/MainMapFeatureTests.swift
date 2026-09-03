@@ -448,6 +448,7 @@ struct MainMapFeatureTests {
       MainMapFeature()
     } withDependencies: {
       $0.trackingClient.updateUserStatus = { _, _, _, _ in }
+      $0.trackingClient.setSubscribeWalkSession = { _, _ in }
     }
 
     await store.send(.sheet(.presented(.walker(.delegate(.trackingEnded))))) {
@@ -477,6 +478,7 @@ struct MainMapFeatureTests {
       routePolyline: nil,
       startedAt: Date(),
       endedAt: nil,
+      currentCoordinate: nil,
       lastPingAt: Date()
     )
 
@@ -654,6 +656,8 @@ struct MainMapFeatureTests {
       ))
     )) {
       MainMapFeature()
+    } withDependencies: {
+      $0.trackingClient.endWalkSession = { _ in }
     }
 
     await store.send(.sheet(.presented(.direction(.delegate(.navigationStarted(sessionID: "user-session-123")))))) {
@@ -676,4 +680,56 @@ struct MainMapFeatureTests {
       $0.sheet = nil
     }
   }
+
+  @Test
+  @MainActor
+  func testWalkSessionUpdatedUpdatesTrackedLocation() async {
+    let store = TestStore(initialState: MainMapFeature.State(
+      activeWalkSessionID: "session-abc"
+    )) {
+      MainMapFeature()
+    }
+
+    let lat = -6.2088
+    let lon = 106.8456
+    let coordData = try! JSONEncoder().encode([lat, lon])
+    let mockSession = WalkSession(
+      id: "session-abc",
+      walkerRef: "walker-123",
+      status: "active",
+      destinationName: "Testing Dest",
+      destinationLatitude: 0,
+      destinationLongitude: 0,
+      routePolyline: nil,
+      startedAt: Date(),
+      endedAt: nil,
+      currentCoordinate: coordData,
+      lastPingAt: Date()
+    )
+
+    await store.send(.walkSessionUpdated(mockSession)) {
+      $0.trackedWalkerLocation = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+    }
+  }
+
+  @Test
+  @MainActor
+  func testStopTrackingTappedUnsubscribes() async {
+    var unsubscribedSessionID: String? = nil
+    let store = TestStore(initialState: MainMapFeature.State(
+      activeWalkSessionID: "session-xyz"
+    )) {
+      MainMapFeature()
+    } withDependencies: {
+      $0.trackingClient.setSubscribeWalkSession = { sessionID, isSubscribed in
+        if !isSubscribed {
+          unsubscribedSessionID = sessionID
+        }
+      }
+    }
+
+    await store.send(.stopTrackingTapped)
+    #expect(unsubscribedSessionID == "session-xyz")
+  }
 }
+

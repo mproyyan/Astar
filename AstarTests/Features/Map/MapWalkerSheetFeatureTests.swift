@@ -29,6 +29,7 @@ final class MapWalkerSheetFeatureTests: XCTestCase {
             routePolyline: nil,
             startedAt: Date(timeIntervalSince1970: 0),
             endedAt: nil,
+            currentCoordinate: nil,
             lastPingAt: Date(timeIntervalSince1970: 0)
         )
         
@@ -117,6 +118,7 @@ final class MapWalkerSheetFeatureTests: XCTestCase {
             routePolyline: nil,
             startedAt: now,
             endedAt: nil,
+            currentCoordinate: nil,
             lastPingAt: now
         )
 
