@@ -24,6 +24,8 @@ struct MapDirectionSheetFeature {
     var isDestinationReached: Bool = false
     var isDevelopmentMode: Bool = DeveloperSettingsStorage.isDevelopmentMode
 
+    var isShowingBroadcastSheet: Bool = false
+
     var journeyLogEntries: [JourneyLogEntry] = []
   }
 
@@ -34,6 +36,7 @@ struct MapDirectionSheetFeature {
     case destinationResolved(CLLocationCoordinate2D)
     
     case startNavigationTapped(currentLocation: CLLocationCoordinate2D?)
+    case setBroadcastSheetPresented(Bool)
     case endJourneyTapped
     case cancelDirectionsTapped
     
@@ -174,6 +177,7 @@ struct MapDirectionSheetFeature {
           state.activeRoute = state.walkingRouteInfo?.route
         }
         state.mode = .progress
+        state.isShowingBroadcastSheet = true
 
         let originCoord = currentLocation ?? CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
         let originAddress = state.originPlace?.subtitle ?? "Current Location"
@@ -232,6 +236,10 @@ struct MapDirectionSheetFeature {
 
             await send(.delegate(.navigationStarted(sessionID: nil)))
         }
+
+      case let .setBroadcastSheetPresented(isPresented):
+        state.isShowingBroadcastSheet = isPresented
+        return .none
 
       case .endJourneyTapped, .cancelDirectionsTapped:
         return .run { send in
