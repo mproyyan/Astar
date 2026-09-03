@@ -167,5 +167,25 @@ struct AddParticipantButton: View {
 }
 
 #Preview {
-    TrustedPersonView(store: Store(initialState: TrustedPersonFeature.State()) { TrustedPersonFeature() })
+    let mockProfile1 = ConnectionProfile(
+        connection: Connection(id: "1", member1RowID: "1", member2RowID: "2", initiatedByRowID: "1", status: "request", createdAt: Date(), updatedAt: Date()),
+        partnerProfile: UserProfile(appleUserId: "2", cloudKitUserId: "2", name: "chusen", email: "chusen@icloud.com", status: "request")
+    )
+    
+    let mockProfile2 = ConnectionProfile(
+        connection: Connection(id: "2", member1RowID: "1", member2RowID: "3", initiatedByRowID: "1", status: "mutual", createdAt: Date(), updatedAt: Date()),
+        partnerProfile: UserProfile(appleUserId: "3", cloudKitUserId: "3", name: "Nadia", email: "nadia@icloud.com", status: "mutual")
+    )
+
+    TrustedPersonView(
+        store: Store(
+            initialState: {
+                var state = TrustedPersonFeature.State()
+                state.connections = [mockProfile1, mockProfile2] // Assign to the main stored array
+                return state
+            }()
+        ) {
+            TrustedPersonFeature()
+        }
+    )
 }
