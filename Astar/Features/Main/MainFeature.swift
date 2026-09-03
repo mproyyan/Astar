@@ -125,8 +125,8 @@ struct MainFeature {
         state.path.append(.trustedPerson(TrustedPersonFeature.State()))
         return .none
         
-      case .path(.element(id: _, action: .trustedPerson(.delegate(.requestSectionTapped)))):
-        state.path.append(.requestTrustedPerson(RequestTrustedPersonFeature.State()))
+      case let .path(.element(id: _, action: .trustedPerson(.delegate(.requestSectionTapped(requests))))):
+        state.path.append(.requestTrustedPerson(RequestTrustedPersonFeature.State(requests: requests)))
         return .none
         
       case .path(.element(id: _, action: .profile(.delegate(.signedOut)))):
