@@ -20,13 +20,12 @@ struct SavedPlacesView: View {
                     .ignoresSafeArea()
 
                 VStack(alignment: .leading, spacing: 0) {
-                    // Title & Subtitle Header
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Places")
+                        Text("Saved Places")
                             .font(.system(size: 34, weight: .bold))
                             .foregroundStyle(.primary)
 
-                        Text("Add places you visit often")
+                        Text("Add, edit, or remove places you visit often.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
