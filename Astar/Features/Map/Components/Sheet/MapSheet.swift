@@ -78,10 +78,11 @@ struct MapSheet: View {
                                 withAnimation(.easeInOut(duration: 0.25)) {
                                     selectedDetent = .fraction(0.42)
                                 }
-                            )
-                            .padding(.horizontal, 16)
-                            .padding(.top, 12)
-                            .transition(.opacity)
+                            }
+                        )
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                        .transition(.opacity)
 
                         case .journeyLog:
                             DirectionJourneyLog(
@@ -288,5 +289,5 @@ struct MapSheet: View {
         }
         .scrollDismissesKeyboard(.interactively)
     }
-    }
+}
 
