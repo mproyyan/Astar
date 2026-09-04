@@ -6,18 +6,21 @@
 //
 
 import ComposableArchitecture
+import Foundation
 
 @Reducer
 struct ProfileFeature {
   @ObservableState
   struct State: Equatable {
-    var userProfile: UserProfile?
+    var userProfile: UserProfile? = UserProfileStorage.load()
     var isDevelopmentMode: Bool = DeveloperSettingsStorage.isDevelopmentMode
     var isShowRouteGuide: Bool = DeveloperSettingsStorage.isShowRouteGuide
     var isDoeWalkingMock: Bool = DeveloperSettingsStorage.isDoeWalkingMockEnabled
   }
 
   enum Action: Equatable {
+    case onAppear
+    case avatarLoaded(Data)
     case signOutButtonTapped
     case setDevelopmentMode(Bool)
     case setRouteGuide(Bool)
@@ -41,6 +44,24 @@ struct ProfileFeature {
   var body: some Reducer<State, Action> {
     Reduce { state, action in
       switch action {
+      case .onAppear:
+        if state.userProfile == nil {
+          state.userProfile = UserProfileStorage.load()
+        }
+        return .run { [profile = state.userProfile] send in
+          if let avatar = await ContactPhotoClient.liveValue.fetchMeCardPhoto(profile?.email, profile?.name) {
+            await send(.avatarLoaded(avatar))
+          }
+        }
+
+      case let .avatarLoaded(avatar):
+        if var profile = state.userProfile {
+          profile.avatarData = avatar
+          state.userProfile = profile
+          UserProfileStorage.save(profile)
+        }
+        return .none
+
       case .signOutButtonTapped:
         UserProfileStorage.clear()
         return .send(.delegate(.signedOut))

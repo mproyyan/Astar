@@ -24,6 +24,7 @@ struct MapDirectionSheetFeature {
     var isDestinationReached: Bool = false
     var isDevelopmentMode: Bool = DeveloperSettingsStorage.isDevelopmentMode
 
+    var watchingPeople: [Person] = []
     var isShowingBroadcastSheet: Bool = false
 
     var journeyLogEntries: [JourneyLogEntry] = []
@@ -31,6 +32,7 @@ struct MapDirectionSheetFeature {
 
   enum Action: Equatable {
     case onAppear(currentLocation: CLLocationCoordinate2D?)
+    case setWatchingPeople([Person])
     case routeCalculated(WalkingRouteInfo)
     case originResolved(SavedPlace)
     case destinationResolved(CLLocationCoordinate2D)
@@ -64,6 +66,10 @@ struct MapDirectionSheetFeature {
   var body: some Reducer<State, Action> {
     Reduce { state, action in
       switch action {
+      case let .setWatchingPeople(people):
+        state.watchingPeople = people
+        return .none
+
       case let .onAppear(currentLocation):
         state.isCalculatingRoute = true
         let originCoord = currentLocation ?? CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)

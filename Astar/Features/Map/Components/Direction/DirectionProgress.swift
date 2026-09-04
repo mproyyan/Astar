@@ -122,38 +122,17 @@ struct DirectionProgress: View {
                         .accessibilityLabel("Journey Log")
                     }
                 }
-//                .padding(.top, 20)
-//                .padding(.bottom, 0)
-//                .padding(.horizontal, 2)
 
                 if !isDone {
                     Divider()
                         .opacity(0.5)
 
-                    VStack(alignment: .leading, spacing: 14) {
-                        HStack(spacing: 6) {
-                            Text("Watching:")
-                                .font(.title3.weight(.semibold))
-                                .foregroundStyle(.primary)
-
-                            Text(watchingPeople.isEmpty ? "None" : "\(watchingPeople.count) Person")
-                                .font(.title3.weight(.medium))
-                                .foregroundStyle(.secondary)
-
-                            Spacer()
-                        }
-
-                        if !watchingPeople.isEmpty {
-                            HStack(spacing: 16) {
-                                ForEach(watchingPeople) { person in
-                                    DirectionPersonView(person: person)
-                                }
-                            }
-                            .padding(.vertical, 4)
-                        }
-                    }
-                    .padding(.vertical, 14)
-                    .padding(.horizontal, 2)
+                    DirectionProgressHeroRowCard(
+                        watchingPeople: watchingPeople,
+                        destinationName: destination.name
+                    )
+                    .padding(.top, 14)
+                    .padding(.bottom, 14)
                 }
 
                 Divider()
@@ -204,10 +183,147 @@ struct DirectionProgress: View {
     }
 }
 
+// MARK: - Companion Hero Row Card
+private struct DirectionProgressHeroRowCard: View {
+    let watchingPeople: [Person]
+    let destinationName: String
+
+    private var activeCompanions: [Person] {
+        watchingPeople.isEmpty ? [Person(name: "Awan", status: "Walking")] : watchingPeople
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Companions Watching")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+
+                Spacer()
+
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 6, height: 6)
+                    Text("\(activeCompanions.count) Connected")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(Color.green)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(Color.green.opacity(0.12), in: .capsule)
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 14) {
+                    ForEach(activeCompanions) { person in
+                        VStack(spacing: 4) {
+                            ZStack(alignment: .bottomTrailing) {
+                                DirectionPersonAvatar(person: person, size: 46)
+                                Circle()
+                                    .fill(Color.green)
+                                    .frame(width: 11, height: 11)
+                                    .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                            }
+
+                            Text(person.name.split(separator: " ").first.map(String.init) ?? person.name)
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                        }
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(Color.primary.opacity(0.03), in: .rect(cornerRadius: 16))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+        }
+    }
+}
+
+// MARK: - Companion Avatar View
+struct DirectionPersonAvatar: View {
+    let person: Person
+    var size: CGFloat = 36
+    @State private var loadedAvatarData: Data?
+
+    private var effectiveAvatarData: Data? {
+        person.avatarData ?? loadedAvatarData
+    }
+
+    private var initials: String {
+        let parts = person.name.split(separator: " ").filter { !$0.isEmpty }
+        if parts.count >= 2 {
+            return "\(parts[0].prefix(1))\(parts[1].prefix(1))".uppercased()
+        }
+        return String(person.name.prefix(1)).uppercased()
+    }
+
+    var body: some View {
+        Group {
+            if let avatarData = effectiveAvatarData, let uiImage = UIImage(data: avatarData) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
+            } else if let avatarImageName = person.avatarImageName, let _ = UIImage(named: avatarImageName) {
+                Image(avatarImageName)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
+            } else {
+                Circle()
+                    .fill(Color(red: 0.77, green: 0.81, blue: 0.96))
+                    .overlay {
+                        Text(initials)
+                            .font(.system(size: size * 0.38, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
+                    .frame(width: size, height: size)
+            }
+        }
+        .overlay {
+            Circle()
+                .stroke(Color.white, lineWidth: 2)
+        }
+        .shadow(color: Color.black.opacity(0.08), radius: 3, x: 0, y: 1)
+        .task(id: person.name) {
+            if loadedAvatarData == nil && person.avatarData == nil && person.avatarImageName == nil {
+                if let email = person.email, let fetched = await ContactPhotoClient.liveValue.fetchContactPhotoByEmail(email) {
+                    loadedAvatarData = fetched
+                } else if let fetched = await ContactPhotoClient.liveValue.fetchContactPhotoByName(person.name) {
+                    loadedAvatarData = fetched
+                }
+            }
+        }
+    }
+}
+
 #Preview("In Progress") {
-    DirectionProgress(isDone: false)
-        .padding()
-        .background(Color(red: 0.95, green: 0.95, blue: 0.97))
+    DirectionProgress(
+        destination: SavedPlace(
+            name: "Autograph Tower",
+            subtitle: "Thamrin Nine",
+            iconName: "building.2.fill"
+        ),
+        estimatedTime: "12 min",
+        eta: "11.02 ETA",
+        totalDistance: "850 m",
+        watchingPeople: [
+            Person(name: "Awan Mendung", status: "Walking"),
+            Person(name: "Pandu Royyan", status: "Idle")
+        ],
+        isDone: false
+    )
+    .padding()
+    .background(Color(red: 0.95, green: 0.95, blue: 0.97))
 }
 
 #Preview("Done") {

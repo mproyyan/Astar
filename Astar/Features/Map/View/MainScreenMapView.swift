@@ -19,6 +19,32 @@ struct MainScreenMapView: View {
     )
   }
 
+  private var isWalkerSheetActive: Bool {
+    if case .walker = store.map.sheet { return true }
+    return false
+  }
+
+  private var isIdleOrAccompanyWalkerSheet: Bool {
+    if case let .walker(walkerState) = store.map.sheet {
+      return walkerState.isIdleOrAccompany || walkerState.isDestinationReached
+    }
+    return false
+  }
+
+  private var availablePresentationDetents: Set<PresentationDetent> {
+    if isWalkerSheetActive {
+      if isIdleOrAccompanyWalkerSheet {
+        return [.fraction(0.42), .large]
+      } else {
+        return [.fraction(0.1), .fraction(0.35), .fraction(0.42), .fraction(0.52), .fraction(0.6), .large]
+      }
+    } else if store.map.isSearchActive {
+      return [.fraction(0.42), .large]
+    } else {
+      return [.fraction(0.1), .fraction(0.35), .fraction(0.42), .fraction(0.52), .fraction(0.6), .large]
+    }
+  }
+
   var body: some View {
     NavigationStack(path: $store.scope(state: \.path, action: \.path)) {
       Map(position: $cameraPosition, interactionModes: [.pan, .zoom, .rotate], scope: mapScope) {
@@ -76,9 +102,7 @@ struct MainScreenMapView: View {
           selectedDetent: $selectedDetent
         )
         .presentationDetents(
-          store.map.isSearchActive
-            ? [.fraction(0.42), .large]
-            : [.fraction(0.1), .fraction(0.35), .fraction(0.42), .fraction(0.52), .fraction(0.6), .large],
+          availablePresentationDetents,
           selection: $selectedDetent
         )
         .presentationDragIndicator(.visible)
@@ -100,6 +124,30 @@ struct MainScreenMapView: View {
       .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
         store.send(.refreshPeople)
       }
+      .onChange(of: isWalkerSheetActive) { _, isWalker in
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+          if isWalker {
+            if isIdleOrAccompanyWalkerSheet {
+              selectedDetent = .large
+            } else {
+              selectedDetent = .fraction(0.35)
+            }
+          } else {
+            selectedDetent = .fraction(0.42)
+          }
+        }
+      }
+      .onChange(of: store.map.activeWalkSessionID) { oldSession, newSession in
+        if isWalkerSheetActive {
+          withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            if newSession != nil && oldSession == nil {
+              selectedDetent = .fraction(0.35)
+            } else if newSession == nil && oldSession != nil && isIdleOrAccompanyWalkerSheet {
+              selectedDetent = .large
+            }
+          }
+        }
+      }
       .onChange(of: store.map.isSearchActive) { _, isSearching in
         if isSearching {
           withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
@@ -111,6 +159,11 @@ struct MainScreenMapView: View {
         if store.map.isSearchActive && newDetent != .large {
           UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
           store.send(.map(.dismissSearch))
+          withAnimation(.easeInOut(duration: 0.25)) {
+            selectedDetent = .fraction(0.42)
+          }
+        } else if isIdleOrAccompanyWalkerSheet && newDetent != .large {
+          store.send(.map(.dismissWalker))
           withAnimation(.easeInOut(duration: 0.25)) {
             selectedDetent = .fraction(0.42)
           }
