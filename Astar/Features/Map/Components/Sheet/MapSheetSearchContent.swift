@@ -6,6 +6,7 @@ struct MapSheetSearchContent: View {
     @Bindable var store: StoreOf<MapSearchSheetFeature>
     @Binding var selectedDetent: PresentationDetent
     var onSelectPlace: ((SavedPlace) -> Void)? = nil
+    var onSavedPlacesHeaderTapped: (() -> Void)? = nil
     @FocusState private var isSearchFieldFocused: Bool
 
     private var searchTextBinding: Binding<String> {
@@ -49,11 +50,14 @@ struct MapSheetSearchContent: View {
 
             if store.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 SavedPlacesCard(
-                    title: "Saved",
+                    title: "Saved Places",
                     places: store.savedPlaces,
                     onSelectPlace: { place in
                         store.send(.selectPlace(place))
                         onSelectPlace?(place)
+                    },
+                    onHeaderTap: {
+                        onSavedPlacesHeaderTapped?()
                     }
                 )
             } else if store.isLoading && store.searchResults.isEmpty {

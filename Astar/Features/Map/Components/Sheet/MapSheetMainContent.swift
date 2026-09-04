@@ -14,6 +14,7 @@ struct MapSheetMainContent: View {
     let onSearchTapped: () -> Void
     var onSelectPlace: ((SavedPlace) -> Void)? = nil
     var onSelectPerson: ((Person) -> Void)? = nil
+    var onSavedPlacesHeaderTapped: (() -> Void)? = nil
 
     private var people: [Person] { store.people }
     private var savedPlaces: [SavedPlace] { store.map.savedPlaces }
@@ -34,7 +35,11 @@ struct MapSheetMainContent: View {
             VStack(spacing: 32) {
                 PeopleSection(people: people, onSelectPerson: onSelectPerson)
 
-                SavedSection(savedPlaces: savedPlaces, onSelectPlace: onSelectPlace)
+                SavedSection(
+                    savedPlaces: savedPlaces,
+                    onSelectPlace: onSelectPlace,
+                    onHeaderTap: onSavedPlacesHeaderTapped
+                )
                     .transition(.asymmetric(
                         insertion: .opacity.combined(with: .move(edge: .bottom)),
                         removal: .opacity

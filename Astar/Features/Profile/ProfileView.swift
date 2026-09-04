@@ -56,7 +56,7 @@ struct ProfileView: View {
                 }
               )
             } label: {
-              Text("Set Default Locations")
+              Text("Saved Places")
                 .font(.body)
                 .padding(.vertical, 8)
             }
@@ -180,6 +180,9 @@ struct ProfileView: View {
     // 1. Navigation
     .navigationTitle("Profile")
     .navigationBarTitleDisplayMode(.inline)
+    .onAppear {
+      store.send(.onAppear)
+    }
   }
 }
 
@@ -187,34 +190,81 @@ struct ProfileView: View {
 
 struct ProfileHeader: View {
   let store: StoreOf<ProfileFeature>
+  @State private var loadedAvatarData: Data?
+
+  private var profile: UserProfile? {
+    store.userProfile ?? UserProfileStorage.load()
+  }
+
+  private var effectiveAvatarData: Data? {
+    profile?.avatarData ?? loadedAvatarData
+  }
+
+  private var initials: String {
+    guard let name = profile?.name, !name.trimmingCharacters(in: .whitespaces).isEmpty else { return "U" }
+
+    let parts = name.split(separator: " ").filter { !$0.isEmpty }
+    if parts.count >= 2 {
+      return "\(parts[0].prefix(1))\(parts[1].prefix(1))".uppercased()
+    }
+    return String(name.prefix(2)).uppercased()
+  }
 
   var body: some View {
     VStack(spacing: 8) {
-      // Avatar Placeholder
-      ZStack {
-        Circle()
-          .fill(Color(red: 0.88, green: 0.88, blue: 0.90))
-          .frame(width: 96, height: 96)
-
-        Image(systemName: "person.fill")
+      if let avatarData = effectiveAvatarData, let uiImage = UIImage(data: avatarData) {
+        Image(uiImage: uiImage)
           .resizable()
-          .scaledToFit()
-          .frame(width: 48, height: 48)
-          .foregroundColor(.gray)
-          .offset(y: 4) // adjust visual center of the person icon
+          .scaledToFill()
+          .frame(width: 96, height: 96)
+          .clipShape(Circle())
+          .padding(.bottom, 8)
+      } else {
+        // Avatar Initial Placeholder
+        ZStack {
+          Circle()
+            .fill(Color(red: 0.67, green: 0.72, blue: 0.93))
+            .overlay {
+              Circle()
+                .fill(.linearGradient(
+                  colors: [
+                    .white.opacity(0.42),
+                    .clear
+                  ],
+                  startPoint: .topLeading,
+                  endPoint: .bottomTrailing
+                ))
+            }
+            .shadow(color: Color(red: 0.45, green: 0.50, blue: 0.82).opacity(0.16), radius: 10, x: 0, y: 4)
+
+          Text(initials)
+            .font(.system(size: 34, weight: .semibold))
+            .foregroundStyle(.white.opacity(0.95))
+        }
+        .frame(width: 96, height: 96)
+        .padding(.bottom, 8)
       }
-      .padding(.bottom, 8)
 
       // 3. Profile Information
-      Text(store.userProfile?.name ?? "Unknown User")
+      Text(profile?.name ?? "Unknown User")
         .font(.title2.bold())
         .foregroundColor(.primary)
         .multilineTextAlignment(.center)
 
-      Text(store.userProfile?.email ?? "unknown@apple.com")
+      Text(profile?.email ?? "unknown@apple.com")
         .font(.footnote)
         .tint(Color.gray)
         .multilineTextAlignment(.center)
+    }
+    .task {
+      let resolvedEmail = profile?.email
+      let resolvedName = profile?.name
+      let fetched = await ContactPhotoClient.liveValue.fetchMeCardPhoto(resolvedEmail, resolvedName)
+      loadedAvatarData = fetched
+      if var current = profile, current.avatarData != fetched {
+        current.avatarData = fetched
+        UserProfileStorage.save(current)
+      }
     }
   }
 }

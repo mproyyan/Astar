@@ -44,15 +44,15 @@ struct SavedPlaceRow: View {
             }
             .buttonStyle(.plain)
 
-            Button {
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 34, height: 34)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Options")
+//            Button {
+//            } label: {
+//                Image(systemName: "ellipsis")
+//                    .font(.body.weight(.semibold))
+//                    .foregroundStyle(.secondary)
+//                    .frame(width: 34, height: 34)
+//            }
+//            .buttonStyle(.plain)
+//            .accessibilityLabel("Options")
         }
         .padding(.top, isFirst ? 20 : 16)
         .padding(.bottom, isLast ? 16 : 20)
