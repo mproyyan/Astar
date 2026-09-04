@@ -76,6 +76,9 @@ struct MapSheet: View {
                             },
                             onSimulateArrival: {
                                 directionStore.send(.simulateArrivalTapped)
+                            },
+                            onSimulatePing: {
+                                directionStore.send(.sendSafetyPingToWatch)
                             }
                         )
                         .padding(.horizontal, 16)

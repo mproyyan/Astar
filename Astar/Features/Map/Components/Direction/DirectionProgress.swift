@@ -29,6 +29,7 @@ struct DirectionProgress: View {
     var onEndJourney: (() -> Void)? = nil
     var onDone: (() -> Void)? = nil
     var onSimulateArrival: (() -> Void)? = nil
+    var onSimulatePing: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -177,6 +178,24 @@ struct DirectionProgress: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel("Simulate arrival")
                     .padding(.top, 8)
+
+                    Button {
+                        onSimulatePing?()
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "bell.badge.fill")
+                                .font(.subheadline.weight(.semibold))
+                            Text("Simulate Safety Ping (Watch)")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .foregroundStyle(.orange)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.orange.opacity(0.1), in: .capsule)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Simulate safety ping on watch")
+                    .padding(.top, 4)
                 }
 
                 Button {

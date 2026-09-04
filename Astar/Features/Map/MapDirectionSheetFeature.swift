@@ -25,6 +25,8 @@ struct MapDirectionSheetFeature {
     var isDevelopmentMode: Bool = DeveloperSettingsStorage.isDevelopmentMode
 
     var journeyLogEntries: [JourneyLogEntry] = []
+
+    var currentSessionID: String?
   }
 
   enum Action: Equatable {
@@ -32,19 +34,24 @@ struct MapDirectionSheetFeature {
     case routeCalculated(WalkingRouteInfo)
     case originResolved(SavedPlace)
     case destinationResolved(CLLocationCoordinate2D)
-    
+
     case startNavigationTapped(currentLocation: CLLocationCoordinate2D?)
     case endJourneyTapped
     case cancelDirectionsTapped
-    
+
     case journeyLogTapped
     case dismissJourneyLogTapped
     case simulateArrivalTapped
 
+    // Added: Simulates sending motionless ping to watch
+    case sendSafetyPingToWatch
+
     // Updates from parent
     case updateLocation(CLLocationCoordinate2D, newMilestones: [JourneyLogEntry])
     case destinationReached(finalEntry: JourneyLogEntry)
-    
+    case watchMessageReceived(WatchActionMessage)
+    case _navigationStartedInternal(sessionID: String?)
+
     case delegate(Delegate)
     
     enum Delegate: Equatable {
@@ -56,6 +63,7 @@ struct MapDirectionSheetFeature {
 
   @Dependency(\.directionRoute) var directionRoute
   @Dependency(\.trackingClient) var trackingClient
+  @Dependency(\.watchConnectivity) var watchConnectivity
   @Dependency(\.uuid) var uuid
 
   var body: some Reducer<State, Action> {
@@ -74,6 +82,7 @@ struct MapDirectionSheetFeature {
         )
 
         return .run { [destination = state.destination] send in
+          await watchConnectivity.activateSession()
           async let originAddress = directionRoute.reverseGeocode(coordinate: originCoord)
 
           var destCoord = destination.coordinate
@@ -165,7 +174,11 @@ struct MapDirectionSheetFeature {
         if let destCoord = routeInfo.route?.polyline.points() {
           // coordinate is preserved on destination
         }
-        return .send(.delegate(.routeChanged(routeInfo.route, routeInfo.polyline)))
+        let mergedEffect: Effect<Action> = .send(.delegate(.routeChanged(routeInfo.route, routeInfo.polyline)))
+        if state.isNavigating {
+            return .merge(mergedEffect, syncWatchEffect(state: state))
+        }
+        return mergedEffect
 
       case let .startNavigationTapped(currentLocation):
         state.isNavigating = true
@@ -204,37 +217,63 @@ struct MapDirectionSheetFeature {
 
         let destinationCopy = state.destination
         let originPlaceCopy = state.originPlace
-        return .run { send in
-            // Call TrackingClient to start WalkSession
-            if let userProfile = UserProfileStorage.load() {
-                let userRecordID = "UserProfile_\(userProfile.appleUserId)_\(userProfile.cloudKitUserId)"
-                  .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+        let watchSyncEffect = syncWatchEffect(state: state)
 
-                let destLat = destinationCopy.coordinate?.latitude ?? -6.2088
-                let destLon = destinationCopy.coordinate?.longitude ?? 106.8456
-                
-                let currentLat = originPlaceCopy?.coordinate?.latitude ?? -6.2088
-                let currentLon = originPlaceCopy?.coordinate?.longitude ?? 106.8456
-                let initialData = (try? JSONEncoder().encode([currentLat, currentLon])) ?? Data()
+        return .merge(
+            watchSyncEffect,
+            .run { send in
+                // Call TrackingClient to start WalkSession
+                await watchConnectivity.activateSession()
+                if let userProfile = UserProfileStorage.load() {
+                    let userRecordID = "UserProfile_\(userProfile.appleUserId)_\(userProfile.cloudKitUserId)"
+                      .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
 
-                do {
-                    let session = try await trackingClient.startWalkSession(userRecordID, destinationCopy.name, destLat, destLon, nil, initialData)
+                    let destLat = destinationCopy.coordinate?.latitude ?? -6.2088
+                    let destLon = destinationCopy.coordinate?.longitude ?? 106.8456
 
-                    // Update user status
-                    try await trackingClient.updateUserStatus(userRecordID, "walking", session.id, nil)
+                    let currentLat = originPlaceCopy?.coordinate?.latitude ?? -6.2088
+                    let currentLon = originPlaceCopy?.coordinate?.longitude ?? 106.8456
+                    let initialData = (try? JSONEncoder().encode([currentLat, currentLon])) ?? Data()
 
-                    await send(.delegate(.navigationStarted(sessionID: session.id)))
-                    return
-                } catch {
-                    // Suppress error for now in UI based on design, but it will fail silently if cloudkit dies
+                    do {
+                        await watchConnectivity.activateSession()
+                        let session = try await trackingClient.startWalkSession(userRecordID, destinationCopy.name, destLat, destLon, nil, initialData)
+
+                        // Update user status
+                        try await trackingClient.updateUserStatus(userRecordID, "walking", session.id, nil)
+
+                        await send(._navigationStartedInternal(sessionID: session.id))
+                        return
+                    } catch {
+                        // Suppress error for now in UI based on design, but it will fail silently if cloudkit dies
+                    }
+                }
+
+                await watchConnectivity.activateSession()
+                await send(._navigationStartedInternal(sessionID: nil))
+            },
+            .run { send in
+                for await message in await watchConnectivity.messageStream() {
+                    await send(.watchMessageReceived(message))
                 }
             }
+        )
 
-            await send(.delegate(.navigationStarted(sessionID: nil)))
-        }
+      case let ._navigationStartedInternal(sessionID):
+        state.currentSessionID = sessionID
+        return .send(.delegate(.navigationStarted(sessionID: sessionID)))
 
       case .endJourneyTapped, .cancelDirectionsTapped:
-        return .run { send in
+        let isDone = action == .endJourneyTapped
+        let watchState = WatchDirectionState(
+            destinationName: isDone ? state.destination.name : "",
+            eta: "--.--",
+            estimatedTime: "--",
+            totalDistance: "--",
+            isDone: isDone,
+            watchingPeople: [ WatchPerson(name: "Awan", status: "Tracking") ]
+        )
+        return .run { [currentSessionID = state.currentSessionID] send in
             if let userProfile = UserProfileStorage.load() {
                 let userRecordID = "UserProfile_\(userProfile.appleUserId)_\(userProfile.cloudKitUserId)"
                   .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
@@ -242,9 +281,43 @@ struct MapDirectionSheetFeature {
                 do {
                     // Revert status to Idle
                     try await trackingClient.updateUserStatus(userRecordID, "idle", nil, nil)
+
+                    if let sid = currentSessionID {
+                        try await trackingClient.logWalkEvent(
+                            sid,
+                            "journey_ended",
+                            isDone ? "Journey ended safely" : "Journey cancelled",
+                            0.0,
+                            0.0
+                        )
+                    }
                 } catch { }
             }
+            try? await watchConnectivity.updateState(watchState)
             await send(.delegate(.navigationEnded))
+        }
+
+      case .sendSafetyPingToWatch:
+        return .run { _ in
+            try? await watchConnectivity.sendMessage(.areYouSafe(message: "We noticed you haven't moved in a while. Are you safe?"))
+        }
+
+      case let .watchMessageReceived(message):
+        let sid = state.currentSessionID
+        let loc = state.journeyLogEntries.first?.coordinate
+        let lat = loc?.latitude ?? 0.0
+        let lon = loc?.longitude ?? 0.0
+
+        return .run { send in
+            guard let sid = sid else { return }
+            switch message {
+            case .imSafe:
+                try? await trackingClient.logWalkEvent(sid, "safety_response", "Walker marked themselves as SAFE.", lat, lon)
+            case .needHelp:
+                try? await trackingClient.logWalkEvent(sid, "emergency", "Walker NEEDS HELP!", lat, lon)
+            default:
+                break
+            }
         }
 
       case .journeyLogTapped:
@@ -258,17 +331,17 @@ struct MapDirectionSheetFeature {
       case let .updateLocation(_, newMilestones):
         // Remove previous live current location
         state.journeyLogEntries.removeAll(where: { $0.entryType == .currentLocation })
-        
+
         for milestone in newMilestones {
            state.journeyLogEntries.insert(milestone, at: 0)
         }
-        return .none
+        return syncWatchEffect(state: state)
 
       case let .destinationReached(finalEntry):
         state.isDestinationReached = true
         state.journeyLogEntries.removeAll(where: { $0.entryType == .currentLocation })
         state.journeyLogEntries.insert(finalEntry, at: 0)
-        return .none
+        return syncWatchEffect(state: state)
 
       case .simulateArrivalTapped:
         state.isDestinationReached = true
@@ -298,11 +371,25 @@ struct MapDirectionSheetFeature {
           state.journeyLogEntries.insert(intermediateEntry, at: 0)
         }
         state.journeyLogEntries.insert(destEntry, at: 0)
-        return .none
+        return syncWatchEffect(state: state)
 
       case .delegate:
         return .none
       }
     }
+  }
+
+  private func syncWatchEffect(state: State) -> Effect<Action> {
+      let watchState = WatchDirectionState(
+          destinationName: state.destination.name,
+          eta: state.walkingRouteInfo?.etaString ?? "--.--",
+          estimatedTime: state.walkingRouteInfo?.travelTimeString ?? "--",
+          totalDistance: state.walkingRouteInfo?.distanceString ?? "--",
+          isDone: state.isDestinationReached,
+          watchingPeople: [ WatchPerson(name: "Awan", status: "Tracking") ] // Mock watching person
+      )
+      return .run { _ in
+          try? await watchConnectivity.updateState(watchState)
+      }
   }
 }

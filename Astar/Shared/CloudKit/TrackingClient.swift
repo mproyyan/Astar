@@ -25,6 +25,16 @@ struct SessionParticipant: Equatable, Sendable {
     let joinedAt: Date
 }
 
+struct WalkSessionEvent: Equatable, Sendable, Identifiable {
+    let id: String
+    let sessionRef: String
+    let eventType: String
+    let message: String
+    let latitude: Double
+    let longitude: Double
+    let createdAt: Date
+}
+
 @DependencyClient
 struct TrackingClient: Sendable {
     var startWalkSession: @Sendable (_ walkerRecordID: String, _ destinationName: String, _ destLat: Double, _ destLon: Double, _ routePolyline: String?, _ initialCoordinateData: Data) async throws -> WalkSession
@@ -33,12 +43,15 @@ struct TrackingClient: Sendable {
     var leaveWalkSession: @Sendable (_ participantID: String) async throws -> Void
     var updateUserStatus: @Sendable (_ userRecordID: String, _ status: String, _ activeSessionID: String?, _ watchingSessionID: String?) async throws -> Void
     var pushLocationUpdate: @Sendable (_ sessionID: String, _ coordinatesData: Data) async throws -> Void
-    
+
     var setSubscribeWalkSession: @Sendable (_ sessionID: String, _ isSubscribed: Bool) async throws -> Void
     var subscribeToWalkSession: @Sendable (_ sessionID: String) async throws -> AsyncStream<WalkSession>
-    
+
     var getWalkSession: @Sendable (_ sessionID: String) async throws -> WalkSession
     var getWalkerActiveSessionID: @Sendable (_ walkerRecordID: String) async throws -> String?
+
+    var logWalkEvent: @Sendable (_ sessionID: String, _ type: String, _ message: String, _ lat: Double, _ lon: Double) async throws -> Void
+    var fetchSessionEvents: @Sendable (_ sessionID: String) async throws -> [WalkSessionEvent]
 }
 
 extension TrackingClient: DependencyKey {
@@ -321,9 +334,53 @@ extension TrackingClient: DependencyKey {
             let id = CKRecord.ID(recordName: walkerRecordID)
             let record = try await db.record(for: id)
             return (record["activeWalkSessionRef"] as? CKRecord.Reference)?.recordID.recordName
+        },
+        logWalkEvent: { sessionID, type, message, lat, lon in
+            let db = CKContainer.default().publicCloudDatabase
+            let record = CKRecord(recordType: "WalkSessionEvent")
+
+            let sessionRef = CKRecord.Reference(recordID: CKRecord.ID(recordName: sessionID), action: .deleteSelf)
+            record["sessionRef"] = sessionRef
+            record["eventType"] = type
+            record["message"] = message
+            record["latitude"] = lat
+            record["longitude"] = lon
+            // createdAt is automatically populated by CloudKit (creationDate), but we can also set it explicitly
+            // if we prefer, but for WalkSessionEvent initialization we can use Date() fallback if missing.
+
+            try await db.save(record)
+            print("📝 [TrackingClient] Logged event '\(type)' for session \(sessionID)")
+        },
+        fetchSessionEvents: { sessionID in
+            let db = CKContainer.default().publicCloudDatabase
+            let sessionRef = CKRecord.Reference(recordID: CKRecord.ID(recordName: sessionID), action: .none)
+
+            let predicate = NSPredicate(format: "sessionRef == %@", sessionRef)
+            let query = CKQuery(recordType: "WalkSessionEvent", predicate: predicate)
+            query.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: true)]
+
+            let (matchResults, _) = try await db.records(matching: query)
+
+            var events: [WalkSessionEvent] = []
+            for (_, recordResult) in matchResults {
+                if case .success(let record) = recordResult {
+                    events.append(
+                        WalkSessionEvent(
+                            id: record.recordID.recordName,
+                            sessionRef: sessionID,
+                            eventType: record["eventType"] as? String ?? "unknown",
+                            message: record["message"] as? String ?? "",
+                            latitude: record["latitude"] as? Double ?? 0.0,
+                            longitude: record["longitude"] as? Double ?? 0.0,
+                            createdAt: record.creationDate ?? Date()
+                        )
+                    )
+                }
+            }
+            return events
         }
     )
-    
+
     static let testValue = Self()
 }
 
