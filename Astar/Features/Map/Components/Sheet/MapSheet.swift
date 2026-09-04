@@ -24,85 +24,98 @@ struct MapSheet: View {
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                                 selectedDetent = .fraction(0.52)
                             }
+                        },
+                        onSavedPlacesHeaderTapped: {
+                            store.send(.savedPlacesHeaderTapped)
                         }
                     )
                     .transition(.opacity)
                     
                 case let .direction(directionStore):
-                    switch directionStore.mode {
-                    case .directions:
-                        MapSheetDirectionContent(
-                            store: directionStore,
-                            onCancel: {
-                                withAnimation(.easeInOut(duration: 0.25)) {
-                                    selectedDetent = .fraction(0.42)
-                                }
-                            },
-                            onStartNavigation: {
-                                withAnimation(.easeInOut(duration: 0.25)) {
-                                    selectedDetent = .fraction(0.6)
-                                }
-                            },
-                            currentLocation: store.map.currentLocation
-                        )
-                        .transition(.opacity)
+                    Group {
+                        switch directionStore.mode {
+                        case .directions:
+                            MapSheetDirectionContent(
+                                store: directionStore,
+                                onCancel: {
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        selectedDetent = .fraction(0.42)
+                                    }
+                                },
+                                onStartNavigation: {
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        selectedDetent = .fraction(0.6)
+                                    }
+                                },
+                                currentLocation: store.map.currentLocation
+                            )
+                            .transition(.opacity)
 
-                    case .progress:
-                        DirectionProgress(
-                            destination: directionStore.destination,
-                            estimatedTime: directionStore.walkingRouteInfo?.travelTimeString ?? "12 min",
-                            eta: directionStore.walkingRouteInfo?.etaString ?? "11.00 ETA",
-                            totalDistance: directionStore.walkingRouteInfo?.distanceString ?? directionStore.destination.distance ?? "850 m",
-                            isDone: directionStore.isDestinationReached,
-                            isLoading: directionStore.isCalculatingRoute,
-                            isDevelopmentMode: directionStore.isDevelopmentMode,
-                            onJourneyLog: {
-                                directionStore.send(.journeyLogTapped)
-                                withAnimation(.easeInOut(duration: 0.25)) {
-                                    selectedDetent = .large
+                        case .progress:
+                            DirectionProgress(
+                                destination: directionStore.destination,
+                                estimatedTime: directionStore.walkingRouteInfo?.travelTimeString ?? "12 min",
+                                eta: directionStore.walkingRouteInfo?.etaString ?? "11.00 ETA",
+                                totalDistance: directionStore.walkingRouteInfo?.distanceString ?? directionStore.destination.distance ?? "850 m",
+                                isDone: directionStore.isDestinationReached,
+                                isLoading: directionStore.isCalculatingRoute,
+                                isDevelopmentMode: directionStore.isDevelopmentMode,
+                                onJourneyLog: {
+                                    directionStore.send(.journeyLogTapped)
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        selectedDetent = .large
+                                    }
+                                },
+                                onEndJourney: {
+                                    directionStore.send(.endJourneyTapped)
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        selectedDetent = .fraction(0.42)
+                                    }
+                                },
+                                onDone: {
+                                    directionStore.send(.endJourneyTapped)
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        selectedDetent = .fraction(0.42)
+                                    }
+                                },
+                                onSimulateArrival: {
+                                    directionStore.send(.simulateArrivalTapped)
                                 }
-                            },
-                            onEndJourney: {
-                                directionStore.send(.endJourneyTapped)
-                                withAnimation(.easeInOut(duration: 0.25)) {
-                                    selectedDetent = .fraction(0.42)
-                                }
-                            },
-                            onDone: {
-                                directionStore.send(.endJourneyTapped)
-                                withAnimation(.easeInOut(duration: 0.25)) {
-                                    selectedDetent = .fraction(0.42)
-                                }
-                            },
-                            onSimulateArrival: {
-                                directionStore.send(.simulateArrivalTapped)
-                            }
-                        )
-                        .padding(.horizontal, 16)
-                        .padding(.top, 12)
-                        .transition(.opacity)
+                            )
+                            .padding(.horizontal, 16)
+                            .padding(.top, 12)
+                            .transition(.opacity)
 
-                    case .journeyLog:
-                        DirectionJourneyLog(
-                            destinationName: directionStore.destination.name,
-                            isDone: directionStore.isDestinationReached,
-                            entries: directionStore.journeyLogEntries.isEmpty ? nil : directionStore.journeyLogEntries,
-                            onDismiss: {
-                                directionStore.send(.dismissJourneyLogTapped)
-                                withAnimation(.easeInOut(duration: 0.25)) {
-                                    selectedDetent = .fraction(0.6)
+                        case .journeyLog:
+                            DirectionJourneyLog(
+                                destinationName: directionStore.destination.name,
+                                isDone: directionStore.isDestinationReached,
+                                entries: directionStore.journeyLogEntries.isEmpty ? nil : directionStore.journeyLogEntries,
+                                onDismiss: {
+                                    directionStore.send(.dismissJourneyLogTapped)
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        selectedDetent = .fraction(0.6)
+                                    }
+                                },
+                                onChecklistTapped: {
+                                    directionStore.send(.dismissJourneyLogTapped)
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        selectedDetent = .fraction(0.6)
+                                    }
                                 }
-                            },
-                            onChecklistTapped: {
-                                directionStore.send(.dismissJourneyLogTapped)
-                                withAnimation(.easeInOut(duration: 0.25)) {
-                                    selectedDetent = .fraction(0.6)
-                                }
-                            }
+                            )
+                            .padding(.horizontal, 16)
+                            .padding(.top, 12)
+                            .transition(.opacity)
+                        }
+                    }
+                    .sheet(
+                        isPresented: Binding(
+                            get: { directionStore.isShowingBroadcastSheet },
+                            set: { directionStore.send(.setBroadcastSheetPresented($0)) }
                         )
-                        .padding(.horizontal, 16)
-                        .padding(.top, 12)
-                        .transition(.opacity)
+                    ) {
+                        BroadcastInfoSheet()
                     }
 
                 case let .walker(walkerStore):
@@ -264,6 +277,9 @@ struct MapSheet: View {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                             selectedDetent = .fraction(0.42)
                         }
+                    },
+                    onSavedPlacesHeaderTapped: {
+                        store.send(.savedPlacesHeaderTapped)
                     }
                 )
                 .transition(.opacity)
@@ -271,4 +287,5 @@ struct MapSheet: View {
         }
         .scrollDismissesKeyboard(.interactively)
     }
-}
+    }
+

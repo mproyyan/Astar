@@ -6,25 +6,52 @@
 //
 
 import SwiftUI
+import ComposableArchitecture
 
 struct SavedPlacesCard: View {
     let title: String
     let places: [SavedPlace]
     var onSelectPlace: ((SavedPlace) -> Void)? = nil
+    var onHeaderTap: (() -> Void)? = nil
+
+    init(
+        title: String,
+        places: [SavedPlace],
+        onSelectPlace: ((SavedPlace) -> Void)? = nil,
+        onHeaderTap: (() -> Void)? = nil
+    ) {
+        self.title = title
+        self.places = places
+        self.onSelectPlace = onSelectPlace
+        self.onHeaderTap = onHeaderTap
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 4) {
+            if title == "Saved Places" || title == "Saved" {
+                Button {
+                    onHeaderTap?()
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(title)
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(.primary)
+
+                        Image(systemName: "chevron.right")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.secondary)
+
+                        Spacer(minLength: 0)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            } else {
                 Text(title)
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(.primary)
-
-                if title == "Saved" {
-                    Image(systemName: "chevron.right")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
             }
+
 
             VStack(spacing: 0) {
                 ForEach(places.enumerated(), id: \.element.id) { index, place in
