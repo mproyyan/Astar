@@ -31,17 +31,41 @@ struct OnboardingView: View {
               .font(.system(size: 64))
               .foregroundColor(.accentColor)
 
-            VStack(spacing: 8) {
+            VStack(spacing: 16) {
               Text(content.title)
                 .font(.title)
                 .fontWeight(.bold)
                 .multilineTextAlignment(.center)
 
-              Text(content.description)
-                .font(.caption)
-                .foregroundColor(.gray)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
+                
+                switch content.body {
+                case .paragraph(let text):
+                    Text(text)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                    
+                case .glossary(let items):
+                    VStack (spacing: 16) {
+                        ForEach(items) { item in
+                            HStack {
+                                Text(item.term)
+                                    .font(.caption)
+                                    .foregroundStyle(.primary)
+                                    .fontWeight(.medium)
+                                    .frame(width: 100, alignment: .leading)
+                                    .multilineTextAlignment(.leading)
+                                
+                                Text(item.definition)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.leading)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 32)
+                }
             }
           }
           .tag(index)
@@ -62,32 +86,57 @@ struct OnboardingView: View {
 
       Spacer()
 
-      SignInWithAppleButton(
-        .signIn,
-        onRequest: { request in
-          request.requestedScopes = [.fullName, .email]
-        },
-        onCompletion: { result in
-          switch result {
-          case .success(let authorization):
-            if let credential = authorization.credential as? ASAuthorizationAppleIDCredential {
-              let formatter = PersonNameComponentsFormatter()
-              let payload = AppleSignInCredential(
-                appleUserId: credential.user,
-                name: credential.fullName.map(formatter.string(from:))?.nilIfBlank,
-                email: credential.email?.nilIfBlank
-              )
-              store.send(.appleSignInCompleted(payload))
-            }
-          case .failure(let error):
-            print("Sign in with Apple failed: \(error.localizedDescription)")
-          }
+      if let errorMessage = store.login.errorMessage {
+        Text(errorMessage)
+          .font(.caption)
+          .foregroundStyle(.red)
+          .multilineTextAlignment(.center)
+          .padding(.horizontal, 24)
+          .padding(.bottom, 8)
+      }
+
+      if store.login.isLoading {
+        HStack(spacing: 12) {
+          ProgressView()
+            .tint(.white)
+          Text("Signing in...")
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.white)
         }
-      )
-      .signInWithAppleButtonStyle(.black)
-      .frame(height: 50)
-      .padding(.horizontal, 24)
-      .padding(.bottom, 40)
+        .frame(maxWidth: .infinity)
+        .frame(height: 50)
+        .background(Color.black)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.horizontal, 24)
+        .padding(.bottom, 40)
+      } else {
+        SignInWithAppleButton(
+          .signIn,
+          onRequest: { request in
+            request.requestedScopes = [.fullName, .email]
+          },
+          onCompletion: { result in
+            switch result {
+            case .success(let authorization):
+              if let credential = authorization.credential as? ASAuthorizationAppleIDCredential {
+                let formatter = PersonNameComponentsFormatter()
+                let payload = AppleSignInCredential(
+                  appleUserId: credential.user,
+                  name: credential.fullName.map(formatter.string(from:))?.nilIfBlank,
+                  email: credential.email?.nilIfBlank
+                )
+                store.send(.login(.appleSignInCompleted(payload)))
+              }
+            case .failure(let error):
+              print("Sign in with Apple failed: \(error.localizedDescription)")
+            }
+          }
+        )
+        .signInWithAppleButtonStyle(.black)
+        .frame(height: 50)
+        .padding(.horizontal, 24)
+        .padding(.bottom, 40)
+      }
     }
     .onAppear {
       store.send(.onAppear)

@@ -6,6 +6,7 @@
 //
 
 import ComposableArchitecture
+import Foundation
 
 @Reducer
 struct RootFeature {
@@ -19,6 +20,8 @@ struct RootFeature {
     case onboarding(OnboardingFeature.Action)
     case main(MainFeature.Action)
     case appDelegate(AppDelegateAction)
+    case openURL(URL)
+    case handleDeepLink(DeepLink)
 
     enum AppDelegateAction: Equatable {
       case didFinishLaunching
@@ -26,37 +29,66 @@ struct RootFeature {
   }
 
   var body: some Reducer<State, Action> {
-    Scope(state: \.onboarding, action: \.onboarding) {
-      OnboardingFeature()
-    }
-    
-    Scope(state: \.main, action: \.main) {
-      MainFeature()
-        ._printChanges()
-    }
-
     Reduce { state, action in
       switch action {
       case .appDelegate(.didFinishLaunching):
-        guard let profile = UserProfileStorage.load() else { return .none }
+        guard let profile = UserProfileStorage.load(), !profile.appleUserId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return .none }
         state = .main(MainFeature.State(userProfile: profile))
         return .none
 
-      case let .onboarding(.delegate(.appleSignInCompleted(credential))):
-        state = .main(MainFeature.State())
-        return .send(.main(.login(.appleSignInCompleted(credential))))
+      case let .openURL(url):
+        guard let deepLink = DeepLink.parse(url: url) else { return .none }
+        return .send(.handleDeepLink(deepLink))
 
-      case let .main(.login(.delegate(.loggedIn(profile)))):
+      case let .handleDeepLink(deepLink):
+        switch deepLink {
+        case .alwaysHome:
+          switch state {
+          case .main:
+            return .send(.main(.map(.startAlwaysHomeNavigation)))
+          case var .onboarding(onboardingState):
+            onboardingState.pendingDeepLink = .alwaysHome
+            state = .onboarding(onboardingState)
+            return .none
+          }
+
+        case let .navigate(destination):
+          switch state {
+          case .main:
+            return .send(.main(.map(.startDirectNavigation(destinationQuery: destination))))
+          case var .onboarding(onboardingState):
+            onboardingState.pendingDeepLink = .navigate(destination: destination)
+            state = .onboarding(onboardingState)
+            return .none
+          }
+        }
+
+      case let .onboarding(.delegate(.loggedIn(profile))):
+        let pending: DeepLink? = if case let .onboarding(onboardingState) = state { onboardingState.pendingDeepLink } else { nil }
         state = .main(MainFeature.State(userProfile: profile))
+        if case .alwaysHome = pending {
+          return .send(.main(.map(.startAlwaysHomeNavigation)))
+        } else if case let .navigate(destination) = pending {
+          return .send(.main(.map(.startDirectNavigation(destinationQuery: destination))))
+        }
         return .none
 
-      case .main(.login(.delegate(.signedOut))):
+      case .main(.delegate(.signedOut)),
+           .main(.login(.delegate(.signedOut))),
+           .main(.path(.element(id: _, action: .profile(.delegate(.signedOut))))):
         state = .onboarding(OnboardingFeature.State())
         return .none
 
       case .onboarding, .main:
         return .none
       }
+    }
+    .ifCaseLet(\.onboarding, action: \.onboarding) {
+      OnboardingFeature()
+    }
+    .ifCaseLet(\.main, action: \.main) {
+      MainFeature()
+        ._printChanges()
     }
   }
 }

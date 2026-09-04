@@ -53,18 +53,22 @@ struct WalkerCardWalking: View {
 
                 Spacer()
 
-                Button {
-                    onDismiss?()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(.primary)
-                        .frame(width: 36, height: 36)
+                if !isTracked {
+                    Button {
+                        onDismiss?()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(.primary)
+                            .frame(width: 36, height: 36)
+                    }
+                    .buttonStyle(.plain)
+                    .glassEffect(.regular.interactive(), in: .circle)
+                    .accessibilityLabel("Close")
+                    .transition(.opacity.combined(with: .scale(scale: 0.8)))
                 }
-                .buttonStyle(.plain)
-                .glassEffect(.regular.interactive(), in: .circle)
-                .accessibilityLabel("Close")
             }
+            .frame(minHeight: 36)
 
             // Profile Header
             WalkerProfileHeader(
@@ -79,15 +83,10 @@ struct WalkerCardWalking: View {
                     onTrack?()
                 },
                 onExitTrack: {
-                    if let onExitTrack {
-                        onExitTrack()
-                    } else if let onReachDestination {
-                        onReachDestination()
-                    } else {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                            isTracked = false
-                        }
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        isTracked = false
                     }
+                    onExitTrack?()
                 },
                 onPing: onPing
             )
@@ -106,6 +105,25 @@ struct WalkerCardWalking: View {
                     insertion: .opacity.combined(with: .move(edge: .top)),
                     removal: .opacity
                 ))
+
+                if DeveloperSettingsStorage.isDevelopmentMode {
+                    Button {
+                        onReachDestination?()
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "flag.checkered")
+                                .font(.subheadline.weight(.semibold))
+                            Text("Simulate Arrival (Mock)")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .foregroundStyle(.blue)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.blue.opacity(0.1), in: .capsule)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Simulate arrival")
+                }
             }
 
             // Route Card
@@ -120,6 +138,11 @@ struct WalkerCardWalking: View {
             WalkerCardRecentLocations(locations: walker.recentLocations)
         }
         .padding(.top, 8)
+        .onChange(of: initialTracked) { _, newValue in
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                isTracked = newValue
+            }
+        }
     }
 
     private func cycleStatus() {

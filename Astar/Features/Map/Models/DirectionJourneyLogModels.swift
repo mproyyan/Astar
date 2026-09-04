@@ -29,7 +29,7 @@ struct JourneyLogEntry: Identifiable, Equatable, Sendable {
         landmarkName: String,
         address: String,
         timeString: String,
-        iconName: String = "mappin.and.ellipse",
+        iconName: String = "mappin.fill",
         entryType: JourneyLogEntryType = .checkpoint,
         coordinate: CLLocationCoordinate2D? = nil
     ) {

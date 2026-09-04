@@ -14,12 +14,14 @@ struct MapSheetMainContent: View {
     let onSearchTapped: () -> Void
     var onSelectPlace: ((SavedPlace) -> Void)? = nil
     var onSelectPerson: ((Person) -> Void)? = nil
+    var onSavedPlacesHeaderTapped: (() -> Void)? = nil
 
-    private let people = MapSampleData.people
-    private let savedPlaces = MapSampleData.savedPlaces
+    private var people: [Person] { store.people }
+    private var savedPlaces: [SavedPlace] { store.map.savedPlaces }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        WithPerceptionTracking {
+            VStack(alignment: .leading, spacing: 20) {
             HStack(spacing: 12) {
                 Button(action: onSearchTapped) {
                     SearchBarView()
@@ -33,7 +35,11 @@ struct MapSheetMainContent: View {
             VStack(spacing: 32) {
                 PeopleSection(people: people, onSelectPerson: onSelectPerson)
 
-                SavedSection(savedPlaces: savedPlaces, onSelectPlace: onSelectPlace)
+                SavedSection(
+                    savedPlaces: savedPlaces,
+                    onSelectPlace: onSelectPlace,
+                    onHeaderTap: onSavedPlacesHeaderTapped
+                )
                     .transition(.asymmetric(
                         insertion: .opacity.combined(with: .move(edge: .bottom)),
                         removal: .opacity
@@ -44,6 +50,7 @@ struct MapSheetMainContent: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 12)
+        }
     }
 }
 

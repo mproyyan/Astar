@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		A640BB71303BDF850064EB80 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = A640BB70303BDF850064EB80 /* ComposableArchitecture */; };
-		A640BB74303BDF8E0064EB80 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = A640BB73303BDF8E0064EB80 /* ComposableArchitecture */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -67,7 +66,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A640BB74303BDF8E0064EB80 /* ComposableArchitecture in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -155,7 +153,6 @@
 			);
 			name = AstarTests;
 			packageProductDependencies = (
-				A640BB73303BDF8E0064EB80 /* ComposableArchitecture */,
 			);
 			productName = AstarTests;
 			productReference = A6DE5307303BDE3000940469 /* AstarTests.xctest */;
@@ -428,6 +425,7 @@
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = L6M39L4GV8;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Astar-Info.plist";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Astar needs your location to center the map on you.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -467,6 +465,7 @@
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = L6M39L4GV8;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Astar-Info.plist";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Astar needs your location to center the map on you.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -630,11 +629,6 @@
 
 /* Begin XCSwiftPackageProductDependency section */
 		A640BB70303BDF850064EB80 /* ComposableArchitecture */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = A640BB6F303BDF850064EB80 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */;
-			productName = ComposableArchitecture;
-		};
-		A640BB73303BDF8E0064EB80 /* ComposableArchitecture */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = A640BB6F303BDF850064EB80 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */;
 			productName = ComposableArchitecture;

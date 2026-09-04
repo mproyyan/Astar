@@ -6,90 +6,95 @@
 //
 
 import SwiftUI
-
+import ComposableArchitecture
 
 struct TrustedPersonView: View {
+    @Bindable var store: StoreOf<TrustedPersonFeature>
+    
     var body: some View {
-        NavigationStack {
+        ScrollView {
+            RequestSection(store: store)
             
-            
-            ScrollView {
-                RequestSection()
-                
-                TrustedPersonList()
-            }
-            .padding(16)
-            
-            
-                .navigationTitle("Trusted Person")
-                .navigationBarTitleDisplayMode(.automatic)
-            
+            TrustedPersonList(store: store)
+        }
+        .padding(16)
+        .navigationTitle("Trusted Person")
+        .navigationBarTitleDisplayMode(.automatic)
+        .onAppear {
+            store.send(.onAppear)
+        }
+        .sheet(item: $store.scope(state: \.destination?.addParticipant, action: \.destination.addParticipant)) { addParticipantStore in
+            AddTrustedPersonView(store: addParticipantStore)
         }
     }
 }
-
 
 // MARK: Request Section
 
 struct RequestSection: View {
+    @Bindable var store: StoreOf<TrustedPersonFeature>
+
     var body: some View {
-        NavigationLink {
-            Text("Request Section")
-        } label: {
-            
-            HStack (spacing: 16) {
-                ZStack {
-                    Circle()
-                        .fill(Color.blue)
-                        .frame(width: 32, height: 32)
-                    Image(systemName: "person.fill.badge.plus")
-                        .font(.body)
-                        .foregroundStyle(.white)
+        if !store.requestConnections.isEmpty {
+            Button {
+                store.send(.requestSectionTapped)
+            } label: {
+                
+                HStack (spacing: 16) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.blue)
+                            .frame(width: 32, height: 32)
+                        Image(systemName: "person.fill.badge.plus")
+                            .font(.body)
+                            .foregroundStyle(.white)
+                        
+                    }
                     
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Request")
+                            .font(.subheadline)
+                            .bold()
+                        let firstRequestName = store.requestConnections.first?.partnerProfile.name ?? "User"
+                        let othersCount = store.requestConnections.count - 1
+                        let othersText = othersCount > 0 ? " + \(othersCount) others" : ""
+                        Text("\(firstRequestName)\(othersText)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.right")
+                        .font(.body)
                 }
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Request")
-                        .font(.subheadline)
-                        .bold()
-                    Text("\(invitedPersons.first?.displayName ?? "user") + \(sampleData.count - 1) others")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                
-                Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .font(.body)
+                .padding(.vertical, 16)
+                .padding(.horizontal, 20)
+                .clipShape(.rect(cornerRadius: 26))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 26)
+                        .stroke(Color(.systemGray6), lineWidth:1)
+                )
             }
-            .padding(.vertical, 16)
-            .padding(.horizontal, 20)
-//            .background(.red)
-            .clipShape(.rect(cornerRadius: 26))
-            .overlay(
-                RoundedRectangle(cornerRadius: 26)
-                    .stroke(Color(.systemGray6), lineWidth:1)
-            )
-//            .border(Color(.systemGray6), width: 1)
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
     }
 }
-
 
 // MARK: Trusted Person List
 
 struct TrustedPersonList: View {
+    @Bindable var store: StoreOf<TrustedPersonFeature>
+
     var body: some View {
         VStack {
-            ForEach(sampleData) { data in
-                TrustedPersonRow(data: data)
+            ForEach(store.mutualConnections) { connectionProfile in
+                TrustedPersonRow(connectionProfile: connectionProfile)
                 Divider()
                     .padding(.leading, 72)
             }
-            AddParticipantButton()
+            AddParticipantButton(store: store)
         }
-
         .padding(.vertical, 16)
         .clipShape(.rect(cornerRadius: 26))
         .overlay(
@@ -102,7 +107,7 @@ struct TrustedPersonList: View {
 // MARK: Trusted Person Row
 
 struct TrustedPersonRow: View {
-    var data: SampleData
+    var connectionProfile: ConnectionProfile
     
     var body: some View {
         HStack (spacing: 16) {
@@ -110,25 +115,24 @@ struct TrustedPersonRow: View {
                 Circle()
                     .frame(width:40, height: 40)
                     .foregroundStyle(.quaternary)
-                Image(systemName: "\(data.avatar)")
+                Image(systemName: "person.crop.circle.fill")
                     .font(.body)
                     .foregroundStyle(Color.white)
             }
             
             VStack(alignment: .leading, spacing: 4) {
-                Text(data.displayName)
+                Text(connectionProfile.partnerProfile.name)
                     .font(.subheadline)
                     .bold()
                 
-                if data.status == .accepted {
-                    Text(data.icloud)
+                if connectionProfile.connection.status == "mutual" {
+                    Text(connectionProfile.partnerProfile.email)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    
                 }
             }
             
-            if data.status == .invited {
+            if connectionProfile.connection.status == "request" {
                 Spacer()
                 Text("Invited")
                     .font(.subheadline)
@@ -136,7 +140,7 @@ struct TrustedPersonRow: View {
                     .padding(.horizontal, 16)
             }
             
-            if data.status == .accepted {
+            if connectionProfile.connection.status == "mutual" {
                 Spacer()
             }
         }
@@ -148,9 +152,11 @@ struct TrustedPersonRow: View {
 // MARK: Add participant Button
 
 struct AddParticipantButton: View {
+    @Bindable var store: StoreOf<TrustedPersonFeature>
+
     var body: some View {
         Button {
-            "Add participant"
+            store.send(.addParticipantTapped)
         } label: {
             Text("Add Participant")
                 .padding(.vertical, 8)
@@ -161,5 +167,5 @@ struct AddParticipantButton: View {
 }
 
 #Preview {
-    TrustedPersonView()
+    TrustedPersonView(store: Store(initialState: TrustedPersonFeature.State()) { TrustedPersonFeature() })
 }

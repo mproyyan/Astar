@@ -6,43 +6,38 @@
 //
 
 import SwiftUI
+import ComposableArchitecture
 
 struct RequestTrustedPersonView: View {
+    let store: StoreOf<RequestTrustedPersonFeature>
+
     var body: some View {
-        NavigationStack{
-            ScrollView {
-                VStack (spacing: 8) {
-                    ForEach(sampleData) { data in
-                        if data.status == .accepted {
-                            RequestCard(data: data)
-                        }
-                        
-                    }
-                    
-                    .padding(.vertical, 16)
-                    .background(.background)
-                    .clipShape(.rect(cornerRadius: 26))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 26)
-                            .stroke(Color(.systemGray6), lineWidth: 1)
-                    )
+        ScrollView {
+            VStack (spacing: 8) {
+                ForEach(store.requests) { request in
+                    RequestCard(store: store, connectionProfile: request)
                 }
             }
-            
-            .padding(.horizontal, 16)
-            .background(Color(.systemGroupedBackground))
-            
-            .navigationTitle("Request")
-            .navigationBarTitleDisplayMode(.inline)
-            
+            .padding(.vertical, 16)
+            .background(.background)
+            .clipShape(.rect(cornerRadius: 26))
+            .overlay(
+                RoundedRectangle(cornerRadius: 26)
+                    .stroke(Color(.systemGray6), lineWidth: 1)
+            )
         }
+        .padding(.horizontal, 16)
+        .background(Color(.systemGroupedBackground))
+        .navigationTitle("Request")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
 // MARK: Request Card
 
 struct RequestCard : View {
-    let data: SampleData
+    let store: StoreOf<RequestTrustedPersonFeature>
+    let connectionProfile: ConnectionProfile
     
     var body: some View {
         VStack {
@@ -51,29 +46,26 @@ struct RequestCard : View {
                     Circle()
                         .frame(width:40, height: 40)
                         .foregroundStyle(.quaternary)
-                    Image(systemName: "\(data.avatar)")
+                    Image(systemName: "person.crop.circle.fill")
                         .font(.body)
                         .foregroundStyle(Color.white)
                 }
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    
-                    Text(data.displayName)
+                    Text(connectionProfile.partnerProfile.name)
                         .font(.subheadline)
                         .bold()
                     
-                    Text(data.icloud)
+                    Text(connectionProfile.partnerProfile.email)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    
                 }
-                
                 Spacer()
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 8)
             
-            RequestButton()
+            RequestButton(store: store, connectionProfile: connectionProfile)
         }
     }
 }
@@ -82,44 +74,43 @@ struct RequestCard : View {
 // MARK: Button
 
 struct RequestButton : View {
+    let store: StoreOf<RequestTrustedPersonFeature>
+    let connectionProfile: ConnectionProfile
+    
     var body: some View {
         HStack {
             Spacer()
-            Button(action: {}) {
+            Button(action: {
+                store.send(.confirmTapped(connectionProfile.connection.id))
+            }) {
                 Text("Confirm")
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                
                     .font(.subheadline)
-//                    .bold()
                     .foregroundStyle(.white)
                     .background(.blue)
                     .clipShape(.capsule)
-                    
             }
             .buttonStyle(.plain)
             
-            Button(action: {}) {
+            Button(action: {
+                store.send(.deleteTapped(connectionProfile.connection.id))
+            }) {
                 Text("Delete")
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                
                     .font(.subheadline)
-//                    .bold()
                     .foregroundStyle(.primary)
                     .background(.quinary)
                     .clipShape(.capsule)
-                    
             }
             .buttonStyle(.plain)
         }
         .padding(.vertical, 4)
         .padding(.horizontal, 16)
-//        .padding(16)
-//        .background(.red)
     }
 }
 
 #Preview {
-    RequestTrustedPersonView()
+    RequestTrustedPersonView(store: Store(initialState: RequestTrustedPersonFeature.State()) { RequestTrustedPersonFeature() })
 }

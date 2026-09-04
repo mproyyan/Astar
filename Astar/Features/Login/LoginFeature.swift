@@ -21,6 +21,20 @@ struct UserProfile: Codable, Equatable, Sendable {
   let cloudKitUserId: String
   let name: String
   let email: String
+  var status: String?
+  
+  var recordName: String {
+    "UserProfile_\(appleUserId)_\(cloudKitUserId)"
+      .map { character in
+        character.isLetter || character.isNumber ? character : "_"
+      }
+      .map(String.init)
+      .joined()
+  }
+  
+  var recordID: CKRecord.ID {
+    CKRecord.ID(recordName: recordName)
+  }
 }
 
 struct LoginError: Error, Equatable, Sendable {
@@ -127,15 +141,16 @@ private func upsertUserProfile(with credential: AppleSignInCredential) async thr
   let existingRecord = try? await database.record(for: recordID)
   let record = existingRecord ?? CKRecord(recordType: "UserProfile", recordID: recordID)
   let storedProfile = UserProfileStorage.load()
+  let isSameStoredUser = storedProfile?.appleUserId == credential.appleUserId
   let existingName = (existingRecord?["name"] as? String)?.nilIfBlank
   let existingEmail = (existingRecord?["email"] as? String)?.nilIfBlank
   let name = credential.name?.nilIfBlank
     ?? existingName
-    ?? storedProfile?.name.nilIfBlank
-    ?? ""
+    ?? (isSameStoredUser ? storedProfile?.name.nilIfBlank : nil)
+    ?? "User"
   let email = credential.email?.nilIfBlank
     ?? existingEmail
-    ?? storedProfile?.email.nilIfBlank
+    ?? (isSameStoredUser ? storedProfile?.email.nilIfBlank : nil)
     ?? ""
 
   record["appleUserId"] = credential.appleUserId as CKRecordValue
@@ -149,7 +164,8 @@ private func upsertUserProfile(with credential: AppleSignInCredential) async thr
     appleUserId: credential.appleUserId,
     cloudKitUserId: cloudKitUserId,
     name: name,
-    email: email
+    email: email,
+    status: existingRecord?["Status"] as? String
   )
 }
 

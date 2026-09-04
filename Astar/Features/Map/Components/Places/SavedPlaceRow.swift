@@ -22,18 +22,18 @@ struct SavedPlaceRow: View {
                     Circle()
                         .fill(place.categoryColor)
                         .overlay {
-                            Image(systemName: place.iconName)
+                            Image(systemName: place.resolvedIconName)
                                 .font(.body.weight(.semibold))
                                 .foregroundStyle(.white)
                         }
                         .frame(width: 40, height: 40)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(place.name)
+                        Text(place.displayTitle)
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.primary)
 
-                        Text(place.subtitle)
+                        Text(place.displaySubtitle)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -44,15 +44,15 @@ struct SavedPlaceRow: View {
             }
             .buttonStyle(.plain)
 
-            Button {
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 34, height: 34)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Options")
+//            Button {
+//            } label: {
+//                Image(systemName: "ellipsis")
+//                    .font(.body.weight(.semibold))
+//                    .foregroundStyle(.secondary)
+//                    .frame(width: 34, height: 34)
+//            }
+//            .buttonStyle(.plain)
+//            .accessibilityLabel("Options")
         }
         .padding(.top, isFirst ? 20 : 16)
         .padding(.bottom, isLast ? 16 : 20)

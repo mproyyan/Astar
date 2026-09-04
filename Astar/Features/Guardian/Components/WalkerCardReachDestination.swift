@@ -11,6 +11,8 @@ struct WalkerCardReachDestination: View {
     var walkerName: String = "Awan Mendung"
     var avatarImageName: String = "AwanAvatar"
     var onDismiss: (() -> Void)? = nil
+    var onJourneyLog: (() -> Void)? = nil
+    var onDone: (() -> Void)? = nil
 
     private let avatarSize: CGFloat = 80
 
@@ -74,6 +76,43 @@ struct WalkerCardReachDestination: View {
                     .foregroundStyle(.primary)
                     .multilineTextAlignment(.center)
                     .lineSpacing(3)
+                
+                // Journey Log Button
+                Button {
+                    onJourneyLog?()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "list.bullet")
+                            .resizable()
+                            .scaledToFit()
+                            .fontWeight(.semibold)
+                            .frame(width: 24, height: 24)
+
+                        Text("Journey Log")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(Color.primary.opacity(0.06), in: .capsule)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Journey Log")
+                .padding(.top, 4)
+
+                // Done Button
+                Button {
+                    onDone?() ?? onDismiss?()
+                } label: {
+                    Text("Done")
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(Color.blue, in: .capsule)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Done")
             }
             .frame(maxWidth: .infinity)
             .padding(.bottom, 8)

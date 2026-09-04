@@ -10,10 +10,17 @@ import ComposableArchitecture
 
 @main
 struct AstarApp: App {
+  @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
   let store: StoreOf<RootFeature>
 
   init() {
-    self.store = Store(initialState: .onboarding(OnboardingFeature.State())) {
+    let initial: RootFeature.State
+    if let profile = UserProfileStorage.load(), !profile.appleUserId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+      initial = .main(MainFeature.State(userProfile: profile))
+    } else {
+      initial = .onboarding(OnboardingFeature.State())
+    }
+    self.store = Store(initialState: initial) {
       RootFeature()
     }
   }
@@ -23,6 +30,19 @@ struct AstarApp: App {
       ContentView(store: store)
         .onAppear {
           store.send(.appDelegate(.didFinishLaunching))
+        }
+        .onOpenURL { url in
+          store.send(.openURL(url))
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .startAlwaysHomeNavigation)) { _ in
+          store.send(.handleDeepLink(.alwaysHome))
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .startDirectNavigation)) { notification in
+          if let dest = notification.userInfo?["destination"] as? String, !dest.isEmpty {
+            store.send(.handleDeepLink(.navigate(destination: dest)))
+          } else {
+            store.send(.handleDeepLink(.alwaysHome))
+          }
         }
     }
   }

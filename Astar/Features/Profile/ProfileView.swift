@@ -26,18 +26,37 @@ struct ProfileView: View {
         // 4 & 5. Profile Options List
         List {
           Section {
-            NavigationLink {
-              Text("Trusted Person")
+            Button {
+              store.send(.trustedPersonTapped)
             } label: {
-              Text("Trusted Person")
-                .font(.body)
-                .padding(.vertical, 8)
+              HStack {
+                Text("Trusted Person")
+                  .font(.body)
+                Spacer()
+                Image(systemName: "chevron.right")
+                  .font(.footnote)
+                  .fontWeight(.semibold)
+                  .foregroundColor(Color(UIColor.tertiaryLabel))
+              }
+              .padding(.vertical, 8)
+              .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
 
             NavigationLink {
-              Text("Set Default Locations")
+              // [REPLACED WITH DYNAMIC SAVED PLACES]
+              // Text("Set Default Locations")
+              SavedPlacesView(
+                store: Store(
+                  initialState: SavedPlacesFeature.State(
+                    userId: store.userProfile?.appleUserId ?? "default_user"
+                  )
+                ) {
+                  SavedPlacesFeature()
+                }
+              )
             } label: {
-              Text("Set Default Locations")
+              Text("Saved Places")
                 .font(.body)
                 .padding(.vertical, 8)
             }
@@ -52,6 +71,102 @@ struct ProfileView: View {
           }
           .listRowBackground(Color.white)
           // Note: Native list section corner radius is managed by iOS.
+
+          Section("Settings") {
+            Toggle(
+              isOn: Binding(
+                get: { store.isDevelopmentMode },
+                set: { store.send(.setDevelopmentMode($0)) }
+              )
+            ) {
+              HStack(spacing: 12) {
+                Image(systemName: "hammer.fill")
+                  .foregroundStyle(.blue)
+                  .font(.system(size: 18))
+                  .frame(width: 24)
+
+                VStack(alignment: .leading, spacing: 2) {
+                  Text("Development Mode")
+                    .font(.body)
+                  Text("Show mock walker and arrival simulation")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+              }
+              .padding(.vertical, 4)
+            }
+
+            Toggle(
+              isOn: Binding(
+                get: { store.isShowRouteGuide },
+                set: { store.send(.setRouteGuide($0)) }
+              )
+            ) {
+              HStack(spacing: 12) {
+                Image(systemName: "point.topleft.down.to.point.bottomright.curvepath.fill")
+                  .foregroundStyle(.blue)
+                  .font(.system(size: 18))
+                  .frame(width: 24)
+
+                VStack(alignment: .leading, spacing: 2) {
+                  Text("Walking Route Guide")
+                    .font(.body)
+                  Text("Show blue line guide to destination during walking")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+              }
+              .padding(.vertical, 4)
+            }
+
+            Toggle(
+              isOn: Binding(
+                get: { store.isDoeWalkingMock },
+                set: { store.send(.setDoeWalkingMock($0)) }
+              )
+            ) {
+              HStack(spacing: 12) {
+                Image(systemName: "figure.walk.circle.fill")
+                  .foregroundStyle(.green)
+                  .font(.system(size: 18))
+                  .frame(width: 24)
+
+                VStack(alignment: .leading, spacing: 2) {
+                  Text("Friend Doe Walking")
+                    .font(.body)
+                  Text("Simulate friend Doe walking to destination")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+              }
+              .padding(.vertical, 4)
+            }
+
+            if store.isDoeWalkingMock && store.isDevelopmentMode {
+              Button {
+                store.send(.resetDoeWalkingSimulation)
+              } label: {
+                HStack(spacing: 12) {
+                  Image(systemName: "arrow.counterclockwise.circle.fill")
+                    .foregroundStyle(.orange)
+                    .font(.system(size: 18))
+                    .frame(width: 24)
+
+                  VStack(alignment: .leading, spacing: 2) {
+                    Text("Restart Doe's Walk")
+                      .font(.body)
+                      .foregroundStyle(.primary)
+                    Text("Reset position and walking status")
+                      .font(.caption)
+                      .foregroundStyle(.secondary)
+                  }
+                }
+                .padding(.vertical, 4)
+              }
+              .buttonStyle(.plain)
+            }
+          }
+          .listRowBackground(Color.white)
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)

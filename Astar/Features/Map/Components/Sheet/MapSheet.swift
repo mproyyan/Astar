@@ -1,10 +1,3 @@
-//
-//  MapSheet.swift
-//  Astar
-//
-//  Created by Dimas Prihady Setyawan on 25/08/26.
-//
-
 import ComposableArchitecture
 import MapKit
 import SwiftUI
@@ -19,116 +12,202 @@ struct MapSheet: View {
 
     var body: some View {
         ScrollView(.vertical) {
-            Group {
-                if let destination = store.map.selectedDestination {
-                    switch store.map.directionMode {
-                    case .directions:
-                        MapSheetDirectionContent(
-                            store: store,
-                            onCancel: {
-                                withAnimation(.easeInOut(duration: 0.25)) {
-                                    selectedDetent = .fraction(0.42)
-                                }
-                            },
-                            onStartNavigation: {
-                                withAnimation(.easeInOut(duration: 0.25)) {
-                                    selectedDetent = .fraction(0.6)
-                                }
+            if let sheetStore = store.scope(state: \.map.sheet, action: \.map.sheet.presented) {
+                switch sheetStore.case {
+                case let .search(searchStore):
+                    MapSheetSearchContent(
+                        store: searchStore,
+                        selectedDetent: $selectedDetent,
+                        onSelectPlace: { place in
+                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                            store.send(.map(.sheet(.presented(.search(.selectPlace(place))))))
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                selectedDetent = .fraction(0.52)
                             }
-                        )
-                        .transition(.opacity)
+                        },
+                        onSavedPlacesHeaderTapped: {
+                            store.send(.savedPlacesHeaderTapped)
+                        }
+                    )
+                    .transition(.opacity)
+                    
+                case let .direction(directionStore):
+                    Group {
+                        switch directionStore.mode {
+                        case .directions:
+                            MapSheetDirectionContent(
+                                store: directionStore,
+                                onCancel: {
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        selectedDetent = .fraction(0.42)
+                                    }
+                                },
+                                onStartNavigation: {
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        selectedDetent = .fraction(0.6)
+                                    }
+                                },
+                                currentLocation: store.map.currentLocation
+                            )
+                            .transition(.opacity)
 
-                    case .progress:
-                        DirectionProgress(
-                            destination: destination,
-                            estimatedTime: store.map.walkingRouteInfo?.travelTimeString ?? "12 min",
-                            eta: store.map.walkingRouteInfo?.etaString ?? "11.00 ETA",
-                            totalDistance: store.map.walkingRouteInfo?.distanceString ?? destination.distance ?? "850 m",
-                            isDone: store.map.isDestinationReached,
-                            onJourneyLog: {
-                                store.send(.map(.journeyLogTapped))
-                                withAnimation(.easeInOut(duration: 0.25)) {
-                                    selectedDetent = .large
-                                }
-                            },
-                            onEndJourney: {
-                                store.send(.map(.endJourneyTapped))
-                                withAnimation(.easeInOut(duration: 0.25)) {
-                                    selectedDetent = .fraction(0.42)
-                                }
-                            },
-                            onDone: {
-                                store.send(.map(.endJourneyTapped))
-                                withAnimation(.easeInOut(duration: 0.25)) {
-                                    selectedDetent = .fraction(0.42)
-                                }
-                            }
-                        )
-                        .padding(.horizontal, 16)
-                        .padding(.top, 12)
-                        .transition(.opacity)
-
-                    case .journeyLog:
-                        DirectionJourneyLog(
-                            destinationName: destination.name,
-                            isDone: store.map.isDestinationReached,
-                            entries: store.map.journeyLogEntries.isEmpty ? nil : store.map.journeyLogEntries,
-                            onDismiss: {
-                                store.send(.map(.dismissJourneyLogTapped))
-                                withAnimation(.easeInOut(duration: 0.25)) {
-                                    selectedDetent = .fraction(0.6)
-                                }
-                            },
-                            onChecklistTapped: {
-                                store.send(.map(.dismissJourneyLogTapped))
-                                withAnimation(.easeInOut(duration: 0.25)) {
-                                    selectedDetent = .fraction(0.6)
-                                }
-                            }
-                        )
-                        .padding(.horizontal, 16)
-                        .padding(.top, 12)
-                        .transition(.opacity)
-                    }
-                } else if let walker = store.map.selectedWalker {
-                    if walker.status == "Idle" {
-                        if let trip = store.map.selectedHistoryTrip {
-                            WalkerCardHistoryDetail(
-                                trip: trip,
-                                onDismiss: {
-                                    store.send(.map(.dismissHistoryDetail))
+                        case .progress:
+                            DirectionProgress(
+                                destination: directionStore.destination,
+                                estimatedTime: directionStore.walkingRouteInfo?.travelTimeString ?? "12 min",
+                                eta: directionStore.walkingRouteInfo?.etaString ?? "11.00 ETA",
+                                totalDistance: directionStore.walkingRouteInfo?.distanceString ?? directionStore.destination.distance ?? "850 m",
+                                isDone: directionStore.isDestinationReached,
+                                isLoading: directionStore.isCalculatingRoute,
+                                isDevelopmentMode: directionStore.isDevelopmentMode,
+                                onJourneyLog: {
+                                    directionStore.send(.journeyLogTapped)
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        selectedDetent = .large
+                                    }
+                                },
+                                onEndJourney: {
+                                    directionStore.send(.endJourneyTapped)
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        selectedDetent = .fraction(0.42)
+                                    }
+                                },
+                                onDone: {
+                                    directionStore.send(.endJourneyTapped)
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        selectedDetent = .fraction(0.42)
+                                    }
+                                },
+                                onSimulateArrival: {
+                                    directionStore.send(.simulateArrivalTapped)
                                 }
                             )
                             .padding(.horizontal, 16)
                             .padding(.top, 12)
                             .transition(.opacity)
-                        } else if store.map.isViewingHistoryList {
-                            WalkerCardHistoryList(
+
+                        case .journeyLog:
+                            DirectionJourneyLog(
+                                destinationName: directionStore.destination.name,
+                                isDone: directionStore.isDestinationReached,
+                                entries: directionStore.journeyLogEntries.isEmpty ? nil : directionStore.journeyLogEntries,
                                 onDismiss: {
-                                    store.send(.map(.dismissHistoryList))
+                                    directionStore.send(.dismissJourneyLogTapped)
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        selectedDetent = .fraction(0.6)
+                                    }
+                                },
+                                onChecklistTapped: {
+                                    directionStore.send(.dismissJourneyLogTapped)
+                                    withAnimation(.easeInOut(duration: 0.25)) {
+                                        selectedDetent = .fraction(0.6)
+                                    }
+                                }
+                            )
+                            .padding(.horizontal, 16)
+                            .padding(.top, 12)
+                            .transition(.opacity)
+                        }
+                    }
+                    .sheet(
+                        isPresented: Binding(
+                            get: { directionStore.isShowingBroadcastSheet },
+                            set: { directionStore.send(.setBroadcastSheetPresented($0)) }
+                        )
+                    ) {
+                        BroadcastInfoSheet()
+                    }
+
+                case let .walker(walkerStore):
+                    if walkerStore.isViewingJourneyLog {
+                        DirectionJourneyLog(
+                            destinationName: walkerStore.destinationPlaceName,
+                            isDone: true,
+                            entries: walkerStore.journeyLogEntries.isEmpty ? nil : walkerStore.journeyLogEntries,
+                            onDismiss: {
+                                walkerStore.send(.dismissJourneyLogTapped)
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    selectedDetent = .fraction(0.42)
+                                }
+                            },
+                            onChecklistTapped: {
+                                walkerStore.send(.dismissJourneyLogTapped)
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    selectedDetent = .fraction(0.42)
+                                }
+                            }
+                        )
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                        .transition(.opacity)
+                    } else if walkerStore.isDestinationReached {
+                        WalkerCardReachDestination(
+                            walkerName: walkerStore.walker.name == "Awan" ? "\(walkerStore.walker.name) Mendung" : walkerStore.walker.name,
+                            avatarImageName: walkerStore.walker.name == "Awan" ? "AwanAvatar" : "\(walkerStore.walker.name)Avatar",
+                            onDismiss: {
+                                walkerStore.send(.dismissWalkerTapped)
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    selectedDetent = .fraction(0.42)
+                                }
+                            },
+                            onJourneyLog: {
+                                walkerStore.send(.journeyLogTapped)
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    selectedDetent = .large
+                                }
+                            },
+                            onDone: {
+                                walkerStore.send(.dismissWalkerTapped)
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    selectedDetent = .fraction(0.42)
+                                }
+                            }
+                        )
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                        .transition(.opacity)
+                    } else if walkerStore.isIdleOrAccompany {
+                        if let trip = walkerStore.selectedHistoryTrip {
+                            WalkerCardHistoryDetail(
+                                trip: trip,
+                                onDismiss: {
+                                    walkerStore.send(.dismissHistoryDetailTapped)
+                                }
+                            )
+                            .padding(.horizontal, 16)
+                            .padding(.top, 12)
+                            .transition(.opacity)
+                        } else if walkerStore.isViewingHistoryList {
+                            WalkerCardHistoryList(
+                                sections: [WalkerHistorySection(title: "Recent", trips: walkerStore.trips)],
+                                onDismiss: {
+                                    walkerStore.send(.dismissHistoryListTapped)
                                 },
                                 onSelectTrip: { trip in
-                                    store.send(.map(.selectHistoryTrip(trip)))
+                                    walkerStore.send(.selectHistoryTrip(trip))
                                 }
                             )
                             .padding(.horizontal, 16)
                             .padding(.top, 12)
                             .transition(.opacity)
                         } else {
+                            let userEmail = sampleData.first(where: { $0.displayName.localizedCaseInsensitiveContains(walkerStore.walker.name) })?.icloud
+                                ?? (walkerStore.walker.name == "Doe" ? "doe@icloud.com" : "\(walkerStore.walker.name.lowercased().filter { !$0.isWhitespace })@icloud.com")
                             WalkerCardIdle(
-                                name: walker.name,
-                                email: "awanmendung@icloud.com",
+                                name: walkerStore.walker.name,
+                                email: userEmail,
+                                trips: walkerStore.trips,
                                 onDismiss: {
-                                    store.send(.map(.dismissWalker))
+                                    walkerStore.send(.dismissWalkerTapped)
                                     withAnimation(.easeInOut(duration: 0.25)) {
                                         selectedDetent = .fraction(0.42)
                                     }
                                 },
                                 onViewAllHistory: {
-                                    store.send(.map(.viewAllHistoryTapped))
+                                    walkerStore.send(.viewAllHistoryTapped)
                                 },
                                 onSelectTrip: { trip in
-                                    store.send(.map(.selectHistoryTrip(trip)))
+                                    walkerStore.send(.selectHistoryTrip(trip))
                                 }
                             )
                             .padding(.horizontal, 16)
@@ -136,119 +215,77 @@ struct MapSheet: View {
                             .transition(.opacity)
                         }
                     } else {
-                        if store.map.isWalkerDestinationReached {
-                            WalkerCardReachDestination(
-                                walkerName: "\(walker.name) Mendung",
-                                avatarImageName: "AwanAvatar",
-                                onDismiss: {
-                                    store.send(.map(.dismissWalker))
-                                    withAnimation(.easeInOut(duration: 0.25)) {
-                                        selectedDetent = .fraction(0.42)
-                                    }
-                                }
-                            )
-                            .padding(.horizontal, 16)
-                            .padding(.top, 12)
-                            .transition(.opacity)
-                        } else {
                             WalkerCardWalking(
                                 walker: WalkerProfile(
-                                    name: walker.name,
+                                    name: walkerStore.walker.name,
                                     locationSubtitle: "Central Jakarta, Jakarta",
                                     timeAgo: "1 Min Ago",
-                                    originPlaceName: "Autograph Tower",
-                                    originIconName: "briefcase.fill",
-                                    destinationPlaceName: "Home",
-                                    destinationIconName: "house.fill",
-                                    recentLocations: WalkerSampleData.awanLocations
+                                    originPlaceName: walkerStore.originPlaceName,
+                                    originIconName: walkerStore.originIconName,
+                                    destinationPlaceName: walkerStore.destinationPlaceName,
+                                    destinationIconName: walkerStore.destinationIconName,
+                                    recentLocations: walkerStore.journeyLogEntries.isEmpty ? WalkerSampleData.awanLocations : walkerStore.journeyLogEntries
                                 ),
+                                initialTracked: walkerStore.activeParticipantID != nil,
                                 onDismiss: {
-                                    store.send(.map(.dismissWalker))
+                                    walkerStore.send(.dismissWalkerTapped)
                                     withAnimation(.easeInOut(duration: 0.25)) {
                                         selectedDetent = .fraction(0.42)
                                     }
                                 },
+                                onTrack: {
+                                    walkerStore.send(.trackTapped)
+                                },
                                 onExitTrack: {
-                                    store.send(.map(.exitTrackTapped))
+                                    walkerStore.send(.exitTrackTapped)
                                     withAnimation(.easeInOut(duration: 0.25)) {
                                         selectedDetent = .fraction(0.35)
                                     }
                                 },
                                 onReachDestination: {
-                                    store.send(.map(.reachDestinationTapped))
+                                    walkerStore.send(.reachDestinationTapped)
                                     withAnimation(.easeInOut(duration: 0.25)) {
                                         selectedDetent = .fraction(0.35)
                                     }
                                 }
                             )
+                            .id(walkerStore.activeParticipantID != nil)
                             .padding(.horizontal, 16)
                             .padding(.top, 12)
                             .transition(.opacity)
-                        }
                     }
-                } else if store.map.isSearching {
-                    MapSheetSearchContent(
-                        store: store,
-                        selectedDetent: $selectedDetent,
-                        onSelectPlace: { place in
-                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                            store.send(.map(.selectPlace(place)))
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                selectedDetent = .fraction(0.52)
-                            }
-                        }
-                    )
-                    .transition(.opacity)
-                } else {
-                    MapSheetMainContent(
-                        store: store,
-                        isExpanded: isExpanded,
-                        onSearchTapped: {
-                            store.send(.map(.searchTapped))
-                            withAnimation(.easeInOut(duration: 0.25)) {
-                                selectedDetent = .large
-                            }
-                        },
-                        onSelectPlace: { place in
-                            store.send(.map(.selectPlace(place)))
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                selectedDetent = .fraction(0.52)
-                            }
-                        },
-                        onSelectPerson: { person in
-                            store.send(.map(.selectPerson(person)))
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                selectedDetent = .large
-                            }
-                        }
-                    )
-                    .transition(.opacity)
                 }
+            } else {
+                // Main Content (when sheet state is nil)
+                MapSheetMainContent(
+                    store: store,
+                    isExpanded: isExpanded,
+                    onSearchTapped: {
+                        store.send(.map(.searchTapped))
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            selectedDetent = .large
+                        }
+                    },
+                    onSelectPlace: { place in
+                        store.send(.map(.selectSavedPlace(place)))
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            selectedDetent = .fraction(0.52)
+                        }
+                    },
+                    onSelectPerson: { person in
+                        store.send(.map(.selectPerson(person)))
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            selectedDetent = .fraction(0.42)
+                        }
+                    },
+                    onSavedPlacesHeaderTapped: {
+                        store.send(.savedPlacesHeaderTapped)
+                    }
+                )
+                .transition(.opacity)
             }
         }
-        .scrollIndicators(.hidden)
-        .presentationBackground {
-            if isExpanded {
-                Color(red: 0.95, green: 0.95, blue: 0.97)
-            }
-        }
-        .animation(.easeInOut(duration: 0.25), value: isExpanded)
-        .animation(.easeInOut(duration: 0.25), value: store.map.selectedDestination != nil)
-        .onChange(of: selectedDetent) { _, newDetent in
-            if store.map.isSearching && newDetent != .large {
-                store.send(.map(.clearSearchTapped))
-            }
-        }
+        .scrollDismissesKeyboard(.interactively)
     }
-}
+    }
 
-#Preview {
-    @Previewable @State var selectedDetent: PresentationDetent = .fraction(0.42)
-
-    MapSheet(
-        store: Store(initialState: MainFeature.State()) {
-            MainFeature()
-        },
-        selectedDetent: $selectedDetent
-    )
-}
