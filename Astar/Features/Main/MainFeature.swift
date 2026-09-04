@@ -8,6 +8,7 @@ struct MainFeature {
     case profile(ProfileFeature)
     case trustedPerson(TrustedPersonFeature)
     case requestTrustedPerson(RequestTrustedPersonFeature)
+    case savedPlaces(SavedPlacesFeature)
   }
   
   @ObservableState
@@ -30,6 +31,7 @@ struct MainFeature {
     case refreshPeople
     case fetchPeopleResponse(Result<[Person], FetchUsersError>)
     case profileButtonTapped
+    case savedPlacesHeaderTapped
     case login(LoginFeature.Action)
     case map(MainMapFeature.Action)
     case path(StackActionOf<Path>)
@@ -145,6 +147,11 @@ struct MainFeature {
           isDoeWalkingMock: state.isDoeWalkingMock
         )
         state.path.append(.profile(profileState))
+        return .none
+
+      case .savedPlacesHeaderTapped:
+        let userId = state.login.userProfile?.appleUserId ?? "default_user"
+        state.path.append(.savedPlaces(SavedPlacesFeature.State(userId: userId)))
         return .none
         
       case let .path(.element(id: _, action: .profile(.delegate(.developmentModeChanged(isEnabled))))):

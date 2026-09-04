@@ -52,6 +52,7 @@ struct MapDirectionSheetFeatureTests {
       $0.isNavigating = true
       $0.isDestinationReached = false
       $0.mode = .progress
+      $0.isShowingBroadcastSheet = true
       let originAddress = "Current Location"
       let streetName = "Current Location"
       let startTimeString = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .short)
@@ -79,6 +80,19 @@ struct MapDirectionSheetFeatureTests {
       await store.receive(.delegate(.navigationStarted(sessionID: "session-1")))
     } else {
       await store.receive(.delegate(.navigationStarted(sessionID: nil)))
+    }
+  }
+
+  @Test
+  @MainActor
+  func testSetBroadcastSheetPresented() async {
+    let dest = SavedPlace(name: "Dest", subtitle: "Sub", iconName: "star", coordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0))
+    let store = TestStore(initialState: MapDirectionSheetFeature.State(destination: dest, isShowingBroadcastSheet: true)) {
+      MapDirectionSheetFeature()
+    }
+
+    await store.send(.setBroadcastSheetPresented(false)) {
+      $0.isShowingBroadcastSheet = false
     }
   }
 

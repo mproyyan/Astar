@@ -56,7 +56,7 @@ struct ProfileView: View {
                 }
               )
             } label: {
-              Text("Set Default Locations")
+              Text("Saved Places")
                 .font(.body)
                 .padding(.vertical, 8)
             }

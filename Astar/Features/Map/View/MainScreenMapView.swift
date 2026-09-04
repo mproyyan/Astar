@@ -374,6 +374,8 @@ private struct NavigationDestination: View {
       TrustedPersonView(store: trustedPersonStore)
     case let .requestTrustedPerson(requestTrustedPersonStore):
       RequestTrustedPersonView(store: requestTrustedPersonStore)
+    case let .savedPlaces(savedPlacesStore):
+      SavedPlacesView(store: savedPlacesStore)
     }
   }
 }
