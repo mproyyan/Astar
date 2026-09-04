@@ -72,17 +72,27 @@ struct MainFeature {
         return .run { [currentUser = state.login.userProfile] send in
           do {
             let profiles = try await usersClient.fetchAllUsers()
-            let people = profiles
-              .filter { $0.appleUserId != currentUser?.appleUserId }
-              .map {
-                Person(
-                  id: UUID(),
-                  name: $0.name,
-                  status: Self.formatStatus($0.status),
-                  appleUserId: $0.appleUserId,
-                  cloudKitUserId: $0.cloudKitUserId
-                )
+            var people: [Person] = []
+            for profile in profiles.filter({ $0.appleUserId != currentUser?.appleUserId }) {
+              var avatar = profile.avatarData
+              if avatar == nil {
+                avatar = await ContactPhotoClient.liveValue.fetchContactPhotoByEmail(profile.email)
               }
+              if avatar == nil {
+                avatar = await ContactPhotoClient.liveValue.fetchContactPhotoByName(profile.name)
+              }
+              let avatarImageName = profile.name == "Awan" ? "AwanAvatar" : nil
+              people.append(Person(
+                id: UUID(),
+                name: profile.name,
+                status: Self.formatStatus(profile.status),
+                appleUserId: profile.appleUserId,
+                cloudKitUserId: profile.cloudKitUserId,
+                email: profile.email,
+                avatarData: avatar,
+                avatarImageName: avatarImageName
+              ))
+            }
             await send(.fetchPeopleResponse(.success(people)))
           } catch {
             await send(.fetchPeopleResponse(.failure(FetchUsersError(error: error))))
@@ -99,7 +109,10 @@ struct MainFeature {
               name: person.name,
               status: person.status,
               appleUserId: person.appleUserId,
-              cloudKitUserId: person.cloudKitUserId
+              cloudKitUserId: person.cloudKitUserId,
+              email: person.email ?? existing.email,
+              avatarData: person.avatarData ?? existing.avatarData,
+              avatarImageName: person.avatarImageName ?? existing.avatarImageName
             ))
           } else {
             updatedPeople.append(person)
@@ -112,6 +125,7 @@ struct MainFeature {
         } else {
           state.people = updatedPeople.filter { $0.id != Person.mockDoeID }
         }
+        state.map.people = state.people
         return .none
         
       case .fetchPeopleResponse(.failure):
@@ -121,11 +135,13 @@ struct MainFeature {
         } else {
           state.people = []
         }
+        state.map.people = state.people
         return .none
         
       case .profileButtonTapped:
+        let userProfile = state.login.userProfile ?? UserProfileStorage.load()
         let profileState = ProfileFeature.State(
-          userProfile: state.login.userProfile,
+          userProfile: userProfile,
           isDevelopmentMode: state.isDevelopmentMode,
           isShowRouteGuide: state.isShowRouteGuide,
           isDoeWalkingMock: state.isDoeWalkingMock

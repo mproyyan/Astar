@@ -20,5 +20,7 @@
 		<string>remote-notification</string>
 		<string>location</string>
 	</array>
+	<key>NSContactsUsageDescription</key>
+	<string>Astar uses your contacts to show profile pictures for you and your trusted companions.</string>
 </dict>
 </plist>

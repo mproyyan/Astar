@@ -51,40 +51,38 @@ struct MapSheet: View {
                             )
                             .transition(.opacity)
 
-                        case .progress:
-                            DirectionProgress(
-                                destination: directionStore.destination,
-                                estimatedTime: directionStore.walkingRouteInfo?.travelTimeString ?? "12 min",
-                                eta: directionStore.walkingRouteInfo?.etaString ?? "11.00 ETA",
-                                totalDistance: directionStore.walkingRouteInfo?.distanceString ?? directionStore.destination.distance ?? "850 m",
-                                isDone: directionStore.isDestinationReached,
-                                isLoading: directionStore.isCalculatingRoute,
-                                isDevelopmentMode: directionStore.isDevelopmentMode,
-                                onJourneyLog: {
-                                    directionStore.send(.journeyLogTapped)
-                                    withAnimation(.easeInOut(duration: 0.25)) {
-                                        selectedDetent = .large
-                                    }
-                                },
-                                onEndJourney: {
-                                    directionStore.send(.endJourneyTapped)
-                                    withAnimation(.easeInOut(duration: 0.25)) {
-                                        selectedDetent = .fraction(0.42)
-                                    }
-                                },
-                                onDone: {
-                                    directionStore.send(.endJourneyTapped)
-                                    withAnimation(.easeInOut(duration: 0.25)) {
-                                        selectedDetent = .fraction(0.42)
-                                    }
-                                },
-                                onSimulateArrival: {
-                                    directionStore.send(.simulateArrivalTapped)
+                    case .progress:
+                        DirectionProgress(
+                            destination: directionStore.destination,
+                            estimatedTime: directionStore.walkingRouteInfo?.travelTimeString ?? "12 min",
+                            eta: directionStore.walkingRouteInfo?.etaString ?? "11.00 ETA",
+                            totalDistance: directionStore.walkingRouteInfo?.distanceString ?? directionStore.destination.distance ?? "850 m",
+                            watchingPeople: directionStore.watchingPeople,
+                            isDone: directionStore.isDestinationReached,
+                            isLoading: directionStore.isCalculatingRoute,
+                            isDevelopmentMode: directionStore.isDevelopmentMode,
+                            onJourneyLog: {
+                                directionStore.send(.journeyLogTapped)
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    selectedDetent = .large
                                 }
-                            )
-                            .padding(.horizontal, 16)
-                            .padding(.top, 12)
-                            .transition(.opacity)
+                            },
+                            onEndJourney: {
+                                directionStore.send(.endJourneyTapped)
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    selectedDetent = .fraction(0.42)
+                                }
+                            },
+                            onDone: {
+                                directionStore.send(.endJourneyTapped)
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    selectedDetent = .fraction(0.42)
+                                }
+                            }
+                        )
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                        .transition(.opacity)
 
                         case .journeyLog:
                             DirectionJourneyLog(
@@ -127,13 +125,13 @@ struct MapSheet: View {
                             onDismiss: {
                                 walkerStore.send(.dismissJourneyLogTapped)
                                 withAnimation(.easeInOut(duration: 0.25)) {
-                                    selectedDetent = .fraction(0.42)
+                                    selectedDetent = .large
                                 }
                             },
                             onChecklistTapped: {
                                 walkerStore.send(.dismissJourneyLogTapped)
                                 withAnimation(.easeInOut(duration: 0.25)) {
-                                    selectedDetent = .fraction(0.42)
+                                    selectedDetent = .large
                                 }
                             }
                         )
@@ -152,7 +150,7 @@ struct MapSheet: View {
                             },
                             onJourneyLog: {
                                 walkerStore.send(.journeyLogTapped)
-                                withAnimation(.easeInOut(duration: 0.25)) {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                                     selectedDetent = .large
                                 }
                             },
@@ -196,6 +194,8 @@ struct MapSheet: View {
                             WalkerCardIdle(
                                 name: walkerStore.walker.name,
                                 email: userEmail,
+                                avatarImageName: walkerStore.walker.avatarImageName ?? (walkerStore.walker.name == "Awan" ? "AwanAvatar" : "\(walkerStore.walker.name)Avatar"),
+                                avatarData: walkerStore.walker.avatarData,
                                 trips: walkerStore.trips,
                                 onDismiss: {
                                     walkerStore.send(.dismissWalkerTapped)
@@ -245,7 +245,7 @@ struct MapSheet: View {
                                 onReachDestination: {
                                     walkerStore.send(.reachDestinationTapped)
                                     withAnimation(.easeInOut(duration: 0.25)) {
-                                        selectedDetent = .fraction(0.35)
+                                        selectedDetent = .large
                                     }
                                 }
                             )
@@ -274,8 +274,10 @@ struct MapSheet: View {
                     },
                     onSelectPerson: { person in
                         store.send(.map(.selectPerson(person)))
+                        let lower = person.status.lowercased()
+                        let isIdleOrAccompany = lower == "idle" || lower == "accompany" || lower == "accompanying" || lower == "arrived" || lower == "finished" || lower == "reached destination"
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                            selectedDetent = .fraction(0.42)
+                            selectedDetent = isIdleOrAccompany ? .large : .fraction(0.35)
                         }
                     },
                     onSavedPlacesHeaderTapped: {
@@ -287,5 +289,5 @@ struct MapSheet: View {
         }
         .scrollDismissesKeyboard(.interactively)
     }
-    }
+}
 

@@ -19,9 +19,26 @@ struct AppleSignInCredential: Equatable, Sendable {
 struct UserProfile: Codable, Equatable, Sendable {
   let appleUserId: String
   let cloudKitUserId: String
-  let name: String
-  let email: String
+  var name: String
+  var email: String
   var status: String?
+  var avatarData: Data?
+
+  init(
+    appleUserId: String,
+    cloudKitUserId: String,
+    name: String,
+    email: String,
+    status: String? = nil,
+    avatarData: Data? = nil
+  ) {
+    self.appleUserId = appleUserId
+    self.cloudKitUserId = cloudKitUserId
+    self.name = name
+    self.email = email
+    self.status = status
+    self.avatarData = avatarData
+  }
   
   var recordName: String {
     "UserProfile_\(appleUserId)_\(cloudKitUserId)"
@@ -70,6 +87,8 @@ struct LoginFeature {
 
   enum Action: Equatable {
     case loadStoredUser
+    case avatarLoaded(Data)
+    case profileUpdated(UserProfile)
     case appleSignInCompleted(AppleSignInCredential)
     case loginResponse(Result<UserProfile, LoginError>)
     case signOutButtonTapped
@@ -87,7 +106,50 @@ struct LoginFeature {
       case .loadStoredUser:
         guard let profile = UserProfileStorage.load() else { return .none }
         state.userProfile = profile
-        return .send(.delegate(.loggedIn(profile)))
+        return .run { [profile] send in
+          await send(.delegate(.loggedIn(profile)))
+
+          // Proactively verify & resolve genuine Apple Account identity
+          let container = CKContainer.default()
+          var resolvedName = profile.name
+          var resolvedEmail = profile.email
+
+          if let userRecordID = try? await container.userRecordID(),
+             let userIdentity = try? await container.userIdentity(forUserRecordID: userRecordID) {
+            if let components = userIdentity.nameComponents {
+              let discoveredName = PersonNameComponentsFormatter().string(from: components).trimmingCharacters(in: .whitespacesAndNewlines)
+              if !discoveredName.isEmpty && (resolvedName == "User" || resolvedName.isEmpty) {
+                resolvedName = discoveredName
+              }
+            }
+            if let discoveredEmail = userIdentity.lookupInfo?.emailAddress?.trimmingCharacters(in: .whitespacesAndNewlines), !discoveredEmail.isEmpty && resolvedEmail.isEmpty {
+              resolvedEmail = discoveredEmail
+            }
+          }
+
+          let avatar = await ContactPhotoClient.liveValue.fetchMeCardPhoto(resolvedEmail, resolvedName)
+          if avatar != profile.avatarData || resolvedName != profile.name || resolvedEmail != profile.email {
+            var updated = profile
+            updated.name = resolvedName
+            updated.email = resolvedEmail
+            updated.avatarData = avatar
+            await send(.profileUpdated(updated))
+          }
+        }
+
+      case let .avatarLoaded(avatarData):
+        if var profile = state.userProfile {
+          profile.avatarData = avatarData
+          state.userProfile = profile
+          UserProfileStorage.save(profile)
+          return .send(.delegate(.loggedIn(profile)))
+        }
+        return .none
+
+      case let .profileUpdated(updatedProfile):
+        state.userProfile = updatedProfile
+        UserProfileStorage.save(updatedProfile)
+        return .send(.delegate(.loggedIn(updatedProfile)))
 
       case let .appleSignInCompleted(credential):
         state.isLoading = true
@@ -96,7 +158,7 @@ struct LoginFeature {
         return .run { send in
           do {
             let profile = try await upsertUserProfile(with: credential)
-            await UserProfileStorage.save(profile)
+            UserProfileStorage.save(profile)
             await send(.loginResponse(.success(profile)))
           } catch {
             await send(.loginResponse(.failure(LoginError(message: error.localizedDescription))))
@@ -132,11 +194,22 @@ private func upsertUserProfile(with credential: AppleSignInCredential) async thr
 
   let container = CKContainer.default()
   let database = container.publicCloudDatabase
-  let cloudKitUserId = try await container.userRecordID().recordName
+  let userRecordID = try await container.userRecordID()
+  let cloudKitUserId = userRecordID.recordName
   let recordID = CKRecord.ID(recordName: userProfileRecordName(
     appleUserId: credential.appleUserId,
     cloudKitUserId: cloudKitUserId
   ))
+
+  // 1. Discover authentic name and email from CloudKit UserIdentity if missing from credential
+  var discoveredName: String?
+  var discoveredEmail: String?
+  if let userIdentity = try? await container.userIdentity(forUserRecordID: userRecordID) {
+    if let components = userIdentity.nameComponents {
+      discoveredName = PersonNameComponentsFormatter().string(from: components).nilIfBlank
+    }
+    discoveredEmail = userIdentity.lookupInfo?.emailAddress?.nilIfBlank
+  }
 
   let existingRecord = try? await database.record(for: recordID)
   let record = existingRecord ?? CKRecord(recordType: "UserProfile", recordID: recordID)
@@ -144,28 +217,44 @@ private func upsertUserProfile(with credential: AppleSignInCredential) async thr
   let isSameStoredUser = storedProfile?.appleUserId == credential.appleUserId
   let existingName = (existingRecord?["name"] as? String)?.nilIfBlank
   let existingEmail = (existingRecord?["email"] as? String)?.nilIfBlank
+
   let name = credential.name?.nilIfBlank
+    ?? discoveredName
     ?? existingName
     ?? (isSameStoredUser ? storedProfile?.name.nilIfBlank : nil)
     ?? "User"
   let email = credential.email?.nilIfBlank
+    ?? discoveredEmail
     ?? existingEmail
     ?? (isSameStoredUser ? storedProfile?.email.nilIfBlank : nil)
     ?? ""
+
+  var avatarData: Data? = nil
+  if let photo = await ContactPhotoClient.liveValue.fetchMeCardPhoto(email, name) {
+    avatarData = photo
+  } else if let existingAvatarData = existingRecord?["avatarData"] as? Data {
+    avatarData = existingAvatarData
+  }
 
   record["appleUserId"] = credential.appleUserId as CKRecordValue
   record["cloudKitUserId"] = cloudKitUserId as CKRecordValue
   record["name"] = name as CKRecordValue
   record["email"] = email as CKRecordValue
+  if let avatarData {
+    record["avatarData"] = avatarData as CKRecordValue
+  } else {
+    record["avatarData"] = nil
+  }
 
-  _ = try await database.save(record)
+  _ = try? await database.save(record)
 
   return UserProfile(
     appleUserId: credential.appleUserId,
     cloudKitUserId: cloudKitUserId,
     name: name,
     email: email,
-    status: existingRecord?["Status"] as? String
+    status: existingRecord?["Status"] as? String,
+    avatarData: avatarData
   )
 }
 

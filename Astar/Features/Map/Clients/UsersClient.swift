@@ -28,12 +28,14 @@ extension UsersClient: DependencyKey {
                let name = record["name"] as? String,
                let email = record["email"] as? String {
                 let status = record["Status"] as? String
+                let avatarData = record["avatarData"] as? Data
                 let profile = UserProfile(
                     appleUserId: appleUserId,
                     cloudKitUserId: cloudKitUserId,
                     name: name,
                     email: email,
-                    status: status
+                    status: status,
+                    avatarData: avatarData
                 )
                 profiles.append(profile)
             }
@@ -53,12 +55,14 @@ extension UsersClient: DependencyKey {
            let name = record["name"] as? String,
            let recordEmail = record["email"] as? String, recordEmail == email {
             let status = record["Status"] as? String
+            let avatarData = record["avatarData"] as? Data
             return UserProfile(
                 appleUserId: appleUserId,
                 cloudKitUserId: cloudKitUserId,
                 name: name,
                 email: recordEmail,
-                status: status
+                status: status,
+                avatarData: avatarData
             )
         }
         return nil
