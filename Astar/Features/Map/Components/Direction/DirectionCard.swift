@@ -68,6 +68,7 @@ struct DirectionCard: View {
                     isLast: false
                 )
 
+                // Route summary & GO button
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         if isLoadingRoute {
@@ -113,17 +114,6 @@ struct DirectionCard: View {
                 .padding(.top, 16)
                 .padding(.bottom, 20)
                 .padding(.horizontal, 2)
-
-                Divider()
-                    .opacity(0.5)
-
-                Text("Trusted contacts will watch over you once they accept your request.")
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(.gray)
-                    .multilineTextAlignment(.center)
-                    .padding(.top, 16)
-                    .padding(.bottom, 8)
-                    .padding(.horizontal, 20)
             }
             .padding(.horizontal, 14)
             .background(.white, in: .rect(cornerRadius: 24))

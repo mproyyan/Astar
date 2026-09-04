@@ -87,7 +87,8 @@ extension ConnectionsClient: DependencyKey {
                             cloudKitUserId: cloudKitUserId,
                             name: name,
                             email: email,
-                            status: partnerRecord["Status"] as? String
+                            status: partnerRecord["Status"] as? String,
+                            avatarData: partnerRecord["avatarData"] as? Data
                         )
                         
                         connectionProfiles.append(ConnectionProfile(connection: connection, partnerProfile: profile))
