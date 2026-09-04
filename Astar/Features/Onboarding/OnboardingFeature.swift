@@ -33,26 +33,38 @@ struct OnboardingFeature {
     var currentIndex = 0
     var pendingDeepLink: DeepLink? = nil
     var login: LoginFeature.State = .init()
-    var contents: [OnboardingContent] = [
-      OnboardingContent(
-        title: "WalkGuard",
-        body: .paragraph("Never feel alone. Trail keeps your trusted person updated in real time, so you can stay aware of your surroundings without checking your phone."),
-        imageName: "figure.walk.motion"
-      ),
-      OnboardingContent(
-        title: "Walker & Guardian",
-        body: .glossary([
-            GlossaryItem(term: "Walker", definition: "The person commuting on foot. Your journey is shared through your iPhone or Apple Watch."),
-            GlossaryItem(term: "Companion", definition: "Your trusted person. You can assign your Companion in your profile so they can actively watch your journey and get notified when you arrive."),
-        ]),
-        imageName: "person.3.fill"
-      ),
-      OnboardingContent(
-        title: "Default Place",
-        body: .paragraph("Add frequent stops like Home or Work to your profile. This helps Trail instantly recognize your usual routes without manual typing."),
-        imageName: "house.fill"
-      )
-    ]
+      var contents: [OnboardingContent] = [
+          OnboardingContent(
+              title: "Trail",
+              body: .paragraph(
+                  "Never feel alone. Trail keeps your trusted person updated in real time."
+              ),
+              imageName: "figure.walk.motion"
+          ),
+
+          OnboardingContent(
+              title: "You Walk. They Watch.",
+              body: .glossary([
+                  GlossaryItem(
+                      term: "Walker",
+                      definition: "You're the person making the journey."
+                  ),
+                  GlossaryItem(
+                      term: "Trusted Person",
+                      definition: "Someone you choose to keep an eye on your journey and know when you arrive."
+                  )
+              ]),
+              imageName: "person.2.fill"
+          ),
+
+          OnboardingContent(
+              title: "Set Your Default Locations",
+              body: .paragraph(
+                  "Add places like Home, Work, or Campus so you can choose them faster when starting a journey."
+              ),
+              imageName: "house.fill"
+          )
+      ]
   }
 
   enum Action: Equatable {
@@ -78,31 +90,18 @@ struct OnboardingFeature {
     Reduce { state, action in
       switch action {
       case .onAppear:
-        return .run { send in
-          for await _ in await self.clock.timer(interval: .seconds(3)) {
-            await send(.timerTicked)
-          }
-        }
+          return .none
         .cancellable(id: "cancel_timer", cancelInFlight: true)
 
       case .onDisappear:
-        return .cancel(id: "cancel_timer")
+          return .none
 
       case .timerTicked:
-        state.currentIndex = (state.currentIndex + 1) % state.contents.count
-        return .none
-
+          return .none
+          
       case let .setIndex(index):
-        state.currentIndex = index
-        return .concatenate(
-          .cancel(id: "cancel_timer"),
-          .run { send in
-            for await _ in await self.clock.timer(interval: .seconds(3)) {
-              await send(.timerTicked)
-            }
-          }
-          .cancellable(id: "cancel_timer", cancelInFlight: true)
-        )
+          state.currentIndex = index
+          return .none
 
       case let .login(.delegate(.loggedIn(profile))):
         return .send(.delegate(.loggedIn(profile)))
