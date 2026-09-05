@@ -1,4 +1,5 @@
 import ComposableArchitecture
+import CloudKit
 import CoreLocation
 import MapKit
 
@@ -59,9 +60,10 @@ struct MapDirectionSheetFeature {
     }
   }
 
-  @Dependency(\.directionRoute) var directionRoute
-  @Dependency(\.trackingClient) var trackingClient
-  @Dependency(\.uuid) var uuid
+    @Dependency(\.directionRoute) var directionRoute
+    @Dependency(\.trackingClient) var trackingClient
+    @Dependency(\.connectionsClient) var connectionsClient
+    @Dependency(\.uuid) var uuid
 
   var body: some Reducer<State, Action> {
     Reduce { state, action in
@@ -232,6 +234,27 @@ struct MapDirectionSheetFeature {
 
                     // Update user status
                     try await trackingClient.updateUserStatus(userRecordID, "walking", session.id, nil)
+                    
+                    // Broadcast to mutual connections
+                    do {
+                        let allConnections = try await connectionsClient.fetchConnections(CKRecord.ID(recordName: userRecordID))
+                        let mutualConnections = allConnections.filter { $0.connection.status == "mutual" }
+                        
+                        for connection in mutualConnections {
+                            let companionID = connection.connection.member1RowID == userRecordID
+                                ? connection.connection.member2RowID
+                                : connection.connection.member1RowID
+                            
+                            do {
+                                _ = try await trackingClient.joinWalkSession(session.id, companionID)
+                                print("📢 [Broadcast] Added mutual connection \(connection.partnerProfile.name) (\(companionID)) as participant for session \(session.id)")
+                            } catch {
+                                print("⚠️ [Broadcast] Failed adding participant \(companionID): \(error)")
+                            }
+                        }
+                    } catch {
+                        print("⚠️ [Broadcast] Failed fetching mutual connections: \(error)")
+                    }
 
                     await send(.delegate(.navigationStarted(sessionID: session.id)))
                     return
