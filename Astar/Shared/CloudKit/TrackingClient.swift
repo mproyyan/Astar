@@ -224,6 +224,7 @@ extension TrackingClient: DependencyKey {
             info.shouldSendContentAvailable = true
             info.alertBody = "Walk session was updated."
             info.soundName = "default"
+            info.category = "WALK_INVITATION"
             info.desiredKeys = ["currentCoordinate", "status", "lastPingAt"]
             
             subscription.notificationInfo = info
