@@ -716,7 +716,7 @@ struct MainMapFeature {
 
                      do {
                          print("👥 Joining session...")
-                         let sessionParticipant = try await trackingClient.joinWalkSession(session.id, selfRecordID)
+                         let sessionParticipant = try await trackingClient.updateParticipantStatus(session.id, selfRecordID, "accept")
                          print("✅ Joined session: \(sessionParticipant.id)")
 
                          print("🔄 Updating user status to accompany...")
@@ -827,6 +827,11 @@ struct MainMapFeature {
                .run { [trackingClient] _ in
                   if let sessionID = endingSessionID {
                      try? await trackingClient.setSubscribeWalkSession(sessionID, false)
+                     if let profile = UserProfileStorage.load() {
+                         let selfRecordID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"
+                            .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+                         try? await trackingClient.updateParticipantStatus(sessionID, selfRecordID, "left")
+                     }
                   }
                   if let profile = UserProfileStorage.load() {
                      let selfRecordID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"

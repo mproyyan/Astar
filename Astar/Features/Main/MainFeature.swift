@@ -1,3 +1,4 @@
+import CloudKit
 import ComposableArchitecture
 import Foundation
 
@@ -36,6 +37,7 @@ struct MainFeature {
     case map(MainMapFeature.Action)
     case path(StackActionOf<Path>)
     case delegate(Delegate)
+    case handleAcceptedInvitation(String)
 
     enum Delegate: Equatable {
       case signedOut
@@ -43,6 +45,7 @@ struct MainFeature {
   }
   
   @Dependency(\.usersClient) var usersClient
+  @Dependency(\.trackingClient) var trackingClient
   
   var body: some Reducer<State, Action> {
     Scope(state: \.login, action: \.login) {
@@ -55,18 +58,71 @@ struct MainFeature {
     
     Reduce { state, action in
       switch action {
-      case .onAppear:
-        return .run { send in
-          // 1. Initial fetch
-          await send(.refreshPeople)
-
-          // 2. Periodic background refresh every 6 seconds to keep presence in sync
-          while !Task.isCancelled {
-            try? await Task.sleep(nanoseconds: 6_000_000_000)
-            guard !Task.isCancelled else { break }
-            await send(.refreshPeople)
-          }
+      case let .handleAcceptedInvitation(walkerRef):
+        // walkerRef is "UserProfile_<appleUserId>_<cloudKitUserId>"
+        let prefix = "UserProfile_"
+        let ids = walkerRef.replacingOccurrences(of: prefix, with: "").components(separatedBy: "_")
+        if ids.count >= 2 {
+            let appleUserId = ids[0]
+            let cloudKitUserId = ids[1...].joined(separator: "_")
+            if let person = state.people.first(where: { $0.appleUserId == appleUserId && $0.cloudKitUserId == cloudKitUserId }) {
+                return .send(.map(.selectPerson(person)))
+            } else if let person = state.people.first(where: { $0.cloudKitUserId == cloudKitUserId }) {
+                return .send(.map(.selectPerson(person)))
+            }
         }
+        return .none
+
+      case .onAppear:
+        return .merge(
+          .run { [currentUser = state.login.userProfile, trackingClient] send in
+            if let profile = currentUser ?? UserProfileStorage.load() {
+               let selfRecordID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"
+                  .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+               do {
+                   try await trackingClient.setupInvitationSubscription(selfRecordID)
+                   print("✅ Setup invitation subscription for \(selfRecordID)")
+               } catch {
+                   print("⚠️ Failed setting up invitation subscription: \(error)")
+               }
+            }
+
+            // 1. Initial fetch
+            await send(.refreshPeople)
+
+            // 2. Periodic background refresh every 6 seconds to keep presence in sync
+            while !Task.isCancelled {
+              try? await Task.sleep(nanoseconds: 6_000_000_000)
+              guard !Task.isCancelled else { break }
+              await send(.refreshPeople)
+            }
+          },
+          .run { [trackingClient] send in
+              for await notification in NotificationCenter.default.publisher(for: Notification.Name("walkSessionUpdateNotification")).values {
+                  guard !Task.isCancelled else { break }
+                  if let userInfo = notification.userInfo,
+                     let isAccepted = userInfo["isAccepted"] as? Bool,
+                     isAccepted,
+                     let recordID = userInfo["recordID"] as? CKRecord.ID {
+                     
+                     let parts = recordID.recordName.components(separatedBy: "_")
+                     if parts.count >= 3 && parts[0] == "SessionParticipant" {
+                         let sessionID = parts[1]
+                         let prefix = "SessionParticipant_\(sessionID)_"
+                         let selfRecordID = recordID.recordName.replacingOccurrences(of: prefix, with: "")
+                         
+                         do {
+                             try await trackingClient.updateParticipantStatus(sessionID, selfRecordID, "accept")
+                             let session = try await trackingClient.getWalkSession(sessionID)
+                             await send(.handleAcceptedInvitation(session.walkerRef))
+                         } catch {
+                             print("❌ Failed to accept invitation or get session: \(error)")
+                         }
+                     }
+                  }
+              }
+          }
+        )
 
       case .refreshPeople:
         return .run { [currentUser = state.login.userProfile] send in

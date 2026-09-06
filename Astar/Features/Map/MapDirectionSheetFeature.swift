@@ -1,4 +1,5 @@
 import ComposableArchitecture
+import CloudKit
 import CoreLocation
 import MapKit
 
@@ -24,6 +25,7 @@ struct MapDirectionSheetFeature {
     var isDestinationReached: Bool = false
     var isDevelopmentMode: Bool = DeveloperSettingsStorage.isDevelopmentMode
 
+    var watchingPeople: [Person] = []
     var isShowingBroadcastSheet: Bool = false
 
     var journeyLogEntries: [JourneyLogEntry] = []
@@ -31,6 +33,7 @@ struct MapDirectionSheetFeature {
 
   enum Action: Equatable {
     case onAppear(currentLocation: CLLocationCoordinate2D?)
+    case setWatchingPeople([Person])
     case routeCalculated(WalkingRouteInfo)
     case originResolved(SavedPlace)
     case destinationResolved(CLLocationCoordinate2D)
@@ -57,13 +60,18 @@ struct MapDirectionSheetFeature {
     }
   }
 
-  @Dependency(\.directionRoute) var directionRoute
-  @Dependency(\.trackingClient) var trackingClient
-  @Dependency(\.uuid) var uuid
+    @Dependency(\.directionRoute) var directionRoute
+    @Dependency(\.trackingClient) var trackingClient
+    @Dependency(\.connectionsClient) var connectionsClient
+    @Dependency(\.uuid) var uuid
 
   var body: some Reducer<State, Action> {
     Reduce { state, action in
       switch action {
+      case let .setWatchingPeople(people):
+        state.watchingPeople = people
+        return .none
+
       case let .onAppear(currentLocation):
         state.isCalculatingRoute = true
         let originCoord = currentLocation ?? CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
@@ -226,6 +234,27 @@ struct MapDirectionSheetFeature {
 
                     // Update user status
                     try await trackingClient.updateUserStatus(userRecordID, "walking", session.id, nil)
+                    
+                    // Broadcast to mutual connections
+                    do {
+                        let allConnections = try await connectionsClient.fetchConnections(CKRecord.ID(recordName: userRecordID))
+                        let mutualConnections = allConnections.filter { $0.connection.status == "mutual" }
+                        
+                        for connection in mutualConnections {
+                            let companionID = connection.connection.member1RowID == userRecordID
+                                ? connection.connection.member2RowID
+                                : connection.connection.member1RowID
+                            
+                            do {
+                                _ = try await trackingClient.inviteToWalkSession(session.id, companionID)
+                                print("📢 [Broadcast] Added mutual connection \(connection.partnerProfile.name) (\(companionID)) as participant for session \(session.id)")
+                            } catch {
+                                print("⚠️ [Broadcast] Failed adding participant \(companionID): \(error)")
+                            }
+                        }
+                    } catch {
+                        print("⚠️ [Broadcast] Failed fetching mutual connections: \(error)")
+                    }
 
                     await send(.delegate(.navigationStarted(sessionID: session.id)))
                     return
