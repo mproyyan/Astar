@@ -4,8 +4,9 @@ import ComposableArchitecture
 
 class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterDelegate {
 
-    // We can store a reference to the global store here if needed, or pass notification info via publishers
+    // Local notification names used to bridge APNs → app logic
     static let walkSessionUpdateNotification = Notification.Name("walkSessionUpdateNotification")
+    static let invitationNotification = Notification.Name("invitationNotification")
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
 
@@ -63,16 +64,26 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         if let queryNotification = notification as? CKQueryNotification,
            (queryNotification.queryNotificationReason == .recordCreated || queryNotification.queryNotificationReason == .recordUpdated) {
 
-            // Post local notification to be picked up by map view tracking
             if let recordID = queryNotification.recordID {
                 let reasonStr = queryNotification.queryNotificationReason == .recordCreated ? "recordCreated" : "recordUpdated"
                 print("📬 [AppDelegate] APNs Remote Notification received at \(receiveTime) | Reason: \(reasonStr) | RecordID: \(recordID.recordName)")
 
-                NotificationCenter.default.post(
-                    name: AppDelegate.walkSessionUpdateNotification,
-                    object: nil,
-                    userInfo: ["recordID": recordID, "receivedAt": receiveTime]
-                )
+                // SessionParticipant records start with "SessionParticipant_"
+                // Route these to the invitation handler, not the WalkSession tracker
+                if recordID.recordName.hasPrefix("SessionParticipant_") {
+                    NotificationCenter.default.post(
+                        name: AppDelegate.invitationNotification,
+                        object: nil,
+                        userInfo: ["recordID": recordID, "receivedAt": receiveTime]
+                    )
+                } else {
+                    // WalkSession updates for live companion tracking
+                    NotificationCenter.default.post(
+                        name: AppDelegate.walkSessionUpdateNotification,
+                        object: nil,
+                        userInfo: ["recordID": recordID, "receivedAt": receiveTime]
+                    )
+                }
             }
             completionHandler(.newData)
         } else {
@@ -98,13 +109,21 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             if let ckNotification = CKNotification(fromRemoteNotificationDictionary: userInfo) as? CKQueryNotification,
                let recordID = ckNotification.recordID {
                 NotificationCenter.default.post(
-                    name: AppDelegate.walkSessionUpdateNotification,
+                    name: AppDelegate.invitationNotification,
                     object: nil,
                     userInfo: ["recordID": recordID, "isAccepted": true]
                 )
             }
         } else if actionID == "DISMISS_WALK_ACTION" {
             print("🚫 [AppDelegate] Companion dismissed walk invitation")
+            if let ckNotification = CKNotification(fromRemoteNotificationDictionary: userInfo) as? CKQueryNotification,
+               let recordID = ckNotification.recordID {
+                NotificationCenter.default.post(
+                    name: AppDelegate.invitationNotification,
+                    object: nil,
+                    userInfo: ["recordID": recordID, "isAccepted": false]
+                )
+            }
         }
 
         completionHandler()

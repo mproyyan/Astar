@@ -329,10 +329,11 @@ extension TrackingClient: DependencyKey {
             
             let info = CKSubscription.NotificationInfo()
             info.shouldSendContentAvailable = true
-            info.alertBody = "You have a new walk tracking invitation!"
+            info.title = "Walk Invitation 🚶"
+            info.alertBody = "Your trusted person started a walk. Would you like to accompany them?"
             info.soundName = "default"
             info.category = "WALK_INVITATION"
-            info.desiredKeys = ["sessionRef", "status"]
+            info.desiredKeys = ["sessionRef", "companionRef", "status"]
             subscription.notificationInfo = info
             
             try await db.save(subscription)

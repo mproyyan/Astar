@@ -124,6 +124,19 @@ struct MainMapFeature {
             for await error in await locationManager.errorUpdates() {
               await send(.locationManager(.didFailWithError(error.localizedDescription)))
             }
+          },
+          // Register CloudKit invitation subscription so this device receives APNs
+          // when a mutual trusted person starts a walk and invites them as companion.
+          .run { _ in
+            guard let userProfile = UserProfileStorage.load() else { return }
+            let userRecordID = "UserProfile_\(userProfile.appleUserId)_\(userProfile.cloudKitUserId)"
+              .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+            do {
+              try await trackingClient.setupInvitationSubscription(userRecordID)
+              print("✅ [MainMapFeature] Invitation subscription registered for \(userRecordID)")
+            } catch {
+              print("⚠️ [MainMapFeature] Failed to register invitation subscription: \(error)")
+            }
           }
         )
 
