@@ -49,6 +49,12 @@ struct Person: Identifiable, Equatable, Sendable {
         self.avatarImageName = avatarImageName
     }
 
+    static func stableID(appleUserId: String?, cloudKitUserId: String?) -> UUID {
+        let combined = "\(appleUserId ?? "")_\(cloudKitUserId ?? "")"
+        let hex = String(format: "%012x", abs(combined.hashValue))
+        return UUID(uuidString: "00000000-0000-0000-0000-\(hex)") ?? UUID()
+    }
+
     static let mockJohnDoe = Person(
         id: UUID(uuidString: "00000000-0000-0000-0000-000000000001") ?? UUID(),
         name: "John Doe",

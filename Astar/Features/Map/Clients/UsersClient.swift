@@ -3,14 +3,19 @@ import ComposableArchitecture
 import Foundation
 
 @DependencyClient
-struct UsersClient {
-  var fetchAllUsers: () async throws -> [UserProfile]
-  var fetchUserByEmail: (_ email: String) async throws -> UserProfile?
+struct UsersClient: Sendable {
+  var fetchAllUsers: @Sendable () async throws -> [UserProfile]
+  var fetchUserByEmail: @Sendable (_ email: String) async throws -> UserProfile?
+  var fetchUserByRecordID: @Sendable (_ recordID: String) async throws -> UserProfile?
 }
 
 extension UsersClient: DependencyKey {
   static let liveValue = Self.live()
-  static let testValue = Self(fetchAllUsers: { [] }, fetchUserByEmail: { _ in nil })
+  static let testValue = Self(
+    fetchAllUsers: { [] },
+    fetchUserByEmail: { _ in nil },
+    fetchUserByRecordID: { _ in nil }
+  )
 
   static func live() -> Self {
     return Self(
@@ -66,6 +71,29 @@ extension UsersClient: DependencyKey {
             )
         }
         return nil
+      },
+      fetchUserByRecordID: { recordID in
+        let container = CKContainer.default()
+        let database = container.publicCloudDatabase
+        do {
+            let record = try await database.record(for: CKRecord.ID(recordName: recordID))
+            let appleUserId = record["appleUserId"] as? String ?? ""
+            let cloudKitUserId = record["cloudKitUserId"] as? String ?? ""
+            let name = record["name"] as? String ?? ""
+            let email = record["email"] as? String ?? ""
+            let status = record["Status"] as? String
+            let avatarData = record["avatarData"] as? Data
+            return UserProfile(
+                appleUserId: appleUserId,
+                cloudKitUserId: cloudKitUserId,
+                name: name,
+                email: email,
+                status: status,
+                avatarData: avatarData
+            )
+        } catch {
+            return nil
+        }
       }
     )
   }

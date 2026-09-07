@@ -26,9 +26,7 @@ struct RootFeatureTests {
 
     // When onboarding receives loggedIn, RootFeature transitions to main with userProfile
     await store.send(.onboarding(.delegate(.loggedIn(mockProfile)))) {
-      var expected = MainFeature.State(userProfile: mockProfile)
-      expected.isDevelopmentMode = false
-      $0 = .main(expected)
+      $0 = .main(MainFeature.State(userProfile: mockProfile))
     }
   }
 

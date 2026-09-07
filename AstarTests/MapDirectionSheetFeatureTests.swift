@@ -46,6 +46,7 @@ struct MapDirectionSheetFeatureTests {
         )
       }
       $0.trackingClient.updateUserStatus = { _, _, _, _ in }
+      $0.connectionsClient.fetchConnections = { _ in [] }
     }
 
     await store.send(.startNavigationTapped(currentLocation: coord)) {

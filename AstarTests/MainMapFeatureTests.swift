@@ -726,6 +726,9 @@ struct MainMapFeatureTests {
           unsubscribedSessionID = sessionID
         }
       }
+      $0.trackingClient.updateParticipantStatus = { _, _, _ in
+        SessionParticipant(id: "p", sessionRef: "s", companionRef: "c", status: "left")
+      }
     }
 
     await store.send(.stopTrackingTapped)

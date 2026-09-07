@@ -49,6 +49,8 @@ struct MainFeature {
   
   @Dependency(\.usersClient) var usersClient
   @Dependency(\.trackingClient) var trackingClient
+  @Dependency(\.connectionsClient) var connectionsClient
+  @Dependency(\.contactPhotoClient) var contactPhotoClient
   
   var body: some Reducer<State, Action> {
     Scope(state: \.login, action: \.login) {
@@ -62,48 +64,29 @@ struct MainFeature {
     Reduce { state, action in
       switch action {
       case let .handleAcceptedInvitation(walkerRef):
-        let prefix = "UserProfile_"
-        let ids = walkerRef.replacingOccurrences(of: prefix, with: "").components(separatedBy: "_")
-        if ids.count >= 2 {
-            let appleUserId = ids[0]
-            let cloudKitUserId = ids[1...].joined(separator: "_")
-            if let person = state.people.first(where: { $0.appleUserId == appleUserId && $0.cloudKitUserId == cloudKitUserId }) {
-                return .send(.map(.selectPerson(person)))
-            } else if let person = state.people.first(where: { $0.cloudKitUserId == cloudKitUserId }) {
-                return .send(.map(.selectPerson(person)))
-            }
+        if let person = state.people.first(where: {
+          let recID = "UserProfile_\($0.appleUserId ?? "")_\($0.cloudKitUserId ?? "")"
+            .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+          return recID == walkerRef || ($0.cloudKitUserId != nil && walkerRef.contains($0.cloudKitUserId!))
+        }) {
+          return .send(.map(.selectPerson(person)))
         }
         return .none
 
       case let .incomingInvitationReceived(participantRecordID, isAccepted):
-        return .run { [usersClient, trackingClient] send in
+        return .run { [usersClient, trackingClient, connectionsClient, contactPhotoClient] send in
           do {
             let participant = try await trackingClient.fetchSessionParticipant(participantRecordID)
             guard !participant.sessionRef.isEmpty else { return }
             let session = try await trackingClient.getWalkSession(participant.sessionRef)
             guard !session.walkerRef.isEmpty else { return }
 
-            let prefix = "UserProfile_"
-            let ids = session.walkerRef.replacingOccurrences(of: prefix, with: "").components(separatedBy: "_")
-            if ids.count >= 2 {
-              let appleUserId = ids[0]
-              let cloudKitUserId = ids[1...].joined(separator: "_")
-              let profiles = (try? await usersClient.fetchAllUsers()) ?? []
-              if let matchedProfile = profiles.first(where: { $0.appleUserId == appleUserId || $0.cloudKitUserId == cloudKitUserId }) {
-                let walkerPerson = Person(
-                  name: matchedProfile.name,
-                  status: Self.formatStatus(matchedProfile.status),
-                  appleUserId: matchedProfile.appleUserId,
-                  cloudKitUserId: matchedProfile.cloudKitUserId,
-                  email: matchedProfile.email,
-                  avatarData: matchedProfile.avatarData
-                )
-                await send(.invitationWalkerResolved(walkerPerson, isAccepted: isAccepted))
-                return
-              }
-            }
-
-            let walkerPerson = Person(name: "Walker", status: "Walking", cloudKitUserId: session.walkerRef)
+            let walkerPerson = await Self.resolveWalkerPerson(
+              walkerRef: session.walkerRef,
+              usersClient: usersClient,
+              connectionsClient: connectionsClient,
+              contactPhotoClient: contactPhotoClient
+            )
             await send(.invitationWalkerResolved(walkerPerson, isAccepted: isAccepted))
           } catch {
             print("⚠️ [MainFeature] Failed resolving incoming invitation \(participantRecordID): \(error)")
@@ -113,7 +96,7 @@ struct MainFeature {
       case let .invitationWalkerResolved(walkerPerson, isAccepted):
         let selectAction = Action.map(.selectPerson(walkerPerson))
         if isAccepted {
-          return .merge(
+          return .concatenate(
             .send(selectAction),
             .send(.map(.sheet(.presented(.walker(.trackTapped)))))
           )
@@ -170,21 +153,21 @@ struct MainFeature {
         }
 
       case .refreshPeople:
-        return .run { [currentUser = state.login.userProfile] send in
+        return .run { [currentUser = state.login.userProfile, contactPhotoClient] send in
           do {
             let profiles = try await usersClient.fetchAllUsers()
             var people: [Person] = []
             for profile in profiles.filter({ $0.appleUserId != currentUser?.appleUserId }) {
               var avatar = profile.avatarData
               if avatar == nil {
-                avatar = await ContactPhotoClient.liveValue.fetchContactPhotoByEmail(profile.email)
+                avatar = await contactPhotoClient.fetchContactPhotoByEmail(profile.email)
               }
               if avatar == nil {
-                avatar = await ContactPhotoClient.liveValue.fetchContactPhotoByName(profile.name)
+                avatar = await contactPhotoClient.fetchContactPhotoByName(profile.name)
               }
               let avatarImageName = profile.name == "Awan" ? "AwanAvatar" : nil
               people.append(Person(
-                id: UUID(),
+                id: Person.stableID(appleUserId: profile.appleUserId, cloudKitUserId: profile.cloudKitUserId),
                 name: profile.name,
                 status: Self.formatStatus(profile.status),
                 appleUserId: profile.appleUserId,
@@ -283,8 +266,9 @@ struct MainFeature {
         }
         return .none
         
-      case .path(.element(id: _, action: .profile(.delegate(.restartDoeWalkingSimulation)))):
+      case .path(.element(id: let id, action: .profile(.delegate(.restartDoeWalkingSimulation)))):
         state.isDoeWalkingMock = true
+        state.path[id: id, case: \.profile]?.isDoeWalkingMock = true
         if let idx = state.people.firstIndex(where: { $0.id == Person.mockDoeID }) {
           state.people[idx] = Person(id: Person.mockDoeID, name: "Doe", status: "Walking")
         }
@@ -378,6 +362,83 @@ struct MainFeature {
       return "Accompanying"
     }
     return trimmed.capitalized
+  }
+
+  static func resolveWalkerPerson(
+    walkerRef: String,
+    usersClient: UsersClient,
+    connectionsClient: ConnectionsClient,
+    contactPhotoClient: ContactPhotoClient
+  ) async -> Person {
+    // 1. Check Mock Doe
+    if walkerRef == "mock-doe" || walkerRef.localizedCaseInsensitiveContains("doe") {
+      return Person.mockDoe
+    }
+
+    // 2. Direct CloudKit record lookup
+    if let profile = try? await usersClient.fetchUserByRecordID(walkerRef) {
+      return await makePerson(from: profile, contactPhotoClient: contactPhotoClient)
+    }
+
+    // 3. Match against all users via sanitized ID
+    if let allProfiles = try? await usersClient.fetchAllUsers() {
+      for profile in allProfiles {
+        let recID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"
+          .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+        if recID == walkerRef
+            || (!profile.cloudKitUserId.isEmpty && walkerRef.contains(profile.cloudKitUserId))
+            || (!profile.appleUserId.isEmpty && walkerRef.contains(profile.appleUserId)) {
+          return await makePerson(from: profile, contactPhotoClient: contactPhotoClient)
+        }
+      }
+    }
+
+    // 4. Match against mutual connections
+    if let currentUser = UserProfileStorage.load() {
+      let selfRecordID = "UserProfile_\(currentUser.appleUserId)_\(currentUser.cloudKitUserId)"
+        .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+      if let connections = try? await connectionsClient.fetchConnections(CKRecord.ID(recordName: selfRecordID)) {
+        for conn in connections {
+          let partner = conn.partnerProfile
+          let recID = "UserProfile_\(partner.appleUserId)_\(partner.cloudKitUserId)"
+            .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+          if recID == walkerRef
+              || (!partner.cloudKitUserId.isEmpty && walkerRef.contains(partner.cloudKitUserId))
+              || (!partner.appleUserId.isEmpty && walkerRef.contains(partner.appleUserId)) {
+            return await makePerson(from: partner, contactPhotoClient: contactPhotoClient)
+          }
+        }
+      }
+    }
+
+    // 5. Fallback with cleaned display name if record is completely unreachable
+    let fallbackName = walkerRef.replacingOccurrences(of: "UserProfile_", with: "")
+    return Person(
+      name: fallbackName.isEmpty ? "Walker" : fallbackName,
+      status: "Walking",
+      cloudKitUserId: walkerRef
+    )
+  }
+
+  static func makePerson(from profile: UserProfile, contactPhotoClient: ContactPhotoClient) async -> Person {
+    var avatar = profile.avatarData
+    if avatar == nil {
+      avatar = await contactPhotoClient.fetchContactPhotoByEmail(profile.email)
+    }
+    if avatar == nil {
+      avatar = await contactPhotoClient.fetchContactPhotoByName(profile.name)
+    }
+    let avatarImageName = profile.name == "Awan" ? "AwanAvatar" : nil
+    return Person(
+      id: Person.stableID(appleUserId: profile.appleUserId, cloudKitUserId: profile.cloudKitUserId),
+      name: profile.name,
+      status: Self.formatStatus(profile.status),
+      appleUserId: profile.appleUserId,
+      cloudKitUserId: profile.cloudKitUserId,
+      email: profile.email,
+      avatarData: avatar,
+      avatarImageName: avatarImageName
+    )
   }
 }
 
