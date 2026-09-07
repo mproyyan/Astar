@@ -6,6 +6,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
     // We can store a reference to the global store here if needed, or pass notification info via publishers
     static let walkSessionUpdateNotification = Notification.Name("walkSessionUpdateNotification")
+    static let walkInvitationNotification = Notification.Name("walkInvitationNotification")
+    static let walkInvitationAcceptedNotification = Notification.Name("walkInvitationAcceptedNotification")
+    static let walkInvitationDismissedNotification = Notification.Name("walkInvitationDismissedNotification")
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
 
@@ -63,16 +66,27 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         if let queryNotification = notification as? CKQueryNotification,
            (queryNotification.queryNotificationReason == .recordCreated || queryNotification.queryNotificationReason == .recordUpdated) {
 
-            // Post local notification to be picked up by map view tracking
             if let recordID = queryNotification.recordID {
                 let reasonStr = queryNotification.queryNotificationReason == .recordCreated ? "recordCreated" : "recordUpdated"
-                print("📬 [AppDelegate] APNs Remote Notification received at \(receiveTime) | Reason: \(reasonStr) | RecordID: \(recordID.recordName)")
+                let subID = queryNotification.subscriptionID ?? ""
+                print("📬 [AppDelegate] APNs Remote Notification received at \(receiveTime) | Reason: \(reasonStr) | SubID: \(subID) | RecordID: \(recordID.recordName)")
 
-                NotificationCenter.default.post(
-                    name: AppDelegate.walkSessionUpdateNotification,
-                    object: nil,
-                    userInfo: ["recordID": recordID, "receivedAt": receiveTime]
-                )
+                if subID.hasPrefix("session-participants-") {
+                    // Participant status update for the walker's session - handled by walker's participant stream
+                    print("ℹ️ [AppDelegate] Session participants update received for session: \(subID)")
+                } else if subID.hasPrefix("session-participant-invitation-") || recordID.recordName.hasPrefix("SessionParticipant_") {
+                    NotificationCenter.default.post(
+                        name: AppDelegate.walkInvitationNotification,
+                        object: nil,
+                        userInfo: ["recordID": recordID, "receivedAt": receiveTime]
+                    )
+                } else {
+                    NotificationCenter.default.post(
+                        name: AppDelegate.walkSessionUpdateNotification,
+                        object: nil,
+                        userInfo: ["recordID": recordID, "receivedAt": receiveTime]
+                    )
+                }
             }
             completionHandler(.newData)
         } else {
@@ -97,14 +111,30 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             print("✅ [AppDelegate] Companion accepted walk invitation (action: \(actionID))")
             if let ckNotification = CKNotification(fromRemoteNotificationDictionary: userInfo) as? CKQueryNotification,
                let recordID = ckNotification.recordID {
+                if recordID.recordName.hasPrefix("SessionParticipant_") {
+                    NotificationCenter.default.post(
+                        name: AppDelegate.walkInvitationAcceptedNotification,
+                        object: nil,
+                        userInfo: ["recordID": recordID, "isAccepted": true]
+                    )
+                } else {
+                    NotificationCenter.default.post(
+                        name: AppDelegate.walkSessionUpdateNotification,
+                        object: nil,
+                        userInfo: ["recordID": recordID, "isAccepted": true]
+                    )
+                }
+            }
+        } else if actionID == "DISMISS_WALK_ACTION" || actionID == UNNotificationDismissActionIdentifier {
+            print("🚫 [AppDelegate] Companion dismissed walk invitation (action: \(actionID))")
+            if let ckNotification = CKNotification(fromRemoteNotificationDictionary: userInfo) as? CKQueryNotification,
+               let recordID = ckNotification.recordID {
                 NotificationCenter.default.post(
-                    name: AppDelegate.walkSessionUpdateNotification,
+                    name: AppDelegate.walkInvitationDismissedNotification,
                     object: nil,
-                    userInfo: ["recordID": recordID, "isAccepted": true]
+                    userInfo: ["recordID": recordID]
                 )
             }
-        } else if actionID == "DISMISS_WALK_ACTION" {
-            print("🚫 [AppDelegate] Companion dismissed walk invitation")
         }
 
         completionHandler()

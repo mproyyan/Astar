@@ -42,6 +42,10 @@ struct TrackingClient: Sendable {
     
     var getWalkSession: @Sendable (_ sessionID: String) async throws -> WalkSession
     var getWalkerActiveSessionID: @Sendable (_ walkerRecordID: String) async throws -> String?
+    var fetchSessionParticipant: @Sendable (_ participantRecordID: String) async throws -> SessionParticipant
+    var fetchSessionParticipants: @Sendable (_ sessionID: String) async throws -> [SessionParticipant]
+    var setSubscribeSessionParticipants: @Sendable (_ sessionID: String, _ isSubscribed: Bool) async throws -> Void
+    var subscribeToSessionParticipants: @Sendable (_ sessionID: String) async throws -> AsyncStream<[SessionParticipant]>
 }
 
 extension TrackingClient: DependencyKey {
@@ -121,7 +125,16 @@ extension TrackingClient: DependencyKey {
         updateParticipantStatus: { sessionID, companionRecordID, status in
             let db = CKContainer.default().publicCloudDatabase
             let recordID = CKRecord.ID(recordName: "SessionParticipant_\(sessionID)_\(companionRecordID)")
-            let record = try await db.record(for: recordID)
+            let record: CKRecord
+            do {
+                record = try await db.record(for: recordID)
+            } catch {
+                record = CKRecord(recordType: "SessionParticipant", recordID: recordID)
+                let sessionRef = CKRecord.Reference(recordID: CKRecord.ID(recordName: sessionID), action: .none)
+                let companionRef = CKRecord.Reference(recordID: CKRecord.ID(recordName: companionRecordID), action: .none)
+                record["sessionRef"] = sessionRef
+                record["companionRef"] = companionRef
+            }
             
             record["status"] = status
             if status == "accept" {
@@ -362,10 +375,126 @@ extension TrackingClient: DependencyKey {
             let id = CKRecord.ID(recordName: walkerRecordID)
             let record = try await db.record(for: id)
             return (record["activeWalkSessionRef"] as? CKRecord.Reference)?.recordID.recordName
+        },
+        fetchSessionParticipant: { participantRecordID in
+            let db = CKContainer.default().publicCloudDatabase
+            let id = CKRecord.ID(recordName: participantRecordID)
+            let record = try await db.record(for: id)
+            let sessionRef = (record["sessionRef"] as? CKRecord.Reference)?.recordID.recordName ?? ""
+            let companionRef = (record["companionRef"] as? CKRecord.Reference)?.recordID.recordName ?? ""
+            let status = record["status"] as? String ?? "notDetermined"
+            let joinedAt = record["joinedAt"] as? Date
+            let leftAt = record["leftAt"] as? Date
+
+            return SessionParticipant(
+                id: participantRecordID,
+                sessionRef: sessionRef,
+                companionRef: companionRef,
+                status: status,
+                joinedAt: joinedAt,
+                leftAt: leftAt
+            )
+        },
+        fetchSessionParticipants: { sessionID in
+            try await querySessionParticipants(sessionID: sessionID)
+        },
+        setSubscribeSessionParticipants: { sessionID, isSubscribed in
+            let db = CKContainer.default().publicCloudDatabase
+            let subscriptionID = "session-participants-\(sessionID)"
+            
+            if !isSubscribed {
+                do {
+                    try await db.deleteSubscription(withID: subscriptionID)
+                    print("[TrackingClient] Deleted participant subscription for session \(sessionID)")
+                } catch let error as CKError where error.code == .unknownItem {
+                } catch {
+                    throw error
+                }
+                return
+            }
+            
+            do {
+                _ = try await db.subscription(for: subscriptionID)
+                return
+            } catch let error as CKError where error.code == .unknownItem {
+            } catch {
+                throw error
+            }
+            
+            let sessionRef = CKRecord.Reference(recordID: CKRecord.ID(recordName: sessionID), action: .none)
+            let predicate = NSPredicate(format: "sessionRef == %@", sessionRef)
+            let subscription = CKQuerySubscription(
+                recordType: "SessionParticipant",
+                predicate: predicate,
+                subscriptionID: subscriptionID,
+                options: [.firesOnRecordCreation, .firesOnRecordUpdate]
+            )
+            
+            let info = CKSubscription.NotificationInfo()
+            info.shouldSendContentAvailable = true
+            info.desiredKeys = ["sessionRef", "companionRef", "status"]
+            subscription.notificationInfo = info
+            
+            try await db.save(subscription)
+            print("[TrackingClient] Registered participant subscription for session \(sessionID)")
+        },
+        subscribeToSessionParticipants: { sessionID in
+            AsyncStream { continuation in
+                let task = Task {
+                    // 1. Initial fetch
+                    if let initial = try? await querySessionParticipants(sessionID: sessionID) {
+                        continuation.yield(initial)
+                    }
+                    
+                    // 2. Poll every 3 seconds for live updates
+                    while !Task.isCancelled {
+                        try? await Task.sleep(nanoseconds: 3_000_000_000)
+                        guard !Task.isCancelled else { break }
+                        
+                        if let updated = try? await querySessionParticipants(sessionID: sessionID) {
+                            continuation.yield(updated)
+                        }
+                    }
+                }
+                
+                continuation.onTermination = { @Sendable _ in
+                    task.cancel()
+                }
+            }
         }
     )
     
     static let testValue = Self()
+}
+
+private func querySessionParticipants(sessionID: String) async throws -> [SessionParticipant] {
+    let db = CKContainer.default().publicCloudDatabase
+    let sessionRef = CKRecord.Reference(recordID: CKRecord.ID(recordName: sessionID), action: .none)
+    let predicate = NSPredicate(format: "sessionRef == %@", sessionRef)
+    let query = CKQuery(recordType: "SessionParticipant", predicate: predicate)
+    
+    let (matchResults, _) = try await db.records(matching: query)
+    var participants: [SessionParticipant] = []
+    
+    for (_, result) in matchResults {
+        if case .success(let record) = result {
+            let sessionRef = (record["sessionRef"] as? CKRecord.Reference)?.recordID.recordName ?? ""
+            let companionRef = (record["companionRef"] as? CKRecord.Reference)?.recordID.recordName ?? ""
+            let status = record["status"] as? String ?? "notDetermined"
+            let joinedAt = record["joinedAt"] as? Date
+            let leftAt = record["leftAt"] as? Date
+            
+            participants.append(SessionParticipant(
+                id: record.recordID.recordName,
+                sessionRef: sessionRef,
+                companionRef: companionRef,
+                status: status,
+                joinedAt: joinedAt,
+                leftAt: leftAt
+            ))
+        }
+    }
+    return participants
 }
 
 extension DependencyValues {

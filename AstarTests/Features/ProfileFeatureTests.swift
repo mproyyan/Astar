@@ -85,6 +85,7 @@ struct ProfileFeatureTests {
   @Test
   @MainActor
   func testMainFeatureDevelopmentModeToggle() async {
+    UserProfileStorage.clear()
     DeveloperSettingsStorage.isDevelopmentMode = false
     DeveloperSettingsStorage.isShowRouteGuide = true
     DeveloperSettingsStorage.isDoeWalkingMockEnabled = true
@@ -101,7 +102,8 @@ struct ProfileFeatureTests {
 
     // Open profile
     await store.send(.profileButtonTapped) {
-      $0.path.append(.profile(ProfileFeature.State(userProfile: nil, isDevelopmentMode: false, isShowRouteGuide: true, isDoeWalkingMock: true)))
+      let userProfile = $0.login.userProfile ?? UserProfileStorage.load()
+      $0.path.append(.profile(ProfileFeature.State(userProfile: userProfile, isDevelopmentMode: false, isShowRouteGuide: true, isDoeWalkingMock: true)))
     }
 
     // Toggle dev mode to true
@@ -127,6 +129,7 @@ struct ProfileFeatureTests {
     await store.send(.path(.element(id: profileID, action: .profile(.resetDoeWalkingSimulation))))
     await store.receive(.path(.element(id: profileID, action: .profile(.delegate(.restartDoeWalkingSimulation))))) {
       $0.isDoeWalkingMock = true
+      $0.path[id: profileID, case: \.profile]?.isDoeWalkingMock = true
       $0.people = [Person(id: Person.mockDoeID, name: "Doe", status: "Walking")]
     }
     await store.receive(.map(.resetDoeWalking))
@@ -282,6 +285,11 @@ struct ProfileFeatureTests {
       )
     ]
 
+    UserProfileStorage.clear()
+    DeveloperSettingsStorage.isDevelopmentMode = false
+    DeveloperSettingsStorage.isShowRouteGuide = false
+    DeveloperSettingsStorage.isDoeWalkingMockEnabled = false
+
     let store = TestStore(initialState: MainFeature.State()) {
       MainFeature()
     } withDependencies: {
@@ -290,7 +298,8 @@ struct ProfileFeatureTests {
 
     // Open profile
     await store.send(.profileButtonTapped) {
-      $0.path.append(.profile(ProfileFeature.State(userProfile: nil, isDevelopmentMode: false, isShowRouteGuide: false, isDoeWalkingMock: false)))
+      let userProfile = $0.login.userProfile ?? UserProfileStorage.load()
+      $0.path.append(.profile(ProfileFeature.State(userProfile: userProfile, isDevelopmentMode: false, isShowRouteGuide: false, isDoeWalkingMock: false)))
     }
 
     let profileID = store.state.path.ids.first!

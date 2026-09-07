@@ -17,9 +17,7 @@ struct DirectionProgress: View {
     var estimatedTime: String = "8 hrs 22 min"
     var eta: String = "08.16 ETA"
     var totalDistance: String = "28 km"
-    var watchingPeople: [Person] = [
-        Person(name: "Awan", status: "Walking")
-    ]
+    var watchingPeople: [Person] = []
 
     var isDone: Bool = false
     var isLoading: Bool = false
@@ -188,10 +186,6 @@ private struct DirectionProgressHeroRowCard: View {
     let watchingPeople: [Person]
     let destinationName: String
 
-    private var activeCompanions: [Person] {
-        watchingPeople.isEmpty ? [Person(name: "Awan", status: "Walking")] : watchingPeople
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -201,39 +195,63 @@ private struct DirectionProgressHeroRowCard: View {
 
                 Spacer()
 
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 6, height: 6)
-                    Text("\(activeCompanions.count) Connected")
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(Color.green)
+                if watchingPeople.isEmpty {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(Color.secondary)
+                            .frame(width: 6, height: 6)
+                        Text("0 Connected")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(Color.secondary)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.secondary.opacity(0.12), in: .capsule)
+                } else {
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(Color.green)
+                            .frame(width: 6, height: 6)
+                        Text("\(watchingPeople.count) Connected")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(Color.green)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.green.opacity(0.12), in: .capsule)
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(Color.green.opacity(0.12), in: .capsule)
             }
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 14) {
-                    ForEach(activeCompanions) { person in
-                        VStack(spacing: 4) {
-                            ZStack(alignment: .bottomTrailing) {
-                                DirectionPersonAvatar(person: person, size: 46)
-                                Circle()
-                                    .fill(Color.green)
-                                    .frame(width: 11, height: 11)
-                                    .overlay(Circle().stroke(Color.white, lineWidth: 2))
-                            }
+            if watchingPeople.isEmpty {
+                HStack {
+                    Text("No companions have joined yet.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .padding(.vertical, 4)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 14) {
+                        ForEach(watchingPeople) { person in
+                            VStack(spacing: 4) {
+                                ZStack(alignment: .bottomTrailing) {
+                                    DirectionPersonAvatar(person: person, size: 46)
+                                    Circle()
+                                        .fill(Color.green)
+                                        .frame(width: 11, height: 11)
+                                        .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                                }
 
-                            Text(person.name.split(separator: " ").first.map(String.init) ?? person.name)
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(.primary)
-                                .lineLimit(1)
+                                Text(person.name.split(separator: " ").first.map(String.init) ?? person.name)
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(.primary)
+                                    .lineLimit(1)
+                            }
                         }
                     }
+                    .padding(.vertical, 2)
                 }
-                .padding(.vertical, 2)
             }
         }
         .padding(.horizontal, 14)

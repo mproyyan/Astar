@@ -46,6 +46,7 @@ struct MapDirectionSheetFeatureTests {
         )
       }
       $0.trackingClient.updateUserStatus = { _, _, _, _ in }
+      $0.connectionsClient.fetchConnections = { _ in [] }
     }
 
     await store.send(.startNavigationTapped(currentLocation: coord)) {
@@ -170,5 +171,19 @@ struct MapDirectionSheetFeatureTests {
     }
 
     await store.receive(\.routeCalculated)
+  }
+
+  @Test
+  @MainActor
+  func testSetWatchingPeople() async {
+    let dest = SavedPlace(name: "Dest", subtitle: "Sub", iconName: "star", coordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0))
+    let store = TestStore(initialState: MapDirectionSheetFeature.State(destination: dest, watchingPeople: [])) {
+      MapDirectionSheetFeature()
+    }
+
+    let companion = Person(id: UUID(), name: "Awan", status: "Accompanying")
+    await store.send(.setWatchingPeople([companion])) {
+      $0.watchingPeople = [companion]
+    }
   }
 }
