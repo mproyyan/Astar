@@ -48,6 +48,7 @@ struct MainFeature {
     case delegate(Delegate)
     case handleAcceptedInvitation(String)
     case incomingInvitationReceived(participantRecordID: String, isAccepted: Bool)
+    case incomingInvitationDismissed(participantRecordID: String)
     case invitationWalkerResolved(Person, isAccepted: Bool)
 
     enum Delegate: Equatable {
@@ -77,17 +78,59 @@ struct MainFeature {
             .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
           return recID == walkerRef || ($0.cloudKitUserId != nil && walkerRef.contains($0.cloudKitUserId!))
         }) {
+          guard !state.map.isNavigating else { return .none }
           return .send(.map(.selectPerson(person)))
         }
         return .none
 
+      case let .incomingInvitationDismissed(participantRecordID):
+        return .run { [trackingClient] _ in
+          do {
+            let participant = try await trackingClient.fetchSessionParticipant(participantRecordID)
+            guard !participant.sessionRef.isEmpty, !participant.companionRef.isEmpty else { return }
+            _ = try await trackingClient.updateParticipantStatus(participant.sessionRef, participant.companionRef, "dismiss")
+            print("🚫 [MainFeature] Updated participant \(participantRecordID) status to dismiss")
+          } catch {
+            print("⚠️ [MainFeature] Failed updating participant \(participantRecordID) to dismiss: \(error)")
+          }
+        }
+
       case let .incomingInvitationReceived(participantRecordID, isAccepted):
+        let currentUser = state.login.userProfile
+        let selfRecordID = currentUser.map {
+          "UserProfile_\($0.appleUserId)_\($0.cloudKitUserId)"
+            .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+        }
+
+        // Navigation Guard: If actively navigating as a walker, ignore incoming invitation events
+        if state.map.isNavigating && state.map.userWalkSessionID != nil {
+          print("⚠️ [MainFeature] Ignoring incomingInvitationReceived because user is navigating as walker.")
+          return .none
+        }
+
         return .run { [usersClient, trackingClient, connectionsClient, contactPhotoClient] send in
           do {
             let participant = try await trackingClient.fetchSessionParticipant(participantRecordID)
             guard !participant.sessionRef.isEmpty else { return }
+
+            // Identity Guard: Current user must be the invited companion
+            if let selfID = selfRecordID, !selfID.isEmpty {
+              guard participant.companionRef == selfID else {
+                print("ℹ️ [MainFeature] Ignoring invitation intended for companion \(participant.companionRef) (self: \(selfID))")
+                return
+              }
+            }
+
             let session = try await trackingClient.getWalkSession(participant.sessionRef)
             guard !session.walkerRef.isEmpty else { return }
+
+            // Identity Guard: Current user cannot be the walker of this session
+            if let selfID = selfRecordID, !selfID.isEmpty {
+              guard session.walkerRef != selfID else {
+                print("ℹ️ [MainFeature] Ignoring invitation because current user is the walker (\(session.walkerRef))")
+                return
+              }
+            }
 
             let walkerPerson = await Self.resolveWalkerPerson(
               walkerRef: session.walkerRef,
@@ -102,6 +145,20 @@ struct MainFeature {
         }
 
       case let .invitationWalkerResolved(walkerPerson, isAccepted):
+        // Guard against overwriting sheet while actively navigating
+        guard !state.map.isNavigating else {
+          print("⚠️ [MainFeature] Ignoring invitationWalkerResolved because user is navigating.")
+          return .none
+        }
+        let currentUser = state.login.userProfile ?? UserProfileStorage.load()
+        if let user = currentUser {
+          let selfPersonID = Person.stableID(appleUserId: user.appleUserId, cloudKitUserId: user.cloudKitUserId)
+          if walkerPerson.id == selfPersonID || walkerPerson.appleUserId == user.appleUserId {
+            print("⚠️ [MainFeature] Ignoring invitationWalkerResolved for self.")
+            return .none
+          }
+        }
+
         let selectAction = Action.map(.selectPerson(walkerPerson))
         if isAccepted {
           return .concatenate(
@@ -146,6 +203,15 @@ struct MainFeature {
                 guard !Task.isCancelled else { break }
                 if let recordID = notification.userInfo?["recordID"] as? CKRecord.ID {
                   await send(.incomingInvitationReceived(participantRecordID: recordID.recordName, isAccepted: true))
+                }
+              }
+            }
+
+            group.addTask {
+              for await notification in NotificationCenter.default.publisher(for: AppDelegate.walkInvitationDismissedNotification).values {
+                guard !Task.isCancelled else { break }
+                if let recordID = notification.userInfo?["recordID"] as? CKRecord.ID {
+                  await send(.incomingInvitationDismissed(participantRecordID: recordID.recordName))
                 }
               }
             }

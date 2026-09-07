@@ -125,7 +125,16 @@ extension TrackingClient: DependencyKey {
         updateParticipantStatus: { sessionID, companionRecordID, status in
             let db = CKContainer.default().publicCloudDatabase
             let recordID = CKRecord.ID(recordName: "SessionParticipant_\(sessionID)_\(companionRecordID)")
-            let record = try await db.record(for: recordID)
+            let record: CKRecord
+            do {
+                record = try await db.record(for: recordID)
+            } catch {
+                record = CKRecord(recordType: "SessionParticipant", recordID: recordID)
+                let sessionRef = CKRecord.Reference(recordID: CKRecord.ID(recordName: sessionID), action: .none)
+                let companionRef = CKRecord.Reference(recordID: CKRecord.ID(recordName: companionRecordID), action: .none)
+                record["sessionRef"] = sessionRef
+                record["companionRef"] = companionRef
+            }
             
             record["status"] = status
             if status == "accept" {

@@ -213,6 +213,10 @@ struct MainMapFeature {
         return .none
 
       case let .selectPerson(person):
+        if state.isNavigating && state.userWalkSessionID != nil {
+          print("⚠️ [MainMapFeature] Ignoring selectPerson(\(person.name)) because user is actively navigating.")
+          return .none
+        }
         let isReached = person.status.caseInsensitiveCompare("Arrived") == .orderedSame
                      || person.status.caseInsensitiveCompare("Reached Destination") == .orderedSame
                      || person.status.caseInsensitiveCompare("Finished") == .orderedSame
@@ -897,6 +901,9 @@ struct MainMapFeature {
                      let selfRecordID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"
                         .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
                      try? await trackingClient.updateUserStatus(selfRecordID, "idle", nil, nil)
+                     if let sessionID = endingSessionID {
+                        _ = try? await trackingClient.updateParticipantStatus(sessionID, selfRecordID, "left")
+                     }
                   }
                }
             )

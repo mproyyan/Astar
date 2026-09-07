@@ -449,6 +449,9 @@ struct MainMapFeatureTests {
     } withDependencies: {
       $0.trackingClient.updateUserStatus = { _, _, _, _ in }
       $0.trackingClient.setSubscribeWalkSession = { _, _ in }
+      $0.trackingClient.updateParticipantStatus = { _, _, status in
+        SessionParticipant(id: "p", sessionRef: "mock-doe-session", companionRef: "c", status: status)
+      }
     }
 
     await store.send(.sheet(.presented(.walker(.delegate(.trackingEnded))))) {
@@ -919,6 +922,28 @@ struct MainMapFeatureTests {
     await store.receive(.setTrackedWalkerPolyline(fallbackPoly)) {
       $0.trackedWalkerPolyline = fallbackPoly
     }
+  }
+
+  @Test
+  @MainActor
+  func testSelectPersonIgnoredWhileActivelyNavigating() async {
+    let dummyPerson = Person(name: "Mentari", status: "Walking")
+    let directionState = MapDirectionSheetFeature.State(
+      destination: SavedPlace(name: "Home", subtitle: "My house", iconName: "house.fill"),
+      mode: .progress,
+      watchingPeople: []
+    )
+    let store = TestStore(initialState: MainMapFeature.State(
+      isNavigating: true,
+      userWalkSessionID: "active-walk-123",
+      sheet: .direction(directionState)
+    )) {
+      MainMapFeature()
+    }
+
+    // Selecting a person while actively navigating must NOT overwrite the direction progress sheet
+    await store.send(.selectPerson(dummyPerson))
+    // No state change expected, sheet remains .direction
   }
 }
 
