@@ -1,3 +1,5 @@
+import CloudKit
+import Combine
 import ComposableArchitecture
 import Foundation
 
@@ -37,6 +39,8 @@ struct MainFeature {
     case path(StackActionOf<Path>)
     case delegate(Delegate)
     case handleAcceptedInvitation(String)
+    case incomingInvitationReceived(participantRecordID: String, isAccepted: Bool)
+    case invitationWalkerResolved(Person, isAccepted: Bool)
 
     enum Delegate: Equatable {
       case signedOut
@@ -44,6 +48,7 @@ struct MainFeature {
   }
   
   @Dependency(\.usersClient) var usersClient
+  @Dependency(\.trackingClient) var trackingClient
   
   var body: some Reducer<State, Action> {
     Scope(state: \.login, action: \.login) {
@@ -70,16 +75,97 @@ struct MainFeature {
         }
         return .none
 
+      case let .incomingInvitationReceived(participantRecordID, isAccepted):
+        return .run { [usersClient, trackingClient] send in
+          do {
+            let participant = try await trackingClient.fetchSessionParticipant(participantRecordID)
+            guard !participant.sessionRef.isEmpty else { return }
+            let session = try await trackingClient.getWalkSession(participant.sessionRef)
+            guard !session.walkerRef.isEmpty else { return }
+
+            let prefix = "UserProfile_"
+            let ids = session.walkerRef.replacingOccurrences(of: prefix, with: "").components(separatedBy: "_")
+            if ids.count >= 2 {
+              let appleUserId = ids[0]
+              let cloudKitUserId = ids[1...].joined(separator: "_")
+              let profiles = (try? await usersClient.fetchAllUsers()) ?? []
+              if let matchedProfile = profiles.first(where: { $0.appleUserId == appleUserId || $0.cloudKitUserId == cloudKitUserId }) {
+                let walkerPerson = Person(
+                  name: matchedProfile.name,
+                  status: Self.formatStatus(matchedProfile.status),
+                  appleUserId: matchedProfile.appleUserId,
+                  cloudKitUserId: matchedProfile.cloudKitUserId,
+                  email: matchedProfile.email,
+                  avatarData: matchedProfile.avatarData
+                )
+                await send(.invitationWalkerResolved(walkerPerson, isAccepted: isAccepted))
+                return
+              }
+            }
+
+            let walkerPerson = Person(name: "Walker", status: "Walking", cloudKitUserId: session.walkerRef)
+            await send(.invitationWalkerResolved(walkerPerson, isAccepted: isAccepted))
+          } catch {
+            print("⚠️ [MainFeature] Failed resolving incoming invitation \(participantRecordID): \(error)")
+          }
+        }
+
+      case let .invitationWalkerResolved(walkerPerson, isAccepted):
+        let selectAction = Action.map(.selectPerson(walkerPerson))
+        if isAccepted {
+          return .merge(
+            .send(selectAction),
+            .send(.map(.sheet(.presented(.walker(.trackTapped)))))
+          )
+        } else {
+          return .send(selectAction)
+        }
+
       case .onAppear:
-        return .run { send in
-          // 1. Initial fetch
+        let currentUser = state.login.userProfile ?? UserProfileStorage.load()
+        return .run { [trackingClient] send in
+          // 1. Setup invitation subscription for companion
+          if let profile = currentUser {
+            let selfRecordID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"
+              .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+            do {
+              try await trackingClient.setupInvitationSubscription(selfRecordID)
+              print("✅ [MainFeature] setupInvitationSubscription registered for \(selfRecordID)")
+            } catch {
+              print("⚠️ [MainFeature] setupInvitationSubscription failed: \(error)")
+            }
+          }
+
+          // 2. Initial fetch
           await send(.refreshPeople)
 
-          // 2. Periodic background refresh every 6 seconds to keep presence in sync
-          while !Task.isCancelled {
-            try? await Task.sleep(nanoseconds: 6_000_000_000)
-            guard !Task.isCancelled else { break }
-            await send(.refreshPeople)
+          // 3. Listen for push notification events and periodic refresh
+          await withTaskGroup(of: Void.self) { group in
+            group.addTask {
+              for await notification in NotificationCenter.default.publisher(for: AppDelegate.walkInvitationNotification).values {
+                guard !Task.isCancelled else { break }
+                if let recordID = notification.userInfo?["recordID"] as? CKRecord.ID {
+                  await send(.incomingInvitationReceived(participantRecordID: recordID.recordName, isAccepted: false))
+                }
+              }
+            }
+
+            group.addTask {
+              for await notification in NotificationCenter.default.publisher(for: AppDelegate.walkInvitationAcceptedNotification).values {
+                guard !Task.isCancelled else { break }
+                if let recordID = notification.userInfo?["recordID"] as? CKRecord.ID {
+                  await send(.incomingInvitationReceived(participantRecordID: recordID.recordName, isAccepted: true))
+                }
+              }
+            }
+
+            group.addTask {
+              while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 6_000_000_000)
+                guard !Task.isCancelled else { break }
+                await send(.refreshPeople)
+              }
+            }
           }
         }
 

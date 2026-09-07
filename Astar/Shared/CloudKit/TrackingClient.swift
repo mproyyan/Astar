@@ -42,6 +42,7 @@ struct TrackingClient: Sendable {
     
     var getWalkSession: @Sendable (_ sessionID: String) async throws -> WalkSession
     var getWalkerActiveSessionID: @Sendable (_ walkerRecordID: String) async throws -> String?
+    var fetchSessionParticipant: @Sendable (_ participantRecordID: String) async throws -> SessionParticipant
 }
 
 extension TrackingClient: DependencyKey {
@@ -362,6 +363,25 @@ extension TrackingClient: DependencyKey {
             let id = CKRecord.ID(recordName: walkerRecordID)
             let record = try await db.record(for: id)
             return (record["activeWalkSessionRef"] as? CKRecord.Reference)?.recordID.recordName
+        },
+        fetchSessionParticipant: { participantRecordID in
+            let db = CKContainer.default().publicCloudDatabase
+            let id = CKRecord.ID(recordName: participantRecordID)
+            let record = try await db.record(for: id)
+            let sessionRef = (record["sessionRef"] as? CKRecord.Reference)?.recordID.recordName ?? ""
+            let companionRef = (record["companionRef"] as? CKRecord.Reference)?.recordID.recordName ?? ""
+            let status = record["status"] as? String ?? "notDetermined"
+            let joinedAt = record["joinedAt"] as? Date
+            let leftAt = record["leftAt"] as? Date
+
+            return SessionParticipant(
+                id: participantRecordID,
+                sessionRef: sessionRef,
+                companionRef: companionRef,
+                status: status,
+                joinedAt: joinedAt,
+                leftAt: leftAt
+            )
         }
     )
     
