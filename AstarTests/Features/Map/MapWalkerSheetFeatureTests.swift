@@ -319,6 +319,7 @@ final class MapWalkerSheetFeatureTests: XCTestCase {
             status: "notDetermined"
         )
 
+        let initialCoordData = try! JSONEncoder().encode([-6.2088, 106.8456])
         let session = WalkSession(
             id: "session-888",
             walkerRef: walkerRecordID,
@@ -329,7 +330,7 @@ final class MapWalkerSheetFeatureTests: XCTestCase {
             routePolyline: nil,
             startedAt: Date(timeIntervalSince1970: 0),
             endedAt: nil,
-            currentCoordinate: nil,
+            currentCoordinate: initialCoordData,
             lastPingAt: Date(timeIntervalSince1970: 0)
         )
 
@@ -337,6 +338,9 @@ final class MapWalkerSheetFeatureTests: XCTestCase {
             MainFeature()
         } withDependencies: {
             $0.date.now = Date(timeIntervalSince1970: 0)
+            $0.directionRoute.calculateWalkingRoute = { _, _ in
+                WalkingRouteInfo(travelTimeString: "10m", etaString: "10.00", distanceString: "800m", rawTravelTime: 600, rawDistanceMeters: 800, route: nil, fallbackPolyline: nil)
+            }
             $0.trackingClient.fetchSessionParticipant = { _ in participant }
             $0.trackingClient.getWalkSession = { _ in session }
             $0.usersClient.fetchUserByRecordID = { _ in expectedProfile }
@@ -392,6 +396,7 @@ final class MapWalkerSheetFeatureTests: XCTestCase {
             $0.map.activeWalkSessionID = "session-888"
             $0.map.trackedWalkerDestinationName = "Grand Indonesia"
             $0.map.trackedWalkerDestination = CLLocationCoordinate2D(latitude: -6.1950, longitude: 106.8200)
+            $0.map.trackedWalkerLocation = CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
             $0.map.hasFittedTrackedWalker = false
         }
     }

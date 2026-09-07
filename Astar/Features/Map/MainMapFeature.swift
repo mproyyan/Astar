@@ -717,8 +717,26 @@ struct MainMapFeature {
                 }
              }
 
-             return .run { send in
-                 print("🔍 Starting tracking for walker. Session ID: \(session.id)")
+              if let coordData = session.currentCoordinate,
+                 let coords = try? JSONDecoder().decode([Double].self, from: coordData),
+                 coords.count >= 2 {
+                  state.trackedWalkerLocation = CLLocationCoordinate2D(latitude: coords[0], longitude: coords[1])
+              }
+
+              let walkerOrigin = state.trackedWalkerLocation
+              let destinationCoord = CLLocationCoordinate2D(latitude: session.destinationLatitude, longitude: session.destinationLongitude)
+
+              return .run { send in
+                  print("🔍 Starting tracking for walker. Session ID: \(session.id)")
+                  if let origin = walkerOrigin {
+                      let routeInfo = await directionRoute.calculateWalkingRoute(origin: origin, destination: destinationCoord)
+                      if let route = routeInfo.route {
+                          await send(.setTrackedWalkerRoute(route))
+                          await send(.setTrackedWalkerPolyline(route.polyline))
+                      } else if let fallback = routeInfo.fallbackPolyline {
+                          await send(.setTrackedWalkerPolyline(fallback))
+                      }
+                  }
                  if let profile = UserProfileStorage.load() {
                      let selfRecordID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"
                          .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)

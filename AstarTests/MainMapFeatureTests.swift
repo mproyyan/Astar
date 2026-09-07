@@ -734,5 +734,92 @@ struct MainMapFeatureTests {
     await store.send(.stopTrackingTapped)
     #expect(unsubscribedSessionID == "session-xyz")
   }
+
+  @Test
+  @MainActor
+  func testRealWalkerTrackingStartedImmediatelySetsLocationAndRoute() async {
+    let now = Date(timeIntervalSince1970: 1000)
+    let walkerLat = -6.2125
+    let walkerLon = 106.8166
+    let destLat = -6.1950
+    let destLon = 106.8200
+    let initialCoordData = try! JSONEncoder().encode([walkerLat, walkerLon])
+
+    let testPerson = Person(
+      id: UUID(),
+      name: "Mentari",
+      status: "Walking",
+      appleUserId: "mentari-apple",
+      cloudKitUserId: "mentari-ck"
+    )
+
+    let testSession = WalkSession(
+      id: "session-real-123",
+      walkerRef: "UserProfile_mentari_apple_mentari_ck",
+      status: "active",
+      destinationName: "Grand Indonesia",
+      destinationLatitude: destLat,
+      destinationLongitude: destLon,
+      routePolyline: nil,
+      startedAt: now,
+      endedAt: nil,
+      currentCoordinate: initialCoordData,
+      lastPingAt: now
+    )
+
+    let fallbackPoly = MKPolyline(coordinates: [
+      CLLocationCoordinate2D(latitude: walkerLat, longitude: walkerLon),
+      CLLocationCoordinate2D(latitude: destLat, longitude: destLon)
+    ], count: 2)
+
+    let mockRouteInfo = WalkingRouteInfo(
+      travelTimeString: "15 min",
+      etaString: "10.15",
+      distanceString: "1.2 km",
+      rawTravelTime: 900,
+      rawDistanceMeters: 1200,
+      route: nil,
+      fallbackPolyline: fallbackPoly
+    )
+
+    let walkerState = MapWalkerSheetFeature.State(
+      walker: testPerson,
+      status: "Walking"
+    )
+    let store = TestStore(initialState: MainMapFeature.State(
+      sheet: .walker(walkerState)
+    )) {
+      MainMapFeature()
+    } withDependencies: {
+      $0.date.now = now
+      $0.directionRoute.calculateWalkingRoute = { origin, dest in
+        #expect(origin.latitude == walkerLat)
+        #expect(origin.longitude == walkerLon)
+        #expect(dest.latitude == destLat)
+        #expect(dest.longitude == destLon)
+        return mockRouteInfo
+      }
+      $0.trackingClient.updateParticipantStatus = { _, _, _ in
+        SessionParticipant(id: "p", sessionRef: "session-real-123", companionRef: "c", status: "accept")
+      }
+      $0.trackingClient.updateUserStatus = { _, _, _, _ in }
+      $0.trackingClient.setSubscribeWalkSession = { _, _ in }
+      $0.trackingClient.subscribeToWalkSession = { _ in
+        AsyncStream { $0.finish() }
+      }
+    }
+
+    await store.send(.sheet(.presented(.walker(.delegate(.trackingStarted(testPerson, testSession)))))) {
+      $0.activeWalkSessionID = "session-real-123"
+      $0.trackedWalkerDestinationName = "Grand Indonesia"
+      $0.trackedWalkerDestination = CLLocationCoordinate2D(latitude: destLat, longitude: destLon)
+      $0.trackedWalkerLocation = CLLocationCoordinate2D(latitude: walkerLat, longitude: walkerLon)
+      $0.hasFittedTrackedWalker = false
+    }
+
+    await store.receive(.setTrackedWalkerPolyline(fallbackPoly)) {
+      $0.trackedWalkerPolyline = fallbackPoly
+    }
+  }
 }
 
