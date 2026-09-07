@@ -44,6 +44,7 @@ struct MainFeature {
   }
   
   @Dependency(\.usersClient) var usersClient
+  @Dependency(\.connectionsClient) var connectionsClient
   
   var body: some Reducer<State, Action> {
     Scope(state: \.login, action: \.login) {
@@ -86,24 +87,31 @@ struct MainFeature {
       case .refreshPeople:
         return .run { [currentUser = state.login.userProfile] send in
           do {
-            let profiles = try await usersClient.fetchAllUsers()
+            guard let profile = UserProfileStorage.load() else {
+              await send(.fetchPeopleResponse(.success([])))
+              return
+            }
+            let connectionProfiles = try await connectionsClient.fetchConnections(profile.recordID)
+            let mutualProfiles = connectionProfiles.filter { $0.connection.status == "mutual" }
             var people: [Person] = []
-            for profile in profiles.filter({ $0.appleUserId != currentUser?.appleUserId }) {
-              var avatar = profile.avatarData
+            for cp in mutualProfiles {
+              let partnerProfile = cp.partnerProfile
+              guard partnerProfile.appleUserId != currentUser?.appleUserId else { continue }
+              var avatar = partnerProfile.avatarData
               if avatar == nil {
-                avatar = await ContactPhotoClient.liveValue.fetchContactPhotoByEmail(profile.email)
+                avatar = await ContactPhotoClient.liveValue.fetchContactPhotoByEmail(partnerProfile.email)
               }
               if avatar == nil {
-                avatar = await ContactPhotoClient.liveValue.fetchContactPhotoByName(profile.name)
+                avatar = await ContactPhotoClient.liveValue.fetchContactPhotoByName(partnerProfile.name)
               }
-              let avatarImageName = profile.name == "Awan" ? "AwanAvatar" : nil
+              let avatarImageName = partnerProfile.name == "Awan" ? "AwanAvatar" : nil
               people.append(Person(
                 id: UUID(),
-                name: profile.name,
-                status: Self.formatStatus(profile.status),
-                appleUserId: profile.appleUserId,
-                cloudKitUserId: profile.cloudKitUserId,
-                email: profile.email,
+                name: partnerProfile.name,
+                status: Self.formatStatus(partnerProfile.status),
+                appleUserId: partnerProfile.appleUserId,
+                cloudKitUserId: partnerProfile.cloudKitUserId,
+                email: partnerProfile.email,
                 avatarData: avatar,
                 avatarImageName: avatarImageName
               ))
