@@ -51,7 +51,7 @@ struct PeopleSection: View {
                                     onSelectPerson?(person)
                                 }
                             )
-                            .frame(width: slotWidth)
+                            .frame(maxWidth: .infinity)
                         }
                     }
                 }
