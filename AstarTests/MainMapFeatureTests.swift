@@ -833,7 +833,9 @@ struct MainMapFeatureTests {
       }
     }
 
-    await store.send(.stopTrackingTapped)
+    await store.send(.stopTrackingTapped) {
+      $0.activeWalkSessionID = nil
+    }
     #expect(unsubscribedSessionID == "session-xyz")
   }
 
@@ -944,6 +946,108 @@ struct MainMapFeatureTests {
     // Selecting a person while actively navigating must NOT overwrite the direction progress sheet
     await store.send(.selectPerson(dummyPerson))
     // No state change expected, sheet remains .direction
+  }
+
+  @Test
+  @MainActor
+  func testWalkSessionUpdatedUpdatesTrackedWalkerLocation() async {
+    let initialCoord = CLLocationCoordinate2D(latitude: -6.2000, longitude: 106.8166)
+    let store = TestStore(initialState: MainMapFeature.State(
+      activeWalkSessionID: "session-stream-1",
+      trackedWalkerLocation: initialCoord
+    )) {
+      MainMapFeature()
+    }
+
+    let nextLat = -6.2010
+    let nextLon = 106.8175
+    let nextCoordData = try! JSONEncoder().encode([nextLat, nextLon])
+    let updatedSession = WalkSession(
+      id: "session-stream-1",
+      walkerRef: "walker-1",
+      status: "active",
+      destinationName: "Plaza Indonesia",
+      destinationLatitude: -6.1930,
+      destinationLongitude: 106.8220,
+      routePolyline: nil,
+      startedAt: Date(),
+      endedAt: nil,
+      currentCoordinate: nextCoordData,
+      lastPingAt: Date()
+    )
+
+    await store.send(.walkSessionUpdated(updatedSession)) {
+      $0.trackedWalkerLocation = CLLocationCoordinate2D(latitude: nextLat, longitude: nextLon)
+    }
+
+    // Next step update
+    let step2Lat = -6.2025
+    let step2Lon = 106.8189
+    let step2CoordData = try! JSONEncoder().encode([step2Lat, step2Lon])
+    let step2Session = WalkSession(
+      id: "session-stream-1",
+      walkerRef: "walker-1",
+      status: "active",
+      destinationName: "Plaza Indonesia",
+      destinationLatitude: -6.1930,
+      destinationLongitude: 106.8220,
+      routePolyline: nil,
+      startedAt: Date(),
+      endedAt: nil,
+      currentCoordinate: step2CoordData,
+      lastPingAt: Date()
+    )
+
+    await store.send(.walkSessionUpdated(step2Session)) {
+      $0.trackedWalkerLocation = CLLocationCoordinate2D(latitude: step2Lat, longitude: step2Lon)
+    }
+  }
+
+  @Test
+  @MainActor
+  func testRealTimeTrackingStreamYieldsAndCancelsOnStop() async {
+    let initialCoord = CLLocationCoordinate2D(latitude: -6.2000, longitude: 106.8166)
+    let store = TestStore(initialState: MainMapFeature.State(
+      activeWalkSessionID: "session-live-stream",
+      trackedWalkerLocation: initialCoord,
+      trackedWalkerDestination: CLLocationCoordinate2D(latitude: -6.1930, longitude: 106.8220),
+      trackedWalkerDestinationName: "Grand Indonesia"
+    )) {
+      MainMapFeature()
+    } withDependencies: {
+      $0.trackingClient.setSubscribeWalkSession = { _, _ in }
+      $0.trackingClient.updateParticipantStatus = { _, _, _ in
+        SessionParticipant(id: "p1", sessionRef: "session-live-stream", companionRef: "c1", status: "left")
+      }
+    }
+
+    let movingLat = -6.2005
+    let movingLon = 106.8170
+    let movingCoordData = try! JSONEncoder().encode([movingLat, movingLon])
+    let movingSession = WalkSession(
+      id: "session-live-stream",
+      walkerRef: "walker-test",
+      status: "active",
+      destinationName: "Grand Indonesia",
+      destinationLatitude: -6.1930,
+      destinationLongitude: 106.8220,
+      routePolyline: nil,
+      startedAt: Date(),
+      endedAt: nil,
+      currentCoordinate: movingCoordData,
+      lastPingAt: Date()
+    )
+
+    await store.send(.walkSessionUpdated(movingSession)) {
+      $0.trackedWalkerLocation = CLLocationCoordinate2D(latitude: movingLat, longitude: movingLon)
+    }
+
+    await store.send(.stopTrackingTapped) {
+      $0.activeWalkSessionID = nil
+      $0.trackedWalkerLocation = nil
+      $0.trackedWalkerDestination = nil
+      $0.trackedWalkerDestinationName = nil
+    }
   }
 }
 

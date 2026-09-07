@@ -779,39 +779,38 @@ struct MainMapFeature {
                           await send(.setTrackedWalkerPolyline(fallback))
                       }
                   }
-                 if let profile = UserProfileStorage.load() {
-                     let selfRecordID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"
-                         .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+                  
+                  if let profile = UserProfileStorage.load() {
+                      let selfRecordID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"
+                          .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
 
-                     do {
-                         print("👥 Joining session...")
-                         let sessionParticipant = try await trackingClient.updateParticipantStatus(session.id, selfRecordID, "accept")
-                         print("✅ Joined session: \(sessionParticipant.id)")
+                      do {
+                          print("👥 Joining session...")
+                          let sessionParticipant = try await trackingClient.updateParticipantStatus(session.id, selfRecordID, "accept")
+                          print("✅ Joined session: \(sessionParticipant.id)")
 
-                         print("🔄 Updating user status to accompany...")
-                         try await trackingClient.updateUserStatus(selfRecordID, "accompany", nil, session.id)
+                          print("🔄 Updating user status to accompany...")
+                          try await trackingClient.updateUserStatus(selfRecordID, "accompany", nil, session.id)
 
-                         // And subscribe
-                         print("Registering push subscription for session \(session.id)")
-                         
-                         try await trackingClient.setSubscribeWalkSession( session.id, true)
-                         print("Push subscription registered successfully.")
-                         
-                         
-                         let stream = try await trackingClient.subscribeToWalkSession(session.id)
-                         for await session in stream {
-                             await send(.walkSessionUpdated(session))
-                         }
-                         
-                         
-                         print("❌ Stream ended for session \(session.id)")
-                     } catch {
-                         print("❌ Tracking failed with error: \(error)")
-                     }
-                 } else {
-                     print("❌ User profile is nil. Cannot join tracking session!")
-                 }
-             }
+                          print("Registering push subscription for session \(session.id)")
+                          try await trackingClient.setSubscribeWalkSession(session.id, true)
+                          print("Push subscription registered successfully.")
+                      } catch {
+                          print("⚠️ Tracking join setup failed with error: \(error)")
+                      }
+                  }
+
+                  do {
+                      let stream = try await trackingClient.subscribeToWalkSession(session.id)
+                      for await session in stream {
+                          await send(.walkSessionUpdated(session))
+                      }
+                      print("❌ Stream ended for session \(session.id)")
+                  } catch {
+                      print("❌ Tracking stream failed with error: \(error)")
+                  }
+              }
+              .cancellable(id: "TrackWalkerStreamID", cancelInFlight: true)
 
          case let .setTrackedWalkerRoute(route):
             state.trackedWalkerRoute = route
@@ -885,13 +884,14 @@ struct MainMapFeature {
                .send(.delegate(.walkerStatusChanged(id: Person.mockDoeID, newStatus: "Walking")))
             )
 
-         case .sheet(.presented(.walker(.delegate(.trackingEnded)))):
+         case .sheet(.presented(.walker(.delegate(.trackingEnded)))) :
             let endingSessionID = state.activeWalkSessionID
             state.activeWalkSessionID = nil
             state.trackedWalkerDestination = nil
             state.trackedWalkerRoute = nil
             state.trackedWalkerPolyline = nil
             return .merge(
+               .cancel(id: "TrackWalkerStreamID"),
                .send(.delegate(.companionStatusChanged(newStatus: "idle"))),
                .run { [trackingClient] _ in
                   if let sessionID = endingSessionID {
@@ -959,23 +959,31 @@ struct MainMapFeature {
           
           return effects.isEmpty ? .none : .merge(effects)
           
-      case .stopTrackingTapped:
-          
-          guard let sessionID = state.activeWalkSessionID else { return .none }
-              
-              return .run { [trackingClient] _ in
-                  do {
-                      try await trackingClient.setSubscribeWalkSession(sessionID, false)
-                      print("Unsubscribed CloudKit push for session \(sessionID)")
-                      if let profile = UserProfileStorage.load() {
-                          let selfRecordID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"
-                             .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
-                          _ = try? await trackingClient.updateParticipantStatus(sessionID, selfRecordID, "left")
-                      }
-                  } catch {
-                      print("Failed to unsubscribe: \(error)")
-                  }
-          }
+       case .stopTrackingTapped:
+           guard let sessionID = state.activeWalkSessionID else { return .none }
+           state.activeWalkSessionID = nil
+           state.trackedWalkerLocation = nil
+           state.trackedWalkerPolyline = nil
+           state.trackedWalkerRoute = nil
+           state.trackedWalkerDestination = nil
+           state.trackedWalkerDestinationName = nil
+
+           return .merge(
+               .cancel(id: "TrackWalkerStreamID"),
+               .run { [trackingClient] _ in
+                   do {
+                       try await trackingClient.setSubscribeWalkSession(sessionID, false)
+                       print("Unsubscribed CloudKit push for session \(sessionID)")
+                       if let profile = UserProfileStorage.load() {
+                           let selfRecordID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"
+                              .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+                           _ = try? await trackingClient.updateParticipantStatus(sessionID, selfRecordID, "left")
+                       }
+                   } catch {
+                       print("Failed to unsubscribe: \(error)")
+                   }
+               }
+           )
 
       case .sheet, .delegate, .updateTrackingLocation:
         return .none
