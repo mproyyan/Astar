@@ -36,6 +36,7 @@ struct MainFeature {
     case map(MainMapFeature.Action)
     case path(StackActionOf<Path>)
     case delegate(Delegate)
+    case handleAcceptedInvitation(String)
 
     enum Delegate: Equatable {
       case signedOut
@@ -55,6 +56,20 @@ struct MainFeature {
     
     Reduce { state, action in
       switch action {
+      case let .handleAcceptedInvitation(walkerRef):
+        let prefix = "UserProfile_"
+        let ids = walkerRef.replacingOccurrences(of: prefix, with: "").components(separatedBy: "_")
+        if ids.count >= 2 {
+            let appleUserId = ids[0]
+            let cloudKitUserId = ids[1...].joined(separator: "_")
+            if let person = state.people.first(where: { $0.appleUserId == appleUserId && $0.cloudKitUserId == cloudKitUserId }) {
+                return .send(.map(.selectPerson(person)))
+            } else if let person = state.people.first(where: { $0.cloudKitUserId == cloudKitUserId }) {
+                return .send(.map(.selectPerson(person)))
+            }
+        }
+        return .none
+
       case .onAppear:
         return .run { send in
           // 1. Initial fetch

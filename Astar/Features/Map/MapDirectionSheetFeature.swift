@@ -246,7 +246,7 @@ struct MapDirectionSheetFeature {
                                 : connection.connection.member1RowID
                             
                             do {
-                                _ = try await trackingClient.joinWalkSession(session.id, companionID)
+                                _ = try await trackingClient.inviteToWalkSession(session.id, companionID)
                                 print("📢 [Broadcast] Added mutual connection \(connection.partnerProfile.name) (\(companionID)) as participant for session \(session.id)")
                             } catch {
                                 print("⚠️ [Broadcast] Failed adding participant \(companionID): \(error)")

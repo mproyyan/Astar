@@ -22,20 +22,23 @@ struct SessionParticipant: Equatable, Sendable {
     let id: String
     let sessionRef: String
     let companionRef: String
-    let joinedAt: Date
+    var status: String
+    var joinedAt: Date?
+    var leftAt: Date?
 }
 
 @DependencyClient
 struct TrackingClient: Sendable {
     var startWalkSession: @Sendable (_ walkerRecordID: String, _ destinationName: String, _ destLat: Double, _ destLon: Double, _ routePolyline: String?, _ initialCoordinateData: Data) async throws -> WalkSession
     var endWalkSession: @Sendable (_ sessionID: String) async throws -> Void
-    var joinWalkSession: @Sendable (_ sessionID: String, _ companionRecordID: String) async throws -> SessionParticipant
-    var leaveWalkSession: @Sendable (_ participantID: String) async throws -> Void
+    var inviteToWalkSession: @Sendable (_ sessionID: String, _ companionRecordID: String) async throws -> Void
+    var updateParticipantStatus: @Sendable (_ sessionID: String, _ companionRecordID: String, _ status: String) async throws -> SessionParticipant
     var updateUserStatus: @Sendable (_ userRecordID: String, _ status: String, _ activeSessionID: String?, _ watchingSessionID: String?) async throws -> Void
     var pushLocationUpdate: @Sendable (_ sessionID: String, _ coordinatesData: Data) async throws -> Void
     
     var setSubscribeWalkSession: @Sendable (_ sessionID: String, _ isSubscribed: Bool) async throws -> Void
     var subscribeToWalkSession: @Sendable (_ sessionID: String) async throws -> AsyncStream<WalkSession>
+    var setupInvitationSubscription: @Sendable (_ companionRecordID: String) async throws -> Void
     
     var getWalkSession: @Sendable (_ sessionID: String) async throws -> WalkSession
     var getWalkerActiveSessionID: @Sendable (_ walkerRecordID: String) async throws -> String?
@@ -102,29 +105,42 @@ extension TrackingClient: DependencyKey {
                 throw error
             }
         },
-        joinWalkSession: { sessionID, companionRecordID in
+        inviteToWalkSession: { sessionID, companionRecordID in
             let db = CKContainer.default().publicCloudDatabase
-            let record = CKRecord(recordType: "SessionParticipant")
+            let recordID = CKRecord.ID(recordName: "SessionParticipant_\(sessionID)_\(companionRecordID)")
+            let record = CKRecord(recordType: "SessionParticipant", recordID: recordID)
             let sessionRef = CKRecord.Reference(recordID: CKRecord.ID(recordName: sessionID), action: .none)
             let companionRef = CKRecord.Reference(recordID: CKRecord.ID(recordName: companionRecordID), action: .none)
             
             record["sessionRef"] = sessionRef
             record["companionRef"] = companionRef
-            record["joinedAt"] = Date()
+            record["status"] = "notDetermined"
             
-            try await db.save(record)
+            let _ = try await db.modifyRecords(saving: [record], deleting: [], savePolicy: .changedKeys, atomically: false)
+        },
+        updateParticipantStatus: { sessionID, companionRecordID, status in
+            let db = CKContainer.default().publicCloudDatabase
+            let recordID = CKRecord.ID(recordName: "SessionParticipant_\(sessionID)_\(companionRecordID)")
+            let record = try await db.record(for: recordID)
+            
+            record["status"] = status
+            if status == "accept" {
+                record["joinedAt"] = Date()
+                record["leftAt"] = nil
+            } else if status == "left" || status == "dismiss" {
+                record["leftAt"] = Date()
+            }
+            
+            let _ = try await db.modifyRecords(saving: [record], deleting: [], savePolicy: .changedKeys, atomically: false)
             
             return SessionParticipant(
-                id: record.recordID.recordName,
+                id: recordID.recordName,
                 sessionRef: sessionID,
                 companionRef: companionRecordID,
-                joinedAt: record["joinedAt"] as? Date ?? Date()
+                status: status,
+                joinedAt: record["joinedAt"] as? Date,
+                leftAt: record["leftAt"] as? Date
             )
-        },
-        leaveWalkSession: { participantID in
-            let db = CKContainer.default().publicCloudDatabase
-            let id = CKRecord.ID(recordName: participantID)
-            try await db.deleteRecord(withID: id)
         },
         updateUserStatus: { userRecordID, status, activeSessionID, watchingSessionID in
             let db = CKContainer.default().publicCloudDatabase
@@ -296,6 +312,30 @@ extension TrackingClient: DependencyKey {
                     task.cancel()
                 }
             }
+        },
+        setupInvitationSubscription: { companionRecordID in
+            let container = CKContainer.default()
+            let db = container.publicCloudDatabase
+            let subscriptionID = "session-participant-invitation-\(companionRecordID)"
+            do {
+                _ = try await db.subscription(for: subscriptionID)
+                return
+            } catch let error as CKError where error.code == .unknownItem {
+            } catch { throw error }
+            
+            let companionRef = CKRecord.Reference(recordID: CKRecord.ID(recordName: companionRecordID), action: .none)
+            let predicate = NSPredicate(format: "companionRef == %@ AND status == %@", companionRef, "notDetermined")
+            let subscription = CKQuerySubscription(recordType: "SessionParticipant", predicate: predicate, subscriptionID: subscriptionID, options: [.firesOnRecordCreation, .firesOnRecordUpdate])
+            
+            let info = CKSubscription.NotificationInfo()
+            info.shouldSendContentAvailable = true
+            info.alertBody = "You have a new walk tracking invitation!"
+            info.soundName = "default"
+            info.category = "WALK_INVITATION"
+            info.desiredKeys = ["sessionRef", "status"]
+            subscription.notificationInfo = info
+            
+            try await db.save(subscription)
         },
         getWalkSession: { sessionID in
             let db = CKContainer.default().publicCloudDatabase
