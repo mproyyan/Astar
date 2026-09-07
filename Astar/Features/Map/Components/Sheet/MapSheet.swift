@@ -282,6 +282,9 @@ struct MapSheet: View {
                     },
                     onSavedPlacesHeaderTapped: {
                         store.send(.savedPlacesHeaderTapped)
+                    },
+                    onProfileTapped: {
+                        store.send(.profileButtonTapped)
                     }
                 )
                 .transition(.opacity)

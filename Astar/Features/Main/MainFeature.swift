@@ -17,6 +17,7 @@ struct MainFeature {
     var map: MainMapFeature.State = .init()
     var path = StackState<Path.State>()
     var people: [Person] = []
+    var isPeopleLoading: Bool = false
     var isDevelopmentMode: Bool = DeveloperSettingsStorage.isDevelopmentMode
     var isShowRouteGuide: Bool = DeveloperSettingsStorage.isShowRouteGuide
     var isDoeWalkingMock: Bool = DeveloperSettingsStorage.isDoeWalkingMockEnabled
@@ -72,6 +73,7 @@ struct MainFeature {
         return .none
 
       case .onAppear:
+        state.isPeopleLoading = true
         return .run { send in
           // 1. Initial fetch
           await send(.refreshPeople)
@@ -149,6 +151,7 @@ struct MainFeature {
           state.people = updatedPeople.filter { $0.id != Person.mockDoeID }
         }
         state.map.people = state.people
+        state.isPeopleLoading = false
         return .none
         
       case .fetchPeopleResponse(.failure):
@@ -159,6 +162,7 @@ struct MainFeature {
           state.people = []
         }
         state.map.people = state.people
+        state.isPeopleLoading = false
         return .none
         
       case .profileButtonTapped:
