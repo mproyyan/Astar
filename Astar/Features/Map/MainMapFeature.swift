@@ -99,6 +99,9 @@ struct MainMapFeature {
 
   @Dependency(\.locationManager) var locationManager
   @Dependency(\.trackingClient) var trackingClient
+  @Dependency(\.usersClient) var usersClient
+  @Dependency(\.connectionsClient) var connectionsClient
+  @Dependency(\.contactPhotoClient) var contactPhotoClient
   @Dependency(\.directionRoute) var directionRoute
   @Dependency(\.uuid) var uuid
   @Dependency(\.date.now) var now
@@ -136,7 +139,7 @@ struct MainMapFeature {
         return .none
 
       case let .selectSavedPlace(place):
-        state.sheet = .direction(MapDirectionSheetFeature.State(destination: place, watchingPeople: state.people))
+        state.sheet = .direction(MapDirectionSheetFeature.State(destination: place, watchingPeople: []))
         let currentLoc = state.currentLocation ?? CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
         return .send(.sheet(.presented(.direction(.onAppear(currentLocation: currentLoc)))))
 
@@ -279,7 +282,7 @@ struct MainMapFeature {
           originPlace: defaultOrigin,
           isCalculatingRoute: true,
           isNavigating: true,
-          watchingPeople: state.people
+          watchingPeople: []
         )
         state.sheet = .direction(directionState)
 
@@ -369,7 +372,7 @@ struct MainMapFeature {
           originPlace: defaultOrigin,
           isCalculatingRoute: true,
           isNavigating: true,
-          watchingPeople: state.people
+          watchingPeople: []
         )
         state.sheet = .direction(directionState)
 
@@ -492,7 +495,7 @@ struct MainMapFeature {
           isCalculatingRoute: false,
           isNavigating: true,
           isDestinationReached: false,
-          watchingPeople: state.people,
+          watchingPeople: [],
           journeyLogEntries: [currentEntry, startEntry]
         )
         state.sheet = .direction(directionState)
@@ -569,7 +572,7 @@ struct MainMapFeature {
         return .none
 
       case let .sheet(.presented(.search(.selectPlace(place)))):
-         state.sheet = .direction(MapDirectionSheetFeature.State(destination: place, watchingPeople: state.people))
+         state.sheet = .direction(MapDirectionSheetFeature.State(destination: place, watchingPeople: []))
          let currentLoc = state.currentLocation ?? CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
          return .send(.sheet(.presented(.direction(.onAppear(currentLocation: currentLoc)))))
 
@@ -599,7 +602,36 @@ struct MainMapFeature {
             state.lastLoggedCoordinate = state.sheet?.direction?.journeyLogEntries.last?.coordinate ?? state.currentLocation
             state.lastLoggedStreet = "Current Area"
             state.lastLoggedIcon = "figure.walk"
-            return .none
+
+            var effects: [Effect<Action>] = []
+            if let sid = sessionID {
+              effects.append(
+                .run { [trackingClient, usersClient, connectionsClient, contactPhotoClient] send in
+                  try? await trackingClient.setSubscribeSessionParticipants(sid, true)
+                  guard let stream = try? await trackingClient.subscribeToSessionParticipants(sid) else { return }
+                  for await participants in stream {
+                    let acceptedParticipants = participants.filter {
+                      $0.status.caseInsensitiveCompare("accept") == .orderedSame
+                    }
+                    var companions: [Person] = []
+                    for participant in acceptedParticipants {
+                      let person = await MainFeature.resolvePerson(
+                        recordRef: participant.companionRef,
+                        usersClient: usersClient,
+                        connectionsClient: connectionsClient,
+                        contactPhotoClient: contactPhotoClient,
+                        defaultStatus: "Accompanying"
+                      )
+                      companions.append(person)
+                    }
+                    await send(.sheet(.presented(.direction(.setWatchingPeople(companions)))))
+                  }
+                }
+                .cancellable(id: "WalkerSessionParticipantsStreamID", cancelInFlight: true)
+              )
+            }
+            return effects.isEmpty ? .none : .merge(effects)
+
          case .navigationEnded:
             let endingSessionID = state.userWalkSessionID
             state.isNavigating = false
@@ -609,12 +641,18 @@ struct MainMapFeature {
             state.activePolyline = nil
             state.sheet = nil
             
+            var effects: [Effect<Action>] = [
+              .cancel(id: "WalkerSessionParticipantsStreamID")
+            ]
             if let sid = endingSessionID {
-                return .run { [trackingClient] _ in
-                    try? await trackingClient.endWalkSession(sid)
+              effects.append(
+                .run { [trackingClient] _ in
+                  try? await trackingClient.setSubscribeSessionParticipants(sid, false)
+                  try? await trackingClient.endWalkSession(sid)
                 }
+              )
             }
-            return .none
+            return .merge(effects)
          }
 
       case .sheet(.presented(.search(.delegate(.dismissed)))):

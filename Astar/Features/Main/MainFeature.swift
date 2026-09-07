@@ -23,8 +23,16 @@ struct MainFeature {
     var isShowRouteGuide: Bool = DeveloperSettingsStorage.isShowRouteGuide
     var isDoeWalkingMock: Bool = DeveloperSettingsStorage.isDoeWalkingMockEnabled
     
-    init(userProfile: UserProfile? = nil) {
+    init(
+      userProfile: UserProfile? = nil,
+      isDevelopmentMode: Bool = DeveloperSettingsStorage.isDevelopmentMode,
+      isShowRouteGuide: Bool = DeveloperSettingsStorage.isShowRouteGuide,
+      isDoeWalkingMock: Bool = DeveloperSettingsStorage.isDoeWalkingMockEnabled
+    ) {
       self.login = LoginFeature.State(userProfile: userProfile)
+      self.isDevelopmentMode = isDevelopmentMode
+      self.isShowRouteGuide = isShowRouteGuide
+      self.isDoeWalkingMock = isDoeWalkingMock
     }
   }
   
@@ -370,14 +378,30 @@ struct MainFeature {
     connectionsClient: ConnectionsClient,
     contactPhotoClient: ContactPhotoClient
   ) async -> Person {
+    await resolvePerson(
+      recordRef: walkerRef,
+      usersClient: usersClient,
+      connectionsClient: connectionsClient,
+      contactPhotoClient: contactPhotoClient,
+      defaultStatus: "Walking"
+    )
+  }
+
+  static func resolvePerson(
+    recordRef: String,
+    usersClient: UsersClient,
+    connectionsClient: ConnectionsClient,
+    contactPhotoClient: ContactPhotoClient,
+    defaultStatus: String = "Accompanying"
+  ) async -> Person {
     // 1. Check Mock Doe
-    if walkerRef == "mock-doe" || walkerRef.localizedCaseInsensitiveContains("doe") {
+    if recordRef == "mock-doe" || recordRef.localizedCaseInsensitiveContains("doe") {
       return Person.mockDoe
     }
 
     // 2. Direct CloudKit record lookup
-    if let profile = try? await usersClient.fetchUserByRecordID(walkerRef) {
-      return await makePerson(from: profile, contactPhotoClient: contactPhotoClient)
+    if let profile = try? await usersClient.fetchUserByRecordID(recordRef) {
+      return await makePerson(from: profile, contactPhotoClient: contactPhotoClient, defaultStatus: defaultStatus)
     }
 
     // 3. Match against all users via sanitized ID
@@ -385,10 +409,10 @@ struct MainFeature {
       for profile in allProfiles {
         let recID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"
           .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
-        if recID == walkerRef
-            || (!profile.cloudKitUserId.isEmpty && walkerRef.contains(profile.cloudKitUserId))
-            || (!profile.appleUserId.isEmpty && walkerRef.contains(profile.appleUserId)) {
-          return await makePerson(from: profile, contactPhotoClient: contactPhotoClient)
+        if recID == recordRef
+            || (!profile.cloudKitUserId.isEmpty && recordRef.contains(profile.cloudKitUserId))
+            || (!profile.appleUserId.isEmpty && recordRef.contains(profile.appleUserId)) {
+          return await makePerson(from: profile, contactPhotoClient: contactPhotoClient, defaultStatus: defaultStatus)
         }
       }
     }
@@ -402,25 +426,25 @@ struct MainFeature {
           let partner = conn.partnerProfile
           let recID = "UserProfile_\(partner.appleUserId)_\(partner.cloudKitUserId)"
             .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
-          if recID == walkerRef
-              || (!partner.cloudKitUserId.isEmpty && walkerRef.contains(partner.cloudKitUserId))
-              || (!partner.appleUserId.isEmpty && walkerRef.contains(partner.appleUserId)) {
-            return await makePerson(from: partner, contactPhotoClient: contactPhotoClient)
+          if recID == recordRef
+              || (!partner.cloudKitUserId.isEmpty && recordRef.contains(partner.cloudKitUserId))
+              || (!partner.appleUserId.isEmpty && recordRef.contains(partner.appleUserId)) {
+            return await makePerson(from: partner, contactPhotoClient: contactPhotoClient, defaultStatus: defaultStatus)
           }
         }
       }
     }
 
     // 5. Fallback with cleaned display name if record is completely unreachable
-    let fallbackName = walkerRef.replacingOccurrences(of: "UserProfile_", with: "")
+    let fallbackName = recordRef.replacingOccurrences(of: "UserProfile_", with: "")
     return Person(
-      name: fallbackName.isEmpty ? "Walker" : fallbackName,
-      status: "Walking",
-      cloudKitUserId: walkerRef
+      name: fallbackName.isEmpty ? (defaultStatus == "Walking" ? "Walker" : "Companion") : fallbackName,
+      status: defaultStatus,
+      cloudKitUserId: recordRef
     )
   }
 
-  static func makePerson(from profile: UserProfile, contactPhotoClient: ContactPhotoClient) async -> Person {
+  static func makePerson(from profile: UserProfile, contactPhotoClient: ContactPhotoClient, defaultStatus: String = "Walking") async -> Person {
     var avatar = profile.avatarData
     if avatar == nil {
       avatar = await contactPhotoClient.fetchContactPhotoByEmail(profile.email)
