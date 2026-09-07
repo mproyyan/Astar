@@ -181,7 +181,12 @@ extension TrackingClient: DependencyKey {
             let pingTime = Date()
             
             let sessionRecordID = CKRecord.ID(recordName: sessionID)
-            let sessionRecord = CKRecord(recordType: "WalkSession", recordID: sessionRecordID)
+            let sessionRecord: CKRecord
+            do {
+                sessionRecord = try await db.record(for: sessionRecordID)
+            } catch {
+                sessionRecord = CKRecord(recordType: "WalkSession", recordID: sessionRecordID)
+            }
             sessionRecord["currentCoordinate"] = coordinatesData
             sessionRecord["lastPingAt"] = pingTime
             
@@ -265,63 +270,90 @@ extension TrackingClient: DependencyKey {
         subscribeToWalkSession: { sessionID in
             AsyncStream { (continuation: AsyncStream<WalkSession>.Continuation) in
                 let db = CKContainer.default().publicCloudDatabase
-                let expectedRecordName = sessionID
+                let sessionRecordID = CKRecord.ID(recordName: sessionID)
+                
+                let fetchSession: @Sendable () async -> WalkSession? = {
+                    do {
+                        let record = try await db.record(for: sessionRecordID)
+                        let walkerRef = (record["walkerRef"] as? CKRecord.Reference)?.recordID.recordName ?? ""
+                        return WalkSession(
+                            id: sessionID,
+                            walkerRef: walkerRef,
+                            status: record["status"] as? String ?? "",
+                            destinationName: record["destinationName"] as? String ?? "",
+                            destinationLatitude: record["destinationLatitude"] as? Double ?? 0.0,
+                            destinationLongitude: record["destinationLongitude"] as? Double ?? 0.0,
+                            routePolyline: record["routePolyline"] as? String,
+                            startedAt: record["startedAt"] as? Date ?? Date(),
+                            endedAt: record["endedAt"] as? Date,
+                            currentCoordinate: record["currentCoordinate"] as? Data,
+                            lastPingAt: record["lastPingAt"] as? Date ?? Date()
+                        )
+                    } catch {
+                        print("❌ [TrackingClient] Error fetching walk session record \(sessionID): \(error)")
+                        return nil
+                    }
+                }
                 
                 let task = Task {
                     var lastCompletedSent = false
-                    for await notification in NotificationCenter.default.publisher(for: Notification.Name("walkSessionUpdateNotification")).values {
+                    
+                    // 1. Initial immediate fetch
+                    if let initial = await fetchSession() {
+                        print("📍 [TrackingClient.subscribeToWalkSession] Yielding initial WalkSession: \(initial.status)")
+                        continuation.yield(initial)
+                        if initial.status == "completed" || initial.status == "arrived" {
+                            continuation.finish()
+                            return
+                        }
+                    }
+                    
+                    // 2. Poll loop for real-time location updates every 2.5 seconds
+                    let pollingTask = Task {
+                        while !Task.isCancelled {
+                            try? await Task.sleep(nanoseconds: 2_500_000_000)
+                            guard !Task.isCancelled else { break }
+                            
+                            if let updated = await fetchSession() {
+                                continuation.yield(updated)
+                                if updated.status == "completed" || updated.status == "arrived" {
+                                    if !lastCompletedSent {
+                                        lastCompletedSent = true
+                                        continuation.finish()
+                                    }
+                                    break
+                                }
+                            }
+                        }
+                    }
+                    
+                    // 3. APNs push notification listener for instant updates
+                    for await notification in NotificationCenter.default.publisher(for: AppDelegate.walkSessionUpdateNotification).values {
                         guard !Task.isCancelled else { break }
-                        let receiveTime = (notification.userInfo?["receivedAt"] as? Date) ?? Date()
-                        
                         guard let userInfo = notification.userInfo,
-                              let recordID = userInfo["recordID"] as? CKRecord.ID else {
+                              let recordID = userInfo["recordID"] as? CKRecord.ID,
+                              recordID.recordName == sessionID else {
                             continue
                         }
                         
-                        guard recordID.recordName == expectedRecordName else {
-                            continue
-                        }
-                        
-                        print("⚡️ [TrackingClient] Fetching WalkSession record \(recordID.recordName) from CloudKit...")
-                        
-                        do {
-                            let record = try await db.record(for: recordID)
-                            let walkerRef = (record["walkerRef"] as? CKRecord.Reference)?.recordID.recordName ?? ""
-                            
-                            let walkSession = WalkSession(
-                                id: sessionID,
-                                walkerRef: walkerRef,
-                                status: record["status"] as? String ?? "",
-                                destinationName: record["destinationName"] as? String ?? "",
-                                destinationLatitude: record["destinationLatitude"] as? Double ?? 0.0,
-                                destinationLongitude: record["destinationLongitude"] as? Double ?? 0.0,
-                                routePolyline: record["routePolyline"] as? String,
-                                startedAt: record["startedAt"] as? Date ?? Date(),
-                                endedAt: record["endedAt"] as? Date,
-                                currentCoordinate: record["currentCoordinate"] as? Data,
-                                lastPingAt: record["lastPingAt"] as? Date ?? Date()
-                            )
-                            
-                            print("📍 [APNs -> TrackingClient] Yielding WalkSession Update: \(walkSession.status) | ReceivedAt: \(receiveTime)")
-                            continuation.yield(walkSession)
-                            
-                            if walkSession.status == "completed" || walkSession.status == "arrived" {
-                                print("🏁 [TrackingClient] session completed, terminating stream.")
+                        if let updated = await fetchSession() {
+                            print("📍 [APNs -> TrackingClient] Yielding WalkSession Update: \(updated.status)")
+                            continuation.yield(updated)
+                            if updated.status == "completed" || updated.status == "arrived" {
                                 if !lastCompletedSent {
                                     lastCompletedSent = true
                                     continuation.finish()
                                 }
                                 break
                             }
-                            
-                        } catch {
-                            print("❌ [TrackingClient] Error fetching walk session record \(recordID.recordName): \(error)")
                         }
                     }
+                    
+                    pollingTask.cancel()
                 }
                 
                 continuation.onTermination = { @Sendable _ in
-                    print("[Stream] Stream terminated/cancelled at \(Date()).")
+                    print("[Stream] subscribeToWalkSession stream terminated at \(Date()).")
                     task.cancel()
                 }
             }
