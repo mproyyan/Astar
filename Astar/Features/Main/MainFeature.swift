@@ -60,7 +60,6 @@ struct MainFeature {
   @Dependency(\.usersClient) var usersClient
   @Dependency(\.connectionsClient) var connectionsClient
   @Dependency(\.trackingClient) var trackingClient
-  @Dependency(\.connectionsClient) var connectionsClient
   @Dependency(\.contactPhotoClient) var contactPhotoClient
   
   var body: some Reducer<State, Action> {
