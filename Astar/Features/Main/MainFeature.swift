@@ -1,3 +1,5 @@
+import CloudKit
+import Combine
 import ComposableArchitecture
 import Foundation
 
@@ -22,8 +24,16 @@ struct MainFeature {
     var isShowRouteGuide: Bool = DeveloperSettingsStorage.isShowRouteGuide
     var isDoeWalkingMock: Bool = DeveloperSettingsStorage.isDoeWalkingMockEnabled
     
-    init(userProfile: UserProfile? = nil) {
+    init(
+      userProfile: UserProfile? = nil,
+      isDevelopmentMode: Bool = DeveloperSettingsStorage.isDevelopmentMode,
+      isShowRouteGuide: Bool = DeveloperSettingsStorage.isShowRouteGuide,
+      isDoeWalkingMock: Bool = DeveloperSettingsStorage.isDoeWalkingMockEnabled
+    ) {
       self.login = LoginFeature.State(userProfile: userProfile)
+      self.isDevelopmentMode = isDevelopmentMode
+      self.isShowRouteGuide = isShowRouteGuide
+      self.isDoeWalkingMock = isDoeWalkingMock
     }
   }
   
@@ -38,6 +48,9 @@ struct MainFeature {
     case path(StackActionOf<Path>)
     case delegate(Delegate)
     case handleAcceptedInvitation(String)
+    case incomingInvitationReceived(participantRecordID: String, isAccepted: Bool)
+    case incomingInvitationDismissed(participantRecordID: String)
+    case invitationWalkerResolved(Person, isAccepted: Bool)
 
     enum Delegate: Equatable {
       case signedOut
@@ -46,6 +59,9 @@ struct MainFeature {
   
   @Dependency(\.usersClient) var usersClient
   @Dependency(\.connectionsClient) var connectionsClient
+  @Dependency(\.trackingClient) var trackingClient
+  @Dependency(\.connectionsClient) var connectionsClient
+  @Dependency(\.contactPhotoClient) var contactPhotoClient
   
   var body: some Reducer<State, Action> {
     Scope(state: \.login, action: \.login) {
@@ -59,35 +75,162 @@ struct MainFeature {
     Reduce { state, action in
       switch action {
       case let .handleAcceptedInvitation(walkerRef):
-        let prefix = "UserProfile_"
-        let ids = walkerRef.replacingOccurrences(of: prefix, with: "").components(separatedBy: "_")
-        if ids.count >= 2 {
-            let appleUserId = ids[0]
-            let cloudKitUserId = ids[1...].joined(separator: "_")
-            if let person = state.people.first(where: { $0.appleUserId == appleUserId && $0.cloudKitUserId == cloudKitUserId }) {
-                return .send(.map(.selectPerson(person)))
-            } else if let person = state.people.first(where: { $0.cloudKitUserId == cloudKitUserId }) {
-                return .send(.map(.selectPerson(person)))
-            }
+        if let person = state.people.first(where: {
+          let recID = "UserProfile_\($0.appleUserId ?? "")_\($0.cloudKitUserId ?? "")"
+            .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+          return recID == walkerRef || ($0.cloudKitUserId != nil && walkerRef.contains($0.cloudKitUserId!))
+        }) {
+          guard !state.map.isNavigating else { return .none }
+          return .send(.map(.selectPerson(person)))
         }
         return .none
 
+      case let .incomingInvitationDismissed(participantRecordID):
+        return .run { [trackingClient] _ in
+          do {
+            let participant = try await trackingClient.fetchSessionParticipant(participantRecordID)
+            guard !participant.sessionRef.isEmpty, !participant.companionRef.isEmpty else { return }
+            _ = try await trackingClient.updateParticipantStatus(participant.sessionRef, participant.companionRef, "dismiss")
+            print("🚫 [MainFeature] Updated participant \(participantRecordID) status to dismiss")
+          } catch {
+            print("⚠️ [MainFeature] Failed updating participant \(participantRecordID) to dismiss: \(error)")
+          }
+        }
+
+      case let .incomingInvitationReceived(participantRecordID, isAccepted):
+        let currentUser = state.login.userProfile
+        let selfRecordID = currentUser.map {
+          "UserProfile_\($0.appleUserId)_\($0.cloudKitUserId)"
+            .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+        }
+
+        // Navigation Guard: If actively navigating as a walker, ignore incoming invitation events
+        if state.map.isNavigating && state.map.userWalkSessionID != nil {
+          print("⚠️ [MainFeature] Ignoring incomingInvitationReceived because user is navigating as walker.")
+          return .none
+        }
+
+        return .run { [usersClient, trackingClient, connectionsClient, contactPhotoClient] send in
+          do {
+            let participant = try await trackingClient.fetchSessionParticipant(participantRecordID)
+            guard !participant.sessionRef.isEmpty else { return }
+
+            // Identity Guard: Current user must be the invited companion
+            if let selfID = selfRecordID, !selfID.isEmpty {
+              guard participant.companionRef == selfID else {
+                print("ℹ️ [MainFeature] Ignoring invitation intended for companion \(participant.companionRef) (self: \(selfID))")
+                return
+              }
+            }
+
+            let session = try await trackingClient.getWalkSession(participant.sessionRef)
+            guard !session.walkerRef.isEmpty else { return }
+
+            // Identity Guard: Current user cannot be the walker of this session
+            if let selfID = selfRecordID, !selfID.isEmpty {
+              guard session.walkerRef != selfID else {
+                print("ℹ️ [MainFeature] Ignoring invitation because current user is the walker (\(session.walkerRef))")
+                return
+              }
+            }
+
+            let walkerPerson = await Self.resolveWalkerPerson(
+              walkerRef: session.walkerRef,
+              usersClient: usersClient,
+              connectionsClient: connectionsClient,
+              contactPhotoClient: contactPhotoClient
+            )
+            await send(.invitationWalkerResolved(walkerPerson, isAccepted: isAccepted))
+          } catch {
+            print("⚠️ [MainFeature] Failed resolving incoming invitation \(participantRecordID): \(error)")
+          }
+        }
+
+      case let .invitationWalkerResolved(walkerPerson, isAccepted):
+        // Guard against overwriting sheet while actively navigating
+        guard !state.map.isNavigating else {
+          print("⚠️ [MainFeature] Ignoring invitationWalkerResolved because user is navigating.")
+          return .none
+        }
+        let currentUser = state.login.userProfile ?? UserProfileStorage.load()
+        if let user = currentUser {
+          let selfPersonID = Person.stableID(appleUserId: user.appleUserId, cloudKitUserId: user.cloudKitUserId)
+          if walkerPerson.id == selfPersonID || walkerPerson.appleUserId == user.appleUserId {
+            print("⚠️ [MainFeature] Ignoring invitationWalkerResolved for self.")
+            return .none
+          }
+        }
+
+        let selectAction = Action.map(.selectPerson(walkerPerson))
+        if isAccepted {
+          return .concatenate(
+            .send(selectAction),
+            .send(.map(.sheet(.presented(.walker(.trackTapped)))))
+          )
+        } else {
+          return .send(selectAction)
+        }
+
       case .onAppear:
         state.isPeopleLoading = true
-        return .run { send in
-          // 1. Initial fetch
+        let currentUser = state.login.userProfile ?? UserProfileStorage.load()
+        return .run { [trackingClient] send in
+          // 1. Setup invitation subscription for companion
+          if let profile = currentUser {
+            let selfRecordID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"
+              .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+            do {
+              try await trackingClient.setupInvitationSubscription(selfRecordID)
+              print("✅ [MainFeature] setupInvitationSubscription registered for \(selfRecordID)")
+            } catch {
+              print("⚠️ [MainFeature] setupInvitationSubscription failed: \(error)")
+            }
+          }
+
+          // 2. Initial fetch
           await send(.refreshPeople)
 
-          // 2. Periodic background refresh every 6 seconds to keep presence in sync
-          while !Task.isCancelled {
-            try? await Task.sleep(nanoseconds: 6_000_000_000)
-            guard !Task.isCancelled else { break }
-            await send(.refreshPeople)
+          // 3. Listen for push notification events and periodic refresh
+          await withTaskGroup(of: Void.self) { group in
+            group.addTask {
+              for await notification in NotificationCenter.default.publisher(for: AppDelegate.walkInvitationNotification).values {
+                guard !Task.isCancelled else { break }
+                if let recordID = notification.userInfo?["recordID"] as? CKRecord.ID {
+                  await send(.incomingInvitationReceived(participantRecordID: recordID.recordName, isAccepted: false))
+                }
+              }
+            }
+
+            group.addTask {
+              for await notification in NotificationCenter.default.publisher(for: AppDelegate.walkInvitationAcceptedNotification).values {
+                guard !Task.isCancelled else { break }
+                if let recordID = notification.userInfo?["recordID"] as? CKRecord.ID {
+                  await send(.incomingInvitationReceived(participantRecordID: recordID.recordName, isAccepted: true))
+                }
+              }
+            }
+
+            group.addTask {
+              for await notification in NotificationCenter.default.publisher(for: AppDelegate.walkInvitationDismissedNotification).values {
+                guard !Task.isCancelled else { break }
+                if let recordID = notification.userInfo?["recordID"] as? CKRecord.ID {
+                  await send(.incomingInvitationDismissed(participantRecordID: recordID.recordName))
+                }
+              }
+            }
+
+            group.addTask {
+              while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 6_000_000_000)
+                guard !Task.isCancelled else { break }
+                await send(.refreshPeople)
+              }
+            }
           }
         }
 
       case .refreshPeople:
-        return .run { [currentUser = state.login.userProfile] send in
+        return .run { [currentUser = state.login.userProfile, contactPhotoClient] send in
           do {
             guard let profile = UserProfileStorage.load() else {
               await send(.fetchPeopleResponse(.success([])))
@@ -108,12 +251,12 @@ struct MainFeature {
               }
               let avatarImageName = partnerProfile.name == "Awan" ? "AwanAvatar" : nil
               people.append(Person(
-                id: UUID(),
-                name: partnerProfile.name,
-                status: Self.formatStatus(partnerProfile.status),
-                appleUserId: partnerProfile.appleUserId,
-                cloudKitUserId: partnerProfile.cloudKitUserId,
-                email: partnerProfile.email,
+                id: Person.stableID(appleUserId: profile.appleUserId, cloudKitUserId: profile.cloudKitUserId),
+                name: profile.name,
+                status: Self.formatStatus(profile.status),
+                appleUserId: profile.appleUserId,
+                cloudKitUserId: profile.cloudKitUserId,
+                email: profile.email,
                 avatarData: avatar,
                 avatarImageName: avatarImageName
               ))
@@ -209,8 +352,9 @@ struct MainFeature {
         }
         return .none
         
-      case .path(.element(id: _, action: .profile(.delegate(.restartDoeWalkingSimulation)))):
+      case .path(.element(id: let id, action: .profile(.delegate(.restartDoeWalkingSimulation)))):
         state.isDoeWalkingMock = true
+        state.path[id: id, case: \.profile]?.isDoeWalkingMock = true
         if let idx = state.people.firstIndex(where: { $0.id == Person.mockDoeID }) {
           state.people[idx] = Person(id: Person.mockDoeID, name: "Doe", status: "Walking")
         }
@@ -304,6 +448,99 @@ struct MainFeature {
       return "Accompanying"
     }
     return trimmed.capitalized
+  }
+
+  static func resolveWalkerPerson(
+    walkerRef: String,
+    usersClient: UsersClient,
+    connectionsClient: ConnectionsClient,
+    contactPhotoClient: ContactPhotoClient
+  ) async -> Person {
+    await resolvePerson(
+      recordRef: walkerRef,
+      usersClient: usersClient,
+      connectionsClient: connectionsClient,
+      contactPhotoClient: contactPhotoClient,
+      defaultStatus: "Walking"
+    )
+  }
+
+  static func resolvePerson(
+    recordRef: String,
+    usersClient: UsersClient,
+    connectionsClient: ConnectionsClient,
+    contactPhotoClient: ContactPhotoClient,
+    defaultStatus: String = "Accompanying"
+  ) async -> Person {
+    // 1. Check Mock Doe
+    if recordRef == "mock-doe" || recordRef.localizedCaseInsensitiveContains("doe") {
+      return Person.mockDoe
+    }
+
+    // 2. Direct CloudKit record lookup
+    if let profile = try? await usersClient.fetchUserByRecordID(recordRef) {
+      return await makePerson(from: profile, contactPhotoClient: contactPhotoClient, defaultStatus: defaultStatus)
+    }
+
+    // 3. Match against all users via sanitized ID
+    if let allProfiles = try? await usersClient.fetchAllUsers() {
+      for profile in allProfiles {
+        let recID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"
+          .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+        if recID == recordRef
+            || (!profile.cloudKitUserId.isEmpty && recordRef.contains(profile.cloudKitUserId))
+            || (!profile.appleUserId.isEmpty && recordRef.contains(profile.appleUserId)) {
+          return await makePerson(from: profile, contactPhotoClient: contactPhotoClient, defaultStatus: defaultStatus)
+        }
+      }
+    }
+
+    // 4. Match against mutual connections
+    if let currentUser = UserProfileStorage.load() {
+      let selfRecordID = "UserProfile_\(currentUser.appleUserId)_\(currentUser.cloudKitUserId)"
+        .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+      if let connections = try? await connectionsClient.fetchConnections(CKRecord.ID(recordName: selfRecordID)) {
+        for conn in connections {
+          let partner = conn.partnerProfile
+          let recID = "UserProfile_\(partner.appleUserId)_\(partner.cloudKitUserId)"
+            .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+          if recID == recordRef
+              || (!partner.cloudKitUserId.isEmpty && recordRef.contains(partner.cloudKitUserId))
+              || (!partner.appleUserId.isEmpty && recordRef.contains(partner.appleUserId)) {
+            return await makePerson(from: partner, contactPhotoClient: contactPhotoClient, defaultStatus: defaultStatus)
+          }
+        }
+      }
+    }
+
+    // 5. Fallback with cleaned display name if record is completely unreachable
+    let fallbackName = recordRef.replacingOccurrences(of: "UserProfile_", with: "")
+    return Person(
+      name: fallbackName.isEmpty ? (defaultStatus == "Walking" ? "Walker" : "Companion") : fallbackName,
+      status: defaultStatus,
+      cloudKitUserId: recordRef
+    )
+  }
+
+  static func makePerson(from profile: UserProfile, contactPhotoClient: ContactPhotoClient, defaultStatus: String = "Walking") async -> Person {
+    var avatar = profile.avatarData
+    if avatar == nil {
+      avatar = await contactPhotoClient.fetchContactPhotoByEmail(profile.email)
+    }
+    if avatar == nil {
+      avatar = await contactPhotoClient.fetchContactPhotoByName(profile.name)
+    }
+    let avatarImageName = profile.name == "Awan" ? "AwanAvatar" : nil
+    return Person(
+      id: Person.stableID(appleUserId: profile.appleUserId, cloudKitUserId: profile.cloudKitUserId),
+      name: profile.name,
+      status: Self.formatStatus(profile.status),
+      appleUserId: profile.appleUserId,
+      cloudKitUserId: profile.cloudKitUserId,
+      email: profile.email,
+      avatarData: avatar,
+      avatarImageName: avatarImageName
+    )
   }
 }
 

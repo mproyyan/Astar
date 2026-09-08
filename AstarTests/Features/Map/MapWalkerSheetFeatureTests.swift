@@ -227,4 +227,264 @@ final class MapWalkerSheetFeatureTests: XCTestCase {
             $0.isViewingHistoryList = false
         }
     }
+
+    func testIncomingInvitationResolvesRealUsername() async {
+        let walkerRecordID = "UserProfile_000123_456_ck123"
+        let expectedProfile = UserProfile(
+            appleUserId: "000123.456",
+            cloudKitUserId: "ck123",
+            name: "Mentari Ayu",
+            email: "mentari@icloud.com",
+            status: "Walking"
+        )
+
+        let participant = SessionParticipant(
+            id: "SessionParticipant_session-777_myid",
+            sessionRef: "session-777",
+            companionRef: "myid",
+            status: "notDetermined"
+        )
+
+        let session = WalkSession(
+            id: "session-777",
+            walkerRef: walkerRecordID,
+            status: "active",
+            destinationName: "Home",
+            destinationLatitude: -6.2125,
+            destinationLongitude: 106.8166,
+            routePolyline: nil,
+            startedAt: Date(timeIntervalSince1970: 0),
+            endedAt: nil,
+            currentCoordinate: nil,
+            lastPingAt: Date(timeIntervalSince1970: 0)
+        )
+
+        let store = TestStore(initialState: MainFeature.State()) {
+            MainFeature()
+        } withDependencies: {
+            $0.trackingClient.fetchSessionParticipant = { recordID in
+                XCTAssertEqual(recordID, participant.id)
+                return participant
+            }
+            $0.trackingClient.getWalkSession = { sessionID in
+                XCTAssertEqual(sessionID, "session-777")
+                return session
+            }
+            $0.usersClient.fetchUserByRecordID = { recordID in
+                XCTAssertEqual(recordID, walkerRecordID)
+                return expectedProfile
+            }
+            $0.usersClient.fetchAllUsers = { [] }
+        }
+
+        await store.send(.incomingInvitationReceived(participantRecordID: participant.id, isAccepted: false))
+
+        let expectedPerson = Person(
+            id: Person.stableID(appleUserId: "000123.456", cloudKitUserId: "ck123"),
+            name: "Mentari Ayu",
+            status: "Walking",
+            appleUserId: "000123.456",
+            cloudKitUserId: "ck123",
+            email: "mentari@icloud.com",
+            avatarData: nil,
+            avatarImageName: nil
+        )
+
+        await store.receive(.invitationWalkerResolved(expectedPerson, isAccepted: false))
+        await store.receive(.map(.selectPerson(expectedPerson))) {
+            var walkerState = MapWalkerSheetFeature.State(
+                walker: expectedPerson,
+                status: "Walking",
+                isDestinationReached: false
+            )
+            walkerState.trips = WalkerSampleData.defaultTrips
+            $0.map.sheet = .walker(walkerState)
+        }
+    }
+
+    func testAcceptedInvitationResolvesRealUsernameAndTriggersTrack() async {
+        let walkerRecordID = "UserProfile_000123_456_ck123"
+        let expectedProfile = UserProfile(
+            appleUserId: "000123.456",
+            cloudKitUserId: "ck123",
+            name: "Dimas Prihady",
+            email: "dimas@icloud.com",
+            status: "Walking"
+        )
+
+        let participant = SessionParticipant(
+            id: "SessionParticipant_session-888_myid",
+            sessionRef: "session-888",
+            companionRef: "myid",
+            status: "notDetermined"
+        )
+
+        let initialCoordData = try! JSONEncoder().encode([-6.2088, 106.8456])
+        let session = WalkSession(
+            id: "session-888",
+            walkerRef: walkerRecordID,
+            status: "active",
+            destinationName: "Grand Indonesia",
+            destinationLatitude: -6.1950,
+            destinationLongitude: 106.8200,
+            routePolyline: nil,
+            startedAt: Date(timeIntervalSince1970: 0),
+            endedAt: nil,
+            currentCoordinate: initialCoordData,
+            lastPingAt: Date(timeIntervalSince1970: 0)
+        )
+
+        let store = TestStore(initialState: MainFeature.State()) {
+            MainFeature()
+        } withDependencies: {
+            $0.date.now = Date(timeIntervalSince1970: 0)
+            $0.directionRoute.calculateWalkingRoute = { _, _ in
+                WalkingRouteInfo(travelTimeString: "10m", etaString: "10.00", distanceString: "800m", rawTravelTime: 600, rawDistanceMeters: 800, route: nil, fallbackPolyline: nil)
+            }
+            $0.trackingClient.fetchSessionParticipant = { _ in participant }
+            $0.trackingClient.getWalkSession = { _ in session }
+            $0.usersClient.fetchUserByRecordID = { _ in expectedProfile }
+            $0.usersClient.fetchAllUsers = { [] }
+            $0.trackingClient.getWalkerActiveSessionID = { _ in "session-888" }
+            $0.trackingClient.updateParticipantStatus = { _, _, _ in participant }
+            $0.trackingClient.updateUserStatus = { _, _, _, _ in }
+            $0.trackingClient.setSubscribeWalkSession = { _, _ in }
+            $0.trackingClient.subscribeToWalkSession = { _ in
+                AsyncStream { continuation in
+                    continuation.finish()
+                }
+            }
+        }
+
+        await store.send(.incomingInvitationReceived(participantRecordID: participant.id, isAccepted: true))
+
+        let expectedPerson = Person(
+            id: Person.stableID(appleUserId: "000123.456", cloudKitUserId: "ck123"),
+            name: "Dimas Prihady",
+            status: "Walking",
+            appleUserId: "000123.456",
+            cloudKitUserId: "ck123",
+            email: "dimas@icloud.com",
+            avatarData: nil,
+            avatarImageName: nil
+        )
+
+        await store.receive(.invitationWalkerResolved(expectedPerson, isAccepted: true))
+        await store.receive(.map(.selectPerson(expectedPerson))) {
+            var walkerState = MapWalkerSheetFeature.State(
+                walker: expectedPerson,
+                status: "Walking",
+                isDestinationReached: false
+            )
+            walkerState.trips = WalkerSampleData.defaultTrips
+            $0.map.sheet = .walker(walkerState)
+        }
+        await store.receive(.map(.sheet(.presented(.walker(.trackTapped)))))
+        await store.receive(.map(.sheet(.presented(.walker(.WalkSessionLoaded(session)))))) {
+            guard case var .walker(walkerState) = $0.map.sheet else {
+                XCTFail("Expected walker sheet")
+                return
+            }
+            walkerState.activeParticipantID = "session-888"
+            walkerState.originPlaceName = "Current Location"
+            walkerState.originIconName = "location.fill"
+            walkerState.destinationPlaceName = "Grand Indonesia"
+            walkerState.destinationIconName = "house.fill"
+            $0.map.sheet = .walker(walkerState)
+        }
+        await store.receive(.map(.sheet(.presented(.walker(.delegate(.trackingStarted(expectedPerson, session))))))) {
+            $0.map.activeWalkSessionID = "session-888"
+            $0.map.trackedWalkerDestinationName = "Grand Indonesia"
+            $0.map.trackedWalkerDestination = CLLocationCoordinate2D(latitude: -6.1950, longitude: 106.8200)
+            $0.map.trackedWalkerLocation = CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
+            $0.map.hasFittedTrackedWalker = false
+        }
+    }
+
+    func testIncomingInvitationDismissedUpdatesStatusToDismiss() async {
+        let participant = SessionParticipant(
+            id: "SessionParticipant_session-999_comp123",
+            sessionRef: "session-999",
+            companionRef: "comp123",
+            status: "notDetermined"
+        )
+
+        var updatedStatus: String? = nil
+        let store = TestStore(initialState: MainFeature.State()) {
+            MainFeature()
+        } withDependencies: {
+            $0.trackingClient.fetchSessionParticipant = { recordID in
+                XCTAssertEqual(recordID, participant.id)
+                return participant
+            }
+            $0.trackingClient.updateParticipantStatus = { sessionID, companionRecordID, status in
+                XCTAssertEqual(sessionID, "session-999")
+                XCTAssertEqual(companionRecordID, "comp123")
+                updatedStatus = status
+                return SessionParticipant(id: participant.id, sessionRef: sessionID, companionRef: companionRecordID, status: status)
+            }
+        }
+
+        await store.send(.incomingInvitationDismissed(participantRecordID: participant.id))
+        XCTAssertEqual(updatedStatus, "dismiss")
+    }
+
+    func testIncomingInvitationIgnoredWhenUserIsWalkerOfSession() async {
+        let myProfile = UserProfile(
+            appleUserId: "000999.888",
+            cloudKitUserId: "ck999",
+            name: "Walker Dimas",
+            email: "walker@icloud.com",
+            status: "Walking"
+        )
+        let walkerRecordID = "UserProfile_000999_888_ck999"
+
+        let participant = SessionParticipant(
+            id: "SessionParticipant_session-mine_comp-other",
+            sessionRef: "session-mine",
+            companionRef: "comp-other",
+            status: "notDetermined"
+        )
+
+        let session = WalkSession(
+            id: "session-mine",
+            walkerRef: walkerRecordID,
+            status: "active",
+            destinationName: "Grand Indonesia",
+            destinationLatitude: -6.1950,
+            destinationLongitude: 106.8200,
+            routePolyline: nil,
+            startedAt: Date(timeIntervalSince1970: 0),
+            endedAt: nil,
+            currentCoordinate: Data(),
+            lastPingAt: Date(timeIntervalSince1970: 0)
+        )
+
+        var mainState = MainFeature.State()
+        mainState.login.userProfile = myProfile
+
+        let store = TestStore(initialState: mainState) {
+            MainFeature()
+        } withDependencies: {
+            $0.trackingClient.fetchSessionParticipant = { _ in participant }
+            $0.trackingClient.getWalkSession = { _ in session }
+        }
+
+        // When participant notification arrives, because user is the walker, it should be completely ignored
+        await store.send(.incomingInvitationReceived(participantRecordID: participant.id, isAccepted: false))
+        // No action received, no sheet change
+    }
+
+    func testIncomingInvitationIgnoredWhenActivelyNavigating() async {
+        var mainState = MainFeature.State()
+        mainState.map.isNavigating = true
+        mainState.map.userWalkSessionID = "user-walk-123"
+
+        let store = TestStore(initialState: mainState) {
+            MainFeature()
+        }
+
+        await store.send(.incomingInvitationReceived(participantRecordID: "SessionParticipant_123_456", isAccepted: false))
+        // Returns .none immediately without attempting to fetch or change sheet
+    }
 }

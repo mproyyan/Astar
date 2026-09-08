@@ -449,6 +449,9 @@ struct MainMapFeatureTests {
     } withDependencies: {
       $0.trackingClient.updateUserStatus = { _, _, _, _ in }
       $0.trackingClient.setSubscribeWalkSession = { _, _ in }
+      $0.trackingClient.updateParticipantStatus = { _, _, status in
+        SessionParticipant(id: "p", sessionRef: "mock-doe-session", companionRef: "c", status: status)
+      }
     }
 
     await store.send(.sheet(.presented(.walker(.delegate(.trackingEnded))))) {
@@ -658,6 +661,10 @@ struct MainMapFeatureTests {
       MainMapFeature()
     } withDependencies: {
       $0.trackingClient.endWalkSession = { _ in }
+      $0.trackingClient.setSubscribeSessionParticipants = { _, _ in }
+      $0.trackingClient.subscribeToSessionParticipants = { _ in
+        AsyncStream { $0.finish() }
+      }
     }
 
     await store.send(.sheet(.presented(.direction(.delegate(.navigationStarted(sessionID: "user-session-123")))))) {
@@ -677,6 +684,101 @@ struct MainMapFeatureTests {
       $0.userWalkSessionID = nil
       $0.activeWalkSessionID = nil
       $0.activeRoute = nil
+      $0.sheet = nil
+    }
+  }
+
+  @Test
+  @MainActor
+  func testWalkerNavigationSubscribesToAcceptedCompanionsWatching() async {
+    let mockDestination = CLLocationCoordinate2D(latitude: -6.2125, longitude: 106.8166)
+    let destinationPlace = SavedPlace(name: "Home", subtitle: "Bendungan Hilir", iconName: "house.fill", coordinate: mockDestination)
+
+    let participantStream = AsyncStream.makeStream(of: [SessionParticipant].self)
+
+    let companion1Profile = UserProfile(
+      appleUserId: "c1_apple",
+      cloudKitUserId: "c1_ck",
+      name: "Mentari Awan",
+      email: "mentari@example.com"
+    )
+
+    let store = TestStore(initialState: MainMapFeature.State(
+      sheet: .direction(MapDirectionSheetFeature.State(
+        destination: destinationPlace,
+        mode: .progress,
+        isNavigating: true
+      ))
+    )) {
+      MainMapFeature()
+    } withDependencies: {
+      $0.trackingClient.endWalkSession = { _ in }
+      $0.trackingClient.setSubscribeSessionParticipants = { _, _ in }
+      $0.trackingClient.subscribeToSessionParticipants = { _ in
+        participantStream.stream
+      }
+      $0.usersClient.fetchUserByRecordID = { recordID in
+        if recordID == "UserProfile_c1_apple_c1_ck" {
+          return companion1Profile
+        }
+        return nil
+      }
+      $0.connectionsClient.fetchConnections = { _ in [] }
+      $0.contactPhotoClient.fetchContactPhotoByEmail = { _ in nil }
+      $0.contactPhotoClient.fetchContactPhotoByName = { _ in nil }
+    }
+
+    await store.send(.sheet(.presented(.direction(.delegate(.navigationStarted(sessionID: "user-session-abc")))))) {
+      $0.isNavigating = true
+      $0.userWalkSessionID = "user-session-abc"
+      $0.lastLoggedStreet = "Current Area"
+      $0.lastLoggedIcon = "figure.walk"
+    }
+
+    // 1. Emit list with mixed statuses: only "accept" should be included
+    let mixedParticipants = [
+      SessionParticipant(id: "p1", sessionRef: "user-session-abc", companionRef: "UserProfile_c1_apple_c1_ck", status: "accept"),
+      SessionParticipant(id: "p2", sessionRef: "user-session-abc", companionRef: "UserProfile_c2_apple_c2_ck", status: "notDetermined"),
+      SessionParticipant(id: "p3", sessionRef: "user-session-abc", companionRef: "UserProfile_c3_apple_c3_ck", status: "dismiss"),
+      SessionParticipant(id: "p4", sessionRef: "user-session-abc", companionRef: "UserProfile_c4_apple_c4_ck", status: "left")
+    ]
+
+    participantStream.continuation.yield(mixedParticipants)
+
+    let expectedCompanion1 = Person(
+      id: Person.stableID(appleUserId: "c1_apple", cloudKitUserId: "c1_ck"),
+      name: "Mentari Awan",
+      status: "Idle",
+      appleUserId: "c1_apple",
+      cloudKitUserId: "c1_ck",
+      email: "mentari@example.com"
+    )
+
+    await store.receive(.sheet(.presented(.direction(.setWatchingPeople([expectedCompanion1]))))) {
+      if case var .direction(dirState) = $0.sheet {
+        dirState.watchingPeople = [expectedCompanion1]
+        $0.sheet = .direction(dirState)
+      }
+    }
+
+    // 2. Companion leaves (status changes to "left") -> watchingPeople becomes empty
+    let leftParticipants = [
+      SessionParticipant(id: "p1", sessionRef: "user-session-abc", companionRef: "UserProfile_c1_apple_c1_ck", status: "left")
+    ]
+    participantStream.continuation.yield(leftParticipants)
+
+    await store.receive(.sheet(.presented(.direction(.setWatchingPeople([]))))) {
+      if case var .direction(dirState) = $0.sheet {
+        dirState.watchingPeople = []
+        $0.sheet = .direction(dirState)
+      }
+    }
+
+    participantStream.continuation.finish()
+
+    await store.send(.sheet(.presented(.direction(.delegate(.navigationEnded))))) {
+      $0.isNavigating = false
+      $0.userWalkSessionID = nil
       $0.sheet = nil
     }
   }
@@ -726,10 +828,226 @@ struct MainMapFeatureTests {
           unsubscribedSessionID = sessionID
         }
       }
+      $0.trackingClient.updateParticipantStatus = { _, _, _ in
+        SessionParticipant(id: "p", sessionRef: "s", companionRef: "c", status: "left")
+      }
     }
 
-    await store.send(.stopTrackingTapped)
+    await store.send(.stopTrackingTapped) {
+      $0.activeWalkSessionID = nil
+    }
     #expect(unsubscribedSessionID == "session-xyz")
+  }
+
+  @Test
+  @MainActor
+  func testRealWalkerTrackingStartedImmediatelySetsLocationAndRoute() async {
+    let now = Date(timeIntervalSince1970: 1000)
+    let walkerLat = -6.2125
+    let walkerLon = 106.8166
+    let destLat = -6.1950
+    let destLon = 106.8200
+    let initialCoordData = try! JSONEncoder().encode([walkerLat, walkerLon])
+
+    let testPerson = Person(
+      id: UUID(),
+      name: "Mentari",
+      status: "Walking",
+      appleUserId: "mentari-apple",
+      cloudKitUserId: "mentari-ck"
+    )
+
+    let testSession = WalkSession(
+      id: "session-real-123",
+      walkerRef: "UserProfile_mentari_apple_mentari_ck",
+      status: "active",
+      destinationName: "Grand Indonesia",
+      destinationLatitude: destLat,
+      destinationLongitude: destLon,
+      routePolyline: nil,
+      startedAt: now,
+      endedAt: nil,
+      currentCoordinate: initialCoordData,
+      lastPingAt: now
+    )
+
+    let fallbackPoly = MKPolyline(coordinates: [
+      CLLocationCoordinate2D(latitude: walkerLat, longitude: walkerLon),
+      CLLocationCoordinate2D(latitude: destLat, longitude: destLon)
+    ], count: 2)
+
+    let mockRouteInfo = WalkingRouteInfo(
+      travelTimeString: "15 min",
+      etaString: "10.15",
+      distanceString: "1.2 km",
+      rawTravelTime: 900,
+      rawDistanceMeters: 1200,
+      route: nil,
+      fallbackPolyline: fallbackPoly
+    )
+
+    let walkerState = MapWalkerSheetFeature.State(
+      walker: testPerson,
+      status: "Walking"
+    )
+    let store = TestStore(initialState: MainMapFeature.State(
+      sheet: .walker(walkerState)
+    )) {
+      MainMapFeature()
+    } withDependencies: {
+      $0.date.now = now
+      $0.directionRoute.calculateWalkingRoute = { origin, dest in
+        #expect(origin.latitude == walkerLat)
+        #expect(origin.longitude == walkerLon)
+        #expect(dest.latitude == destLat)
+        #expect(dest.longitude == destLon)
+        return mockRouteInfo
+      }
+      $0.trackingClient.updateParticipantStatus = { _, _, _ in
+        SessionParticipant(id: "p", sessionRef: "session-real-123", companionRef: "c", status: "accept")
+      }
+      $0.trackingClient.updateUserStatus = { _, _, _, _ in }
+      $0.trackingClient.setSubscribeWalkSession = { _, _ in }
+      $0.trackingClient.subscribeToWalkSession = { _ in
+        AsyncStream { $0.finish() }
+      }
+    }
+
+    await store.send(.sheet(.presented(.walker(.delegate(.trackingStarted(testPerson, testSession)))))) {
+      $0.activeWalkSessionID = "session-real-123"
+      $0.trackedWalkerDestinationName = "Grand Indonesia"
+      $0.trackedWalkerDestination = CLLocationCoordinate2D(latitude: destLat, longitude: destLon)
+      $0.trackedWalkerLocation = CLLocationCoordinate2D(latitude: walkerLat, longitude: walkerLon)
+      $0.hasFittedTrackedWalker = false
+    }
+
+    await store.receive(.setTrackedWalkerPolyline(fallbackPoly)) {
+      $0.trackedWalkerPolyline = fallbackPoly
+    }
+  }
+
+  @Test
+  @MainActor
+  func testSelectPersonIgnoredWhileActivelyNavigating() async {
+    let dummyPerson = Person(name: "Mentari", status: "Walking")
+    let directionState = MapDirectionSheetFeature.State(
+      destination: SavedPlace(name: "Home", subtitle: "My house", iconName: "house.fill"),
+      mode: .progress,
+      watchingPeople: []
+    )
+    let store = TestStore(initialState: MainMapFeature.State(
+      isNavigating: true,
+      userWalkSessionID: "active-walk-123",
+      sheet: .direction(directionState)
+    )) {
+      MainMapFeature()
+    }
+
+    // Selecting a person while actively navigating must NOT overwrite the direction progress sheet
+    await store.send(.selectPerson(dummyPerson))
+    // No state change expected, sheet remains .direction
+  }
+
+  @Test
+  @MainActor
+  func testWalkSessionUpdatedUpdatesTrackedWalkerLocation() async {
+    let initialCoord = CLLocationCoordinate2D(latitude: -6.2000, longitude: 106.8166)
+    let store = TestStore(initialState: MainMapFeature.State(
+      activeWalkSessionID: "session-stream-1",
+      trackedWalkerLocation: initialCoord
+    )) {
+      MainMapFeature()
+    }
+
+    let nextLat = -6.2010
+    let nextLon = 106.8175
+    let nextCoordData = try! JSONEncoder().encode([nextLat, nextLon])
+    let updatedSession = WalkSession(
+      id: "session-stream-1",
+      walkerRef: "walker-1",
+      status: "active",
+      destinationName: "Plaza Indonesia",
+      destinationLatitude: -6.1930,
+      destinationLongitude: 106.8220,
+      routePolyline: nil,
+      startedAt: Date(),
+      endedAt: nil,
+      currentCoordinate: nextCoordData,
+      lastPingAt: Date()
+    )
+
+    await store.send(.walkSessionUpdated(updatedSession)) {
+      $0.trackedWalkerLocation = CLLocationCoordinate2D(latitude: nextLat, longitude: nextLon)
+    }
+
+    // Next step update
+    let step2Lat = -6.2025
+    let step2Lon = 106.8189
+    let step2CoordData = try! JSONEncoder().encode([step2Lat, step2Lon])
+    let step2Session = WalkSession(
+      id: "session-stream-1",
+      walkerRef: "walker-1",
+      status: "active",
+      destinationName: "Plaza Indonesia",
+      destinationLatitude: -6.1930,
+      destinationLongitude: 106.8220,
+      routePolyline: nil,
+      startedAt: Date(),
+      endedAt: nil,
+      currentCoordinate: step2CoordData,
+      lastPingAt: Date()
+    )
+
+    await store.send(.walkSessionUpdated(step2Session)) {
+      $0.trackedWalkerLocation = CLLocationCoordinate2D(latitude: step2Lat, longitude: step2Lon)
+    }
+  }
+
+  @Test
+  @MainActor
+  func testRealTimeTrackingStreamYieldsAndCancelsOnStop() async {
+    let initialCoord = CLLocationCoordinate2D(latitude: -6.2000, longitude: 106.8166)
+    let store = TestStore(initialState: MainMapFeature.State(
+      activeWalkSessionID: "session-live-stream",
+      trackedWalkerLocation: initialCoord,
+      trackedWalkerDestination: CLLocationCoordinate2D(latitude: -6.1930, longitude: 106.8220),
+      trackedWalkerDestinationName: "Grand Indonesia"
+    )) {
+      MainMapFeature()
+    } withDependencies: {
+      $0.trackingClient.setSubscribeWalkSession = { _, _ in }
+      $0.trackingClient.updateParticipantStatus = { _, _, _ in
+        SessionParticipant(id: "p1", sessionRef: "session-live-stream", companionRef: "c1", status: "left")
+      }
+    }
+
+    let movingLat = -6.2005
+    let movingLon = 106.8170
+    let movingCoordData = try! JSONEncoder().encode([movingLat, movingLon])
+    let movingSession = WalkSession(
+      id: "session-live-stream",
+      walkerRef: "walker-test",
+      status: "active",
+      destinationName: "Grand Indonesia",
+      destinationLatitude: -6.1930,
+      destinationLongitude: 106.8220,
+      routePolyline: nil,
+      startedAt: Date(),
+      endedAt: nil,
+      currentCoordinate: movingCoordData,
+      lastPingAt: Date()
+    )
+
+    await store.send(.walkSessionUpdated(movingSession)) {
+      $0.trackedWalkerLocation = CLLocationCoordinate2D(latitude: movingLat, longitude: movingLon)
+    }
+
+    await store.send(.stopTrackingTapped) {
+      $0.activeWalkSessionID = nil
+      $0.trackedWalkerLocation = nil
+      $0.trackedWalkerDestination = nil
+      $0.trackedWalkerDestinationName = nil
+    }
   }
 }
 

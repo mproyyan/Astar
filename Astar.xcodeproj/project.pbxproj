@@ -7,10 +7,18 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A6204CEA304F022A00CB37C5 /* trail Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = A6204CE9304F022A00CB37C5 /* trail Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A640BB71303BDF850064EB80 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = A640BB70303BDF850064EB80 /* ComposableArchitecture */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		35C06872B8FB6397E409D21A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A6DE52F2303BDE2F00940469 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A6204CE8304F022A00CB37C5;
+			remoteInfo = "trail Watch App";
+		};
 		A6DE5308303BDE3000940469 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = A6DE52F2303BDE2F00940469 /* Project object */;
@@ -27,8 +35,24 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		A6204CF6304F022A00CB37C5 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				A6204CEA304F022A00CB37C5 /* trail Watch App.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		7D64EA68303D68BA00390737 /* RULES.md */ = {isa = PBXFileReference; lastKnownFileType = text.markdown; path = RULES.md; sourceTree = "<group>"; };
+		A6204CDD304F022900CB37C5 /* trail.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = trail.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A6204CE9304F022A00CB37C5 /* trail Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "trail Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A640BB81303BE77F0064EB80 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 		A6DE52FA303BDE2F00940469 /* Astar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Astar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A6DE5307303BDE3000940469 /* AstarTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AstarTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -36,6 +60,16 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		A6204CDE304F022900CB37C5 /* trail */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = trail;
+			sourceTree = "<group>";
+		};
+		A6204CED304F022A00CB37C5 /* trail Watch App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "trail Watch App";
+			sourceTree = "<group>";
+		};
 		A6DE52FC303BDE2F00940469 /* Astar */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Astar;
@@ -54,6 +88,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		A6204CE6304F022A00CB37C5 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A6DE52F7303BDE2F00940469 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -94,6 +135,8 @@
 				A6DE52FC303BDE2F00940469 /* Astar */,
 				A6DE530A303BDE3000940469 /* AstarTests */,
 				A6DE5314303BDE3000940469 /* AstarUITests */,
+				A6204CDE304F022900CB37C5 /* trail */,
+				A6204CED304F022A00CB37C5 /* trail Watch App */,
 				A640BB72303BDF8E0064EB80 /* Frameworks */,
 				A6DE52FB303BDE2F00940469 /* Products */,
 			);
@@ -105,6 +148,8 @@
 				A6DE52FA303BDE2F00940469 /* Astar.app */,
 				A6DE5307303BDE3000940469 /* AstarTests.xctest */,
 				A6DE5311303BDE3000940469 /* AstarUITests.xctest */,
+				A6204CDD304F022900CB37C5 /* trail.app */,
+				A6204CE9304F022A00CB37C5 /* trail Watch App.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -112,6 +157,26 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		A6204CE8304F022A00CB37C5 /* trail Watch App */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A6204CF9304F022A00CB37C5 /* Build configuration list for PBXNativeTarget "trail Watch App" */;
+			buildPhases = (
+				A6204CE5304F022A00CB37C5 /* Sources */,
+				A6204CE6304F022A00CB37C5 /* Frameworks */,
+				A6204CE7304F022A00CB37C5 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A6204CED304F022A00CB37C5 /* trail Watch App */,
+			);
+			name = "trail Watch App";
+			productName = "trail Watch App";
+			productReference = A6204CE9304F022A00CB37C5 /* trail Watch App.app */;
+			productType = "com.apple.product-type.application";
+		};
 		A6DE52F9303BDE2F00940469 /* Astar */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = A6DE531B303BDE3000940469 /* Build configuration list for PBXNativeTarget "Astar" */;
@@ -119,10 +184,12 @@
 				A6DE52F6303BDE2F00940469 /* Sources */,
 				A6DE52F7303BDE2F00940469 /* Frameworks */,
 				A6DE52F8303BDE2F00940469 /* Resources */,
+				A6204CF6304F022A00CB37C5 /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				EA2E2E7E818670E47DC50BDA /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				A6DE52FC303BDE2F00940469 /* Astar */,
@@ -152,8 +219,6 @@
 				A6DE530A303BDE3000940469 /* AstarTests */,
 			);
 			name = AstarTests;
-			packageProductDependencies = (
-			);
 			productName = AstarTests;
 			productReference = A6DE5307303BDE3000940469 /* AstarTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -175,8 +240,6 @@
 				A6DE5314303BDE3000940469 /* AstarUITests */,
 			);
 			name = AstarUITests;
-			packageProductDependencies = (
-			);
 			productName = AstarUITests;
 			productReference = A6DE5311303BDE3000940469 /* AstarUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
@@ -191,6 +254,9 @@
 				LastSwiftUpdateCheck = 2640;
 				LastUpgradeCheck = 2640;
 				TargetAttributes = {
+					A6204CE8304F022A00CB37C5 = {
+						CreatedOnToolsVersion = 26.4;
+					};
 					A6DE52F9303BDE2F00940469 = {
 						CreatedOnToolsVersion = 26.4;
 					};
@@ -224,11 +290,19 @@
 				A6DE52F9303BDE2F00940469 /* Astar */,
 				A6DE5306303BDE3000940469 /* AstarTests */,
 				A6DE5310303BDE3000940469 /* AstarUITests */,
+				A6204CE8304F022A00CB37C5 /* trail Watch App */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		A6204CE7304F022A00CB37C5 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A6DE52F8303BDE2F00940469 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -253,6 +327,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		A6204CE5304F022A00CB37C5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A6DE52F6303BDE2F00940469 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -287,9 +368,89 @@
 			target = A6DE52F9303BDE2F00940469 /* Astar */;
 			targetProxy = A6DE5312303BDE3000940469 /* PBXContainerItemProxy */;
 		};
+		EA2E2E7E818670E47DC50BDA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = "trail Watch App";
+			target = A6204CE8304F022A00CB37C5 /* trail Watch App */;
+			targetProxy = 35C06872B8FB6397E409D21A /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		A6204CF7304F022A00CB37C5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				"CODE_SIGN_IDENTITY[sdk=watchos*]" = "iPhone Developer";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=watchos*]" = L6M39L4GV8;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Trail;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.astar.trail;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.astar.trail.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=watchos*]" = ASTAR_DEV_PROFILE_WATCH;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.4;
+			};
+			name = Debug;
+		};
+		A6204CF8304F022A00CB37C5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				"CODE_SIGN_IDENTITY[sdk=watchos*]" = "iPhone Developer";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=watchos*]" = L6M39L4GV8;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Trail;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.astar.trail;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.astar.trail.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=watchos*]" = ASTAR_DEV_PROFILE_WATCH;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.4;
+			};
+			name = Release;
+		};
 		A6DE5319303BDE3000940469 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -426,6 +587,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Astar-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Trail;
 				INFOPLIST_KEY_NSContactsUsageDescription = "Astar uses your contacts to show profile pictures for you and your trusted companions.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Astar needs your location to center the map on you.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -467,6 +629,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Astar-Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Trail;
 				INFOPLIST_KEY_NSContactsUsageDescription = "Astar uses your contacts to show profile pictures for you and your trusted companions.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Astar needs your location to center the map on you.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -580,6 +743,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		A6204CF9304F022A00CB37C5 /* Build configuration list for PBXNativeTarget "trail Watch App" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A6204CF7304F022A00CB37C5 /* Debug */,
+				A6204CF8304F022A00CB37C5 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		A6DE52F5303BDE2F00940469 /* Build configuration list for PBXProject "Astar" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
