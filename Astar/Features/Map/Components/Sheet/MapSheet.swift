@@ -252,6 +252,7 @@ struct MapSheet: View {
                             .id(walkerStore.activeParticipantID != nil)
                             .padding(.horizontal, 16)
                             .padding(.top, 12)
+                            .task { walkerStore.send(.onAppear) }
                             .transition(.opacity)
                     }
                 }
