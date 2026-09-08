@@ -34,6 +34,7 @@ struct DirectionProgress: View {
                 .font(.title.weight(.bold))
                 .foregroundStyle(.primary)
                 .accessibilityLabel("To \(destination.name)")
+                .accessibilitySortPriority(1.0)
 
             VStack(alignment: .leading, spacing: 0) {
                 VStack(spacing: 16) {
