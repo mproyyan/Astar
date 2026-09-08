@@ -101,7 +101,7 @@ struct DirectionCard: View {
                             Text(walkingRoute?.distanceString ?? destination.distance ?? "-- km")
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
-                                .accessibilityLabel("The journet distance is \(walkingRoute?.distanceString ?? "-- km")")
+                                .accessibilityLabel("The journey distance is \(walkingRoute?.distanceString ?? "The journey distance is unavailable")")
                         }
                     }
 
@@ -118,7 +118,7 @@ struct DirectionCard: View {
                             .background(Color.green, in: .capsule)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Start navigation")
+                    .accessibilityLabel("Start journey")
                     .accessibilityAddTraits(.isButton)
                 }
                 .padding(.top, 16)
