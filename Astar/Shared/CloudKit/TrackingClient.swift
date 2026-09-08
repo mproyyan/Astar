@@ -239,10 +239,10 @@ extension TrackingClient: DependencyKey {
             let db = CKContainer.default().publicCloudDatabase
             let predicate = NSPredicate(format: "sessionRef == %@", CKRecord.Reference(recordID: CKRecord.ID(recordName: sessionID), action: .deleteSelf))
             let query = CKQuery(recordType: "JourneyLogRecord", predicate: predicate)
-            query.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-            
+            // No sortDescriptors on query to avoid "creationDate not sortable" error
+
             let (results, _) = try await db.records(matching: query)
-            var logs: [JourneyLogEntry] = []
+            var tempLogs: [(entry: JourneyLogEntry, date: Date)] = []
             for (_, result) in results {
                 if let record = try? result.get() {
                     let log = JourneyLogEntry(
@@ -259,10 +259,10 @@ extension TrackingClient: DependencyKey {
                             return nil
                         }()
                     )
-                    logs.append(log)
+                    tempLogs.append((entry: log, date: record.creationDate ?? Date.distantPast))
                 }
             }
-            return logs
+            return tempLogs.sorted(by: { $0.date > $1.date }).map(\.entry)
         },
         subscribeToJourneyLogs: { sessionID in
             let db = CKContainer.default().publicCloudDatabase
@@ -289,10 +289,10 @@ extension TrackingClient: DependencyKey {
             return AsyncStream { continuation in
                 let internalFetch: @Sendable () async -> [JourneyLogEntry]? = {
                     let fetchQuery = CKQuery(recordType: "JourneyLogRecord", predicate: predicate)
-                    fetchQuery.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+                    // Retrieve records without CloudKit-level sort, then sort locally to avoid "creationDate not sortable" error
                     do {
                         let (results, _) = try await db.records(matching: fetchQuery)
-                        var logs: [JourneyLogEntry] = []
+                        var tempLogs: [(entry: JourneyLogEntry, date: Date)] = []
                         for (_, result) in results {
                             if let record = try? result.get() {
                                 let log = JourneyLogEntry(
@@ -306,11 +306,12 @@ extension TrackingClient: DependencyKey {
                                         (record["longitude"] as? Double).map { lon in CLLocationCoordinate2D(latitude: lat, longitude: lon) }
                                     }
                                 )
-                                logs.append(log)
+                                tempLogs.append((entry: log, date: record.creationDate ?? Date.distantPast))
                             }
                         }
-                        return logs
+                        return tempLogs.sorted(by: { $0.date > $1.date }).map(\.entry)
                     } catch {
+                        print("❌ [TrackingClient.subscribeToJourneyLogs] internalFetch Error: \(error)")
                         return nil
                     }
                 }
@@ -391,7 +392,7 @@ extension TrackingClient: DependencyKey {
             info.alertBody = "Walk session was updated."
             info.soundName = "default"
             info.category = "WALK_INVITATION"
-            info.desiredKeys = ["currentCoordinate", "status", "lastPingAt"]
+            info.desiredKeys = ["status", "lastPingAt"]
             
             subscription.notificationInfo = info
             
