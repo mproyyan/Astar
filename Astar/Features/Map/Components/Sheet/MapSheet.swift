@@ -224,7 +224,7 @@ struct MapSheet: View {
                                     originIconName: walkerStore.originIconName,
                                     destinationPlaceName: walkerStore.destinationPlaceName,
                                     destinationIconName: walkerStore.destinationIconName,
-                                    recentLocations: walkerStore.journeyLogEntries.isEmpty ? WalkerSampleData.awanLocations : walkerStore.journeyLogEntries
+                                    recentLocations: walkerStore.journeyLogEntries
                                 ),
                                 initialTracked: walkerStore.activeParticipantID != nil,
                                 onDismiss: {
