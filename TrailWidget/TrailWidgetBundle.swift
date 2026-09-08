@@ -12,6 +12,7 @@ import WidgetKit
 @main
 struct TrailWidgetBundle: WidgetBundle {
   var body: some Widget {
+    TrailHomeScreenWidget()
     TrailLiveActivityWidget()
   }
 }
