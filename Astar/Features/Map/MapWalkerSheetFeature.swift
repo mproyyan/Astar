@@ -177,10 +177,13 @@ struct MapWalkerSheetFeature {
            state.destinationPlaceName = session.destinationName
            state.destinationIconName = "house.fill"
          }
+
+         CompanionJourneyLiveActivityManager.shared.startActivity(walkerName: state.walker.name)
          return .send(.delegate(.trackingStarted(state.walker, session)))
 
       case .exitTrackTapped:
         state.activeParticipantID = nil
+        CompanionJourneyLiveActivityManager.shared.endActivity()
         return .send(.delegate(.trackingEnded))
 
       case .reachDestinationTapped:
@@ -203,6 +206,7 @@ struct MapWalkerSheetFeature {
             state.trips.insert(trip, at: 0)
           }
         }
+        CompanionJourneyLiveActivityManager.shared.endActivity()
         return .send(.delegate(.walkerReachedDestination(state.walker)))
 
       case .journeyLogTapped:
@@ -215,6 +219,13 @@ struct MapWalkerSheetFeature {
 
       case let .updateJourneyLog(entries):
         state.journeyLogEntries = entries
+        if let latestEntry = entries.first {
+            CompanionJourneyLiveActivityManager.shared.updateActivity(
+                latestLandmarkName: latestEntry.landmarkName,
+                latestTimeString: latestEntry.timeString,
+                isArrived: latestEntry.entryType == .finish
+            )
+        }
         return .none
 
       case .delegate:
