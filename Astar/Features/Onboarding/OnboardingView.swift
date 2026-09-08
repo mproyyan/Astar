@@ -17,6 +17,7 @@ private extension String {
 }
 
 struct OnboardingView: View {
+    @Environment(\.colorScheme) private var colorScheme
     @Bindable var store: StoreOf<OnboardingFeature>
 
     var body: some View {
@@ -38,17 +39,17 @@ struct OnboardingView: View {
                                 Image("TrailLogo")
                                     .resizable()
                                     .scaledToFit()
-                                    .frame(width: 88, height: 88)
+                                    .frame(width: 120, height: 120)
                             } else {
                                 Image(systemName: content.imageName)
                                     .font(.system(size: 56, weight: .medium))
                                     .foregroundStyle(.tint)
-                                    .frame(width: 88, height: 88)
+                                    .frame(width: 120, height: 120)
                             }
                         }
 
                         Spacer()
-                            .frame(height: 28)
+                            .frame(height: 16)
 
                         // MARK: Title
                         Text(content.title)
@@ -181,7 +182,9 @@ struct OnboardingView: View {
                         }
                     }
                 )
-                .signInWithAppleButtonStyle(.black)
+                .signInWithAppleButtonStyle(
+                    colorScheme == .dark ? .white : .black
+                )
                 .frame(height: 50)
                 .clipShape(Capsule())
                 .padding(.horizontal, 24)

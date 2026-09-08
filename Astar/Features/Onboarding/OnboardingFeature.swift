@@ -37,21 +37,25 @@ struct OnboardingFeature {
           OnboardingContent(
               title: "Trail",
               body: .paragraph(
-                  "Never feel alone. Trail keeps your trusted person updated in real time."
+                  "Stay Connected. Trail keeps your trusted person updated in real time."
               ),
               imageName: "figure.walk.motion"
           ),
 
           OnboardingContent(
-              title: "You Walk. They Watch.",
+              title: "Stay Connected Along the Way",
               body: .glossary([
                   GlossaryItem(
                       term: "Walker",
-                      definition: "You're the person making the journey."
+                      definition: "The person making the journey. They share their journey with a trusted person."
                   ),
                   GlossaryItem(
                       term: "Trusted Person",
-                      definition: "Someone you choose to keep an eye on your journey and know when you arrive."
+                      definition: "Someone the walker trusts to accompany their journey. They can follow the journey and receive updates."
+                  ),
+                  GlossaryItem(
+                      term: "Companion",
+                      definition: "The trusted person following the journey. They can receive updates and know when the walker arrives."
                   )
               ]),
               imageName: "person.2.fill"
