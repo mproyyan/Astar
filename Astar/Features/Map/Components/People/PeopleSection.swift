@@ -35,7 +35,12 @@ struct PeopleSection: View {
                 Image(systemName: "chevron.right")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+                    .accessibilityRemoveTraits(.isImage)
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityHint("Tap to see more your trusted person")
+            .accessibilityAddTraits(.isButton)
 
             if isLoading {
                 PeopleSectionSkeleton()
@@ -90,12 +95,15 @@ struct PeopleSectionSkeleton: View {
                         .fill(Color(.systemGray6))
                         .frame(width: 40, height: 10)
                 }
+                .padding(4)
             }
+            Spacer()
         }
         .frame(maxWidth: .infinity)
         .opacity(isAnimating ? 0.4 : 1.0)
         .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: isAnimating)
         .onAppear { isAnimating = true }
+        .accessibilityHidden(true)
     }
 }
 
@@ -109,6 +117,7 @@ struct PeopleSectionEmptyState: View {
             Image(systemName: "person.2.slash")
                 .font(.system(size: 32))
                 .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
 
             VStack(spacing: 4) {
                 Text("Your trusted person will be shown here.")
@@ -129,6 +138,8 @@ struct PeopleSectionEmptyState: View {
                             .foregroundStyle(.blue)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityHint("Add your trusted person")
                 }
             }
         }
