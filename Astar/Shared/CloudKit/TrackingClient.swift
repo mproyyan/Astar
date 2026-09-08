@@ -631,7 +631,28 @@ extension TrackingClient: DependencyKey {
         }
     )
     
-    static let testValue = Self()
+    static let testValue = Self(
+        startWalkSession: { _, _, _, _, _, _ in
+            WalkSession(id: "test", walkerRef: "w", status: "active", destinationName: "dest", destinationLatitude: 0, destinationLongitude: 0, routePolyline: nil, startedAt: Date(), endedAt: nil, currentCoordinate: nil, lastPingAt: Date())
+        },
+        endWalkSession: { _ in },
+        inviteToWalkSession: { _, _ in },
+        updateParticipantStatus: { s, c, st in SessionParticipant(id: "p", sessionRef: s, companionRef: c, status: st) },
+        updateUserStatus: { _, _, _, _ in },
+        pushLocationUpdate: { _, _ in },
+        addJourneyLog: { _, _ in },
+        fetchJourneyLogs: { _ in [] },
+        subscribeToJourneyLogs: { _ in AsyncStream { $0.finish() } },
+        setSubscribeWalkSession: { _, _ in },
+        subscribeToWalkSession: { _ in AsyncStream { $0.finish() } },
+        setupInvitationSubscription: { _ in },
+        getWalkSession: { s in WalkSession(id: s, walkerRef: "w", status: "active", destinationName: "dest", destinationLatitude: 0, destinationLongitude: 0, routePolyline: nil, startedAt: Date(), endedAt: nil, currentCoordinate: nil, lastPingAt: Date()) },
+        getWalkerActiveSessionID: { _ in nil },
+        fetchSessionParticipant: { p in SessionParticipant(id: p, sessionRef: "s", companionRef: "c", status: "notDetermined") },
+        fetchSessionParticipants: { _ in [] },
+        setSubscribeSessionParticipants: { _, _ in },
+        subscribeToSessionParticipants: { _ in AsyncStream { $0.finish() } }
+    )
 }
 
 private func querySessionParticipants(sessionID: String) async throws -> [SessionParticipant] {

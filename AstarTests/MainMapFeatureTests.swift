@@ -152,6 +152,7 @@ struct MainMapFeatureTests {
   @Test
   @MainActor
   func testStartAlwaysHomeNavigation() async {
+    let now = Date(timeIntervalSince1970: 1000)
     let mockCoord = CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
     let mockRouteInfo = WalkingRouteInfo(
       travelTimeString: "15 min",
@@ -167,6 +168,7 @@ struct MainMapFeatureTests {
       MainMapFeature()
     } withDependencies: {
       $0.uuid = .incrementing
+      $0.date.now = now
       $0.locationManager.getCurrentLocation = { mockCoord }
       $0.directionRoute.reverseGeocode = { _ in "Jl. Sudirman, Central Jakarta" }
       $0.directionRoute.calculateWalkingRoute = { _, _ in mockRouteInfo }
@@ -198,6 +200,7 @@ struct MainMapFeatureTests {
       $0.lastLoggedCoordinate = mockCoord
       $0.lastLoggedStreet = "Jl. Sudirman"
       $0.lastLoggedIcon = "figure.walk"
+      $0.lastLoggedTime = now
       let streetName = "Jl. Sudirman"
       let startTimeString = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .short)
       let startEntry = JourneyLogEntry(
@@ -251,6 +254,7 @@ struct MainMapFeatureTests {
   @Test
   @MainActor
   func testStartDirectNavigationOffice() async {
+    let now = Date(timeIntervalSince1970: 1000)
     let mockCoord = CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
     let mockRouteInfo = WalkingRouteInfo(
       travelTimeString: "12 min",
@@ -266,6 +270,7 @@ struct MainMapFeatureTests {
       MainMapFeature()
     } withDependencies: {
       $0.uuid = .incrementing
+      $0.date.now = now
       $0.locationManager.getCurrentLocation = { mockCoord }
       $0.directionRoute.reverseGeocode = { _ in "Jl. M.H. Thamrin, Central Jakarta" }
       $0.directionRoute.calculateWalkingRoute = { _, _ in mockRouteInfo }
@@ -297,6 +302,7 @@ struct MainMapFeatureTests {
       $0.lastLoggedCoordinate = mockCoord
       $0.lastLoggedStreet = "Jl. M.H. Thamrin"
       $0.lastLoggedIcon = "figure.walk"
+      $0.lastLoggedTime = now
       let streetName = "Jl. M.H. Thamrin"
       let startTimeString = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .short)
       let startEntry = JourneyLogEntry(
@@ -485,6 +491,7 @@ struct MainMapFeatureTests {
       lastPingAt: Date()
     )
 
+    let now = Date(timeIntervalSince1970: 1000)
     let store = TestStore(initialState: MainMapFeature.State(
       activeWalkSessionID: nil,
       trackedWalkerLocation: currentWalkLocation,
@@ -498,7 +505,7 @@ struct MainMapFeatureTests {
     )) {
       MainMapFeature()
     } withDependencies: {
-      $0.date.now = Date(timeIntervalSince1970: 1000)
+      $0.date.now = now
       $0.directionRoute.calculateWalkingRoute = { _, _ in
         WalkingRouteInfo(travelTimeString: "8 min", etaString: "11.00 ETA", distanceString: "500 m", rawTravelTime: 480, rawDistanceMeters: 500, route: nil)
       }
@@ -509,6 +516,21 @@ struct MainMapFeatureTests {
       $0.trackedWalkerDestinationName = mockSession.destinationName
       $0.trackedWalkerDestination = CLLocationCoordinate2D(latitude: mockSession.destinationLatitude, longitude: mockSession.destinationLongitude)
       $0.hasFittedTrackedWalker = false
+      $0.trackedWalkerAttributes = TrailWalkAttributes(
+        sessionID: "mock-doe-session",
+        walkerName: "Doe",
+        originTitle: "Autograph Tower",
+        destinationTitle: "Home"
+      )
+      $0.trackedWalkerLiveActivityState = TrailWalkAttributes.ContentState(
+        step: "Walking",
+        progressPercentage: 0.0,
+        remainingDistanceMeters: 650.0,
+        currentLandmark: "Home",
+        estimatedArrivalDate: now.addingTimeInterval(6 * 60),
+        expectedTravelTime: "6 min",
+        isApproaching: false
+      )
       // Doe is already walking: retains existing location and isMockDoeWalking flag
       $0.trackedWalkerLocation = currentWalkLocation
       $0.isMockDoeWalking = true
@@ -644,6 +666,7 @@ struct MainMapFeatureTests {
   @Test
   @MainActor
   func testNavigationStartedClearsTrackedWalkerAndSetsUserWalkSession() async {
+    let now = Date(timeIntervalSince1970: 1000)
     let mockDestination = CLLocationCoordinate2D(latitude: -6.2125, longitude: 106.8166)
     let destinationPlace = SavedPlace(name: "Home", subtitle: "Bendungan Hilir, South Jakarta", iconName: "house.fill", coordinate: mockDestination)
 
@@ -660,6 +683,7 @@ struct MainMapFeatureTests {
     )) {
       MainMapFeature()
     } withDependencies: {
+      $0.date.now = now
       $0.trackingClient.endWalkSession = { _ in }
       $0.trackingClient.setSubscribeSessionParticipants = { _, _ in }
       $0.trackingClient.subscribeToSessionParticipants = { _ in
@@ -677,6 +701,7 @@ struct MainMapFeatureTests {
       $0.lastLoggedCoordinate = nil
       $0.lastLoggedStreet = "Current Area"
       $0.lastLoggedIcon = "figure.walk"
+      $0.lastLoggedTime = now
     }
 
     await store.send(.sheet(.presented(.direction(.delegate(.navigationEnded))))) {
@@ -691,6 +716,7 @@ struct MainMapFeatureTests {
   @Test
   @MainActor
   func testWalkerNavigationSubscribesToAcceptedCompanionsWatching() async {
+    let now = Date(timeIntervalSince1970: 1000)
     let mockDestination = CLLocationCoordinate2D(latitude: -6.2125, longitude: 106.8166)
     let destinationPlace = SavedPlace(name: "Home", subtitle: "Bendungan Hilir", iconName: "house.fill", coordinate: mockDestination)
 
@@ -712,6 +738,7 @@ struct MainMapFeatureTests {
     )) {
       MainMapFeature()
     } withDependencies: {
+      $0.date.now = now
       $0.trackingClient.endWalkSession = { _ in }
       $0.trackingClient.setSubscribeSessionParticipants = { _, _ in }
       $0.trackingClient.subscribeToSessionParticipants = { _ in
@@ -733,6 +760,7 @@ struct MainMapFeatureTests {
       $0.userWalkSessionID = "user-session-abc"
       $0.lastLoggedStreet = "Current Area"
       $0.lastLoggedIcon = "figure.walk"
+      $0.lastLoggedTime = now
     }
 
     // 1. Emit list with mixed statuses: only "accept" should be included
@@ -842,6 +870,7 @@ struct MainMapFeatureTests {
   @Test
   @MainActor
   func testRealWalkerTrackingStartedImmediatelySetsLocationAndRoute() async {
+    UserProfileStorage.clear()
     let now = Date(timeIntervalSince1970: 1000)
     let walkerLat = -6.2125
     let walkerLon = 106.8166
@@ -911,6 +940,9 @@ struct MainMapFeatureTests {
       $0.trackingClient.subscribeToWalkSession = { _ in
         AsyncStream { $0.finish() }
       }
+      $0.trackingClient.subscribeToJourneyLogs = { _ in
+        AsyncStream { $0.finish() }
+      }
     }
 
     await store.send(.sheet(.presented(.walker(.delegate(.trackingStarted(testPerson, testSession)))))) {
@@ -919,6 +951,21 @@ struct MainMapFeatureTests {
       $0.trackedWalkerDestination = CLLocationCoordinate2D(latitude: destLat, longitude: destLon)
       $0.trackedWalkerLocation = CLLocationCoordinate2D(latitude: walkerLat, longitude: walkerLon)
       $0.hasFittedTrackedWalker = false
+      $0.trackedWalkerAttributes = TrailWalkAttributes(
+        sessionID: "session-real-123",
+        walkerName: "Mentari",
+        originTitle: "Starting Point",
+        destinationTitle: "Grand Indonesia"
+      )
+      $0.trackedWalkerLiveActivityState = TrailWalkAttributes.ContentState(
+        step: "Walking",
+        progressPercentage: 0.0,
+        remainingDistanceMeters: 650.0,
+        currentLandmark: "Grand Indonesia",
+        estimatedArrivalDate: now.addingTimeInterval(6 * 60),
+        expectedTravelTime: "6 min",
+        isApproaching: false
+      )
     }
 
     await store.receive(.setTrackedWalkerPolyline(fallbackPoly)) {

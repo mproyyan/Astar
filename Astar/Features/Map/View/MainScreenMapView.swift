@@ -96,6 +96,17 @@ struct MainScreenMapView: View {
         .padding(.trailing, 16)
         .padding(.top, 60)
       }
+      .overlay(alignment: .top) {
+        if let attributes = store.map.trackedWalkerAttributes,
+           let liveState = store.map.trackedWalkerLiveActivityState {
+          FloatingDynamicIslandOverlay(
+            state: liveState,
+            attributes: attributes
+          )
+          .padding(.top, 8)
+          .transition(.move(edge: .top).combined(with: .opacity))
+        }
+      }
       .sheet(isPresented: isSheetPresented) {
         MapSheet(
           store: store,
