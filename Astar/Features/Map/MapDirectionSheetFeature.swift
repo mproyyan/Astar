@@ -193,7 +193,10 @@ struct MapDirectionSheetFeature {
 
         let originCoord = currentLocation ?? CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
         let originAddress = state.originPlace?.subtitle ?? "Current Location"
-        let streetName = originAddress.components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces) ?? "Current Area"
+        let rawStreet = originAddress.components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces) ?? ""
+        let originName = state.originPlace?.name != "Current Location" ? (state.originPlace?.name ?? "") : ""
+        let streetCandidate = !originName.isEmpty ? originName : rawStreet
+        let streetName = (streetCandidate.isEmpty || streetCandidate == "Locating current area..." || streetCandidate == "Current Location" || streetCandidate == "Current Area") ? "Start Position" : streetCandidate
         let startTimeString = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .short)
 
         let startEntry = JourneyLogEntry(
@@ -208,7 +211,7 @@ struct MapDirectionSheetFeature {
 
         let currentEntry = JourneyLogEntry(
           id: uuid(),
-          landmarkName: "Near \(streetName)",
+          landmarkName: streetName == "Start Position" ? "Near Start Position" : "Near \(streetName)",
           address: originAddress,
           timeString: "Now",
           iconName: "location.fill",

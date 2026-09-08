@@ -68,7 +68,7 @@ struct MapDirectionSheetFeatureTests {
       )
       let currentEntry = JourneyLogEntry(
         id: UUID(1),
-        landmarkName: "Near \(streetName)",
+        landmarkName: "Near Start Position",
         address: originAddress,
         timeString: "Now",
         iconName: "location.fill",

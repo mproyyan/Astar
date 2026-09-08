@@ -365,17 +365,8 @@ extension TrackingClient: DependencyKey {
                 return
             }
             
-            print("[TrackingClient] Checking existing subscription: \(subscriptionID)")
-            do {
-                _ = try await db.subscription(for: subscriptionID)
-                print("Already subscribed to session: \(sessionID)")
-                return
-            } catch let error as CKError where error.code == .unknownItem {
-                print("[TrackingClient] Subscription missing, creating new one...")
-            } catch {
-                print("[TrackingClient] Subscription check error: \(error.localizedDescription)")
-                throw error
-            }
+            // Always delete previous subscription first to guarantee old alertBody is replaced
+            try? await db.deleteSubscription(withID: subscriptionID)
             
             let sessionRecordID = CKRecord.ID(recordName: sessionID)
             let predicate = NSPredicate(format: "recordID == %@", sessionRecordID)
@@ -389,9 +380,6 @@ extension TrackingClient: DependencyKey {
             
             let info = CKSubscription.NotificationInfo()
             info.shouldSendContentAvailable = true
-            info.alertBody = "Walk session was updated."
-            info.soundName = "default"
-            info.category = "WALK_INVITATION"
             info.desiredKeys = ["status", "lastPingAt"]
             
             subscription.notificationInfo = info

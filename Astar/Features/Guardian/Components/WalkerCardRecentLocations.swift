@@ -10,32 +10,53 @@ import SwiftUI
 struct WalkerCardRecentLocations: View {
     var locations: [JourneyLogEntry] = WalkerSampleData.awanLocations
 
+    var sortedLocations: [JourneyLogEntry] {
+        var current: [JourneyLogEntry] = []
+        var checkpoints: [JourneyLogEntry] = []
+        var starts: [JourneyLogEntry] = []
+
+        for loc in locations {
+            switch loc.entryType {
+            case .currentLocation, .destination:
+                current.append(loc)
+            case .checkpoint:
+                checkpoints.append(loc)
+            case .start:
+                starts.append(loc)
+            }
+        }
+        return current + checkpoints + starts
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Recent locations")
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.primary)
 
-            VStack(spacing: 0) {
-                ForEach(locations.enumerated(), id: \.element.id) { index, entry in
-                    WalkerRecentLocationRow(
-                        entry: entry,
-                        isFirst: index == 0,
-                        isLast: index == locations.count - 1
-                    )
+            let entries = sortedLocations
+            if !entries.isEmpty {
+                VStack(spacing: 0) {
+                    ForEach(entries.enumerated(), id: \.element.id) { index, entry in
+                        WalkerRecentLocationRow(
+                            entry: entry,
+                            isFirst: index == 0,
+                            isLast: index == entries.count - 1
+                        )
 
-                    if index < locations.count - 1 {
-                        Divider()
-                            .padding(.leading, 52)
-                            .opacity(0.5)
+                        if index < entries.count - 1 {
+                            Divider()
+                                .padding(.leading, 52)
+                                .opacity(0.5)
+                        }
                     }
                 }
-            }
-            .padding(.horizontal, 14)
-            .background(.white, in: .rect(cornerRadius: 24))
-            .overlay {
-                RoundedRectangle(cornerRadius: 24)
-                    .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+                .padding(.horizontal, 14)
+                .background(.white, in: .rect(cornerRadius: 24))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 24)
+                        .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+                }
             }
         }
     }
@@ -55,7 +76,7 @@ struct WalkerRecentLocationRow: View {
         case .destination:
             return .green
         case .checkpoint:
-            return Color(red: 0.15, green: 0.15, blue: 0.15)
+            return SavedPlace.categoryColor(for: entry.iconName)
         }
     }
 

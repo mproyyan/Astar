@@ -699,7 +699,7 @@ struct MainMapFeatureTests {
       $0.trackedWalkerRoute = nil
       $0.trackedWalkerDestination = nil
       $0.lastLoggedCoordinate = nil
-      $0.lastLoggedStreet = "Current Area"
+      $0.lastLoggedStreet = "Start Position"
       $0.lastLoggedIcon = "figure.walk"
       $0.lastLoggedTime = now
     }
@@ -758,7 +758,7 @@ struct MainMapFeatureTests {
     await store.send(.sheet(.presented(.direction(.delegate(.navigationStarted(sessionID: "user-session-abc")))))) {
       $0.isNavigating = true
       $0.userWalkSessionID = "user-session-abc"
-      $0.lastLoggedStreet = "Current Area"
+      $0.lastLoggedStreet = "Start Position"
       $0.lastLoggedIcon = "figure.walk"
       $0.lastLoggedTime = now
     }
@@ -1168,6 +1168,49 @@ struct MainMapFeatureTests {
     }
 
     await store.receive(.delegate(.companionStatusChanged(newStatus: "idle")))
+  }
+
+  @Test
+  @MainActor
+  func testWalkerCardRecentLocationsOrderTopToBottom() {
+    let start = JourneyLogEntry(
+      landmarkName: "Start Position",
+      address: "Jl. Sudirman",
+      timeString: "9:00 AM",
+      iconName: "figure.walk.motion",
+      entryType: .start
+    )
+    let cp1 = JourneyLogEntry(
+      landmarkName: "Passed Checkpoint 1",
+      address: "Jl. Sudirman",
+      timeString: "9:05 AM",
+      iconName: "figure.walk",
+      entryType: .checkpoint
+    )
+    let cp2 = JourneyLogEntry(
+      landmarkName: "Passed Checkpoint 2",
+      address: "Jl. Sudirman",
+      timeString: "9:10 AM",
+      iconName: "figure.walk",
+      entryType: .checkpoint
+    )
+    let current = JourneyLogEntry(
+      landmarkName: "Near Landmark",
+      address: "Jl. Sudirman",
+      timeString: "Now",
+      iconName: "location.fill",
+      entryType: .currentLocation
+    )
+
+    // Pass mixed array
+    let view = WalkerCardRecentLocations(locations: [start, cp1, current, cp2])
+    let sorted = view.sortedLocations
+
+    #expect(sorted.count == 4)
+    #expect(sorted[0].entryType == .currentLocation)
+    #expect(sorted[1].entryType == .checkpoint)
+    #expect(sorted[2].entryType == .checkpoint)
+    #expect(sorted[3].entryType == .start)
   }
 }
 

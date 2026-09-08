@@ -459,7 +459,8 @@ struct MainMapFeature {
       case let .directNavigationReady(destination, destCoord, originCoord, originAddress, routeInfo):
         state.currentLocation = originCoord
         state.activeRoute = routeInfo.route
-        let streetName = originAddress.components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces) ?? "Current Area"
+        let rawStreet = originAddress.components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces) ?? ""
+        let streetName = (rawStreet.isEmpty || rawStreet == "Locating current area..." || rawStreet == "Current Location" || rawStreet == "Current Area") ? "Start Position" : rawStreet
         let startTimeString = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .short)
 
         let startEntry = JourneyLogEntry(
@@ -474,7 +475,7 @@ struct MainMapFeature {
 
         let currentEntry = JourneyLogEntry(
           id: uuid(),
-          landmarkName: "Near \(streetName)",
+          landmarkName: streetName == "Start Position" ? "Near Start Position" : "Near \(streetName)",
           address: originAddress,
           timeString: "Now",
           iconName: "location.fill",
@@ -569,10 +570,23 @@ struct MainMapFeature {
                 
               if !isDuplicateName || isTimeLimitExceeded {
                   let passedTitle: String
+                  let cleanPrev = previousStreet
+                      .replacingOccurrences(of: "Passed ", with: "")
+                      .replacingOccurrences(of: "Near ", with: "")
+                      .replacingOccurrences(of: "On ", with: "")
+                      .replacingOccurrences(of: "Still on ", with: "")
+                      .trimmingCharacters(in: .whitespaces)
+                  let isInvalidPrev = cleanPrev.isEmpty ||
+                      cleanPrev.caseInsensitiveCompare("Current Area") == .orderedSame ||
+                      cleanPrev.caseInsensitiveCompare("Current Location") == .orderedSame ||
+                      cleanPrev.caseInsensitiveCompare("Locating current area...") == .orderedSame ||
+                      cleanPrev.caseInsensitiveCompare("Start Position") == .orderedSame
+
                   if isDuplicateName {
                       passedTitle = "Still on \(landmarkInfo.name)"
+                  } else if isInvalidPrev {
+                      passedTitle = "Passed \(landmarkInfo.name)"
                   } else {
-                      let cleanPrev = previousStreet.replacingOccurrences(of: "Passed ", with: "").replacingOccurrences(of: "Near ", with: "").replacingOccurrences(of: "On ", with: "").replacingOccurrences(of: "Still on ", with: "")
                       passedTitle = "Passed \(cleanPrev)"
                   }
 
@@ -648,8 +662,14 @@ struct MainMapFeature {
             if state.activePolyline == nil {
               state.activePolyline = state.activeRoute?.polyline ?? state.sheet?.direction?.walkingRouteInfo?.polyline
             }
+            let resolvedOriginStreet = state.sheet?.direction?.journeyLogEntries.first(where: { $0.entryType == .currentLocation })?.landmarkName.replacingOccurrences(of: "Near ", with: "")
+                ?? state.sheet?.direction?.originPlace?.subtitle.components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces)
+                ?? state.sheet?.direction?.originPlace?.name
+                ?? "Start Position"
+            let cleanOrigin = (resolvedOriginStreet.isEmpty || resolvedOriginStreet == "Locating current area..." || resolvedOriginStreet == "Current Location" || resolvedOriginStreet == "Current Area") ? "Start Position" : resolvedOriginStreet
+
             state.lastLoggedCoordinate = state.sheet?.direction?.journeyLogEntries.last?.coordinate ?? state.currentLocation
-            state.lastLoggedStreet = "Current Area"
+            state.lastLoggedStreet = cleanOrigin
             state.lastLoggedIcon = "figure.walk"
             state.lastLoggedTime = self.now
 
@@ -1239,12 +1259,12 @@ private enum LandmarkDetector {
     let geocoder = CLGeocoder()
     let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
 
-    var streetName = "Current Area"
+    var streetName = "Start Position"
     var fullAddress = "Jakarta, Indonesia"
 
     if let placemarks = try? await geocoder.reverseGeocodeLocation(location),
        let pm = placemarks.first {
-      streetName = pm.thoroughfare ?? pm.subLocality ?? pm.name ?? "Current Area"
+      streetName = pm.thoroughfare ?? pm.name ?? pm.subLocality ?? pm.locality ?? "Start Position"
       let parts = [pm.thoroughfare, pm.subLocality, pm.locality, pm.administrativeArea].compactMap { $0 }.filter { !$0.isEmpty }
       fullAddress = parts.isEmpty ? (pm.name ?? "Central Jakarta") : parts.joined(separator: ", ")
     }
