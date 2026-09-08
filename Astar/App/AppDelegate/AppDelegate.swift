@@ -9,6 +9,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     static let walkInvitationNotification = Notification.Name("walkInvitationNotification")
     static let walkInvitationAcceptedNotification = Notification.Name("walkInvitationAcceptedNotification")
     static let walkInvitationDismissedNotification = Notification.Name("walkInvitationDismissedNotification")
+    static let journeyLogUpdateNotification = Notification.Name("journeyLogUpdateNotification")
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
 
@@ -77,6 +78,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                 } else if subID.hasPrefix("session-participant-invitation-") || recordID.recordName.hasPrefix("SessionParticipant_") {
                     NotificationCenter.default.post(
                         name: AppDelegate.walkInvitationNotification,
+                        object: nil,
+                        userInfo: ["recordID": recordID, "receivedAt": receiveTime]
+                    )
+                } else if subID.hasPrefix("journey-logs-") {
+                    NotificationCenter.default.post(
+                        name: AppDelegate.journeyLogUpdateNotification,
                         object: nil,
                         userInfo: ["recordID": recordID, "receivedAt": receiveTime]
                     )

@@ -33,6 +33,8 @@ struct MainMapFeature {
     var mockDoeHistoryTrips: [WalkerHistoryTrip] = []
 
     var lastLoggedCoordinate: CLLocationCoordinate2D?
+    var lastLoggedTime: Date? = nil
+
     var lastLoggedStreet: String = ""
     var lastLoggedIcon: String = "figure.walk"
     var savedPlaces: [SavedPlace] = SavedPlacesStorage.load()
@@ -75,6 +77,9 @@ struct MainMapFeature {
     case stopTrackingTapped
 
     case sheet(PresentationAction<MapSheetFeature.Action>)
+
+    case internal_updateLastLogged(street: String, time: Date, icon: String)
+    case internal_updateCompanionJourneyLogs([JourneyLogEntry])
 
     case markTrackedWalkerFitted
     case setShowRouteGuide(Bool)
@@ -506,6 +511,8 @@ struct MainMapFeature {
         state.lastLoggedCoordinate = originCoord
         state.lastLoggedStreet = streetName
         state.lastLoggedIcon = "figure.walk"
+        state.lastLoggedTime = now
+
         return .none
 
       case let .updateTrackingLocation(newCoord):
@@ -538,38 +545,71 @@ struct MainMapFeature {
           let lastCL = CLLocation(latitude: lastCoord.latitude, longitude: lastCoord.longitude)
           let distMoved = userCL.distance(from: lastCL)
 
-          if distMoved >= 60.0 {
+          if distMoved >= 250.0 {
             let previousStreet = state.lastLoggedStreet
             let previousIcon = state.lastLoggedIcon
+            let previousTime = state.lastLoggedTime ?? now
+
+            // Update local state right away so next tick triggers correctly
             state.lastLoggedCoordinate = newCoord
 
             return .run { send in
               let landmarkInfo = await LandmarkDetector.detectNearbyLandmark(coordinate: newCoord)
               let timeStr = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .short)
+                
+              let isDuplicateName = (landmarkInfo.name == previousStreet) || (landmarkInfo.name == previousStreet.replacingOccurrences(of: "Passed ", with: "").replacingOccurrences(of: "Near ", with: "").replacingOccurrences(of: "On ", with: "").replacingOccurrences(of: "Still on ", with: ""))
+              
+              let timeElapsed = Date().timeIntervalSince(previousTime)
+              let isTimeLimitExceeded = timeElapsed >= (10 * 60) // 10 minutes limit
+                
+              if !isDuplicateName || isTimeLimitExceeded {
+                  let passedTitle: String
+                  if isDuplicateName {
+                      passedTitle = "Still on \(landmarkInfo.name)"
+                  } else {
+                      let cleanPrev = previousStreet.replacingOccurrences(of: "Passed ", with: "").replacingOccurrences(of: "Near ", with: "").replacingOccurrences(of: "On ", with: "").replacingOccurrences(of: "Still on ", with: "")
+                      passedTitle = "Passed \(cleanPrev)"
+                  }
 
-              let passedTitle = previousStreet.hasPrefix("Passed") || previousStreet.hasPrefix("Near") || previousStreet.hasPrefix("On")
-                ? previousStreet
-                : "Passed \(previousStreet)"
+                  let passedEntry = JourneyLogEntry(
+                    landmarkName: passedTitle,
+                    address: landmarkInfo.address,
+                    timeString: timeStr,
+                    iconName: previousIcon,
+                    entryType: .checkpoint,
+                    coordinate: lastCoord
+                  )
 
-              let passedEntry = JourneyLogEntry(
-                landmarkName: passedTitle,
-                address: landmarkInfo.address,
-                timeString: timeStr,
-                iconName: previousIcon,
-                entryType: .checkpoint,
-                coordinate: lastCoord
-              )
+                  let currentEntry = JourneyLogEntry(
+                    landmarkName: "Near \(landmarkInfo.name)",
+                    address: landmarkInfo.address,
+                    timeString: "Now",
+                    iconName: "location.fill",
+                    entryType: .currentLocation,
+                    coordinate: newCoord
+                  )
+                  
+                  // Update the state for the next check!
+                  await send(.internal_updateLastLogged(street: landmarkInfo.name, time: Date(), icon: "figure.walk"))
 
-              let currentEntry = JourneyLogEntry(
-                landmarkName: "Near \(landmarkInfo.name)",
-                address: landmarkInfo.address,
-                timeString: "Now",
-                iconName: "location.fill",
-                entryType: .currentLocation,
-                coordinate: newCoord
-              )
-
-              await send(.sheet(.presented(.direction(.updateLocation(newCoord, newMilestones: [passedEntry, currentEntry])))))
+                  await send(.sheet(.presented(.direction(.updateLocation(newCoord, newMilestones: [passedEntry, currentEntry])))))
+              } else {
+                  // It's a duplicate but within time limit
+                  // We still update the "Current Location" entry to reflect movement but NO new checkpoint
+                  let currentEntry = JourneyLogEntry(
+                    landmarkName: "Near \(landmarkInfo.name)",
+                    address: landmarkInfo.address,
+                    timeString: "Now",
+                    iconName: "location.fill",
+                    entryType: .currentLocation,
+                    coordinate: newCoord
+                  )
+                  
+                  // Because we made progress, lastLoggedCoordinate is already updated to newCoord.
+                  // We DO NOT update `lastLoggedTime` here, so the 10 mins clock keeps ticking from the original entry!
+                  
+                  await send(.sheet(.presented(.direction(.updateLocation(newCoord, newMilestones: [currentEntry])))))
+              }
             }
           }
         }
@@ -606,9 +646,20 @@ struct MainMapFeature {
             state.lastLoggedCoordinate = state.sheet?.direction?.journeyLogEntries.last?.coordinate ?? state.currentLocation
             state.lastLoggedStreet = "Current Area"
             state.lastLoggedIcon = "figure.walk"
+            state.lastLoggedTime = self.now
 
             var effects: [Effect<Action>] = []
+
             if let sid = sessionID {
+              if case let .direction(dirState) = state.sheet {
+                  let logs = dirState.journeyLogEntries
+                  effects.append(.run { [sid, logs] _ in
+                      for log in logs {
+                          try? await self.trackingClient.addJourneyLog(sid, log)
+                      }
+                  })
+              }
+
               effects.append(
                 .run { [trackingClient, usersClient, connectionsClient, contactPhotoClient] send in
                   try? await trackingClient.setSubscribeSessionParticipants(sid, true)
@@ -765,10 +816,13 @@ struct MainMapFeature {
                   state.trackedWalkerLocation = CLLocationCoordinate2D(latitude: coords[0], longitude: coords[1])
               }
 
+
               let walkerOrigin = state.trackedWalkerLocation
               let destinationCoord = CLLocationCoordinate2D(latitude: session.destinationLatitude, longitude: session.destinationLongitude)
 
-              return .run { send in
+              var trackingEffects: [Effect<Action>] = []
+              
+              trackingEffects.append(.run { send in
                   print("🔍 Starting tracking for walker. Session ID: \(session.id)")
                   if let origin = walkerOrigin {
                       let routeInfo = await directionRoute.calculateWalkingRoute(origin: origin, destination: destinationCoord)
@@ -810,7 +864,21 @@ struct MainMapFeature {
                       print("❌ Tracking stream failed with error: \(error)")
                   }
               }
-              .cancellable(id: "TrackWalkerStreamID", cancelInFlight: true)
+              .cancellable(id: "TrackWalkerStreamID", cancelInFlight: true))
+              
+              trackingEffects.append(.run { [trackingClient] send in
+                  do {
+                      let stream = try await trackingClient.subscribeToJourneyLogs(session.id)
+                      for await logs in stream {
+                          await send(.internal_updateCompanionJourneyLogs(logs))
+                      }
+                  } catch {
+                      print("❌ JourneyLog stream failed: \(error)")
+                  }
+              }
+              .cancellable(id: "TrackJourneyLogsStreamID", cancelInFlight: true))
+              
+              return .merge(trackingEffects)
 
          case let .setTrackedWalkerRoute(route):
             state.trackedWalkerRoute = route
@@ -892,6 +960,7 @@ struct MainMapFeature {
             state.trackedWalkerPolyline = nil
             return .merge(
                .cancel(id: "TrackWalkerStreamID"),
+               .cancel(id: "TrackJourneyLogsStreamID"),
                .send(.delegate(.companionStatusChanged(newStatus: "idle"))),
                .run { [trackingClient] _ in
                   if let sessionID = endingSessionID {
@@ -915,6 +984,19 @@ struct MainMapFeature {
                .send(.delegate(.walkerStatusChanged(id: walker.id, newStatus: "Idle")))
             )
 
+      case let .internal_updateLastLogged(street, time, icon):
+        state.lastLoggedStreet = street
+        state.lastLoggedTime = time
+        state.lastLoggedIcon = icon
+        return .none
+
+      case let .internal_updateCompanionJourneyLogs(logs):
+        if case var .walker(walkerState) = state.sheet {
+            walkerState.journeyLogEntries = logs
+            state.sheet = .walker(walkerState)
+        }
+        return .none
+
         case .markTrackedWalkerFitted:
            state.hasFittedTrackedWalker = true
            return .none
@@ -931,6 +1013,7 @@ struct MainMapFeature {
               state.trackedWalkerPolyline = nil
               
               effects.append(.cancel(id: "TrackWalkerStreamID"))
+              effects.append(.cancel(id: "TrackJourneyLogsStreamID"))
               effects.append(.send(.delegate(.companionStatusChanged(newStatus: "idle"))))
               
               effects.append(.run { [trackingClient] _ in
@@ -957,6 +1040,8 @@ struct MainMapFeature {
               print("⚠️ [MainMapFeature] WalkSession \(session.id) had nil currentCoordinate at \(receiveTime)")
           }
           
+
+          
           return effects.isEmpty ? .none : .merge(effects)
           
        case .stopTrackingTapped:
@@ -970,6 +1055,7 @@ struct MainMapFeature {
 
            return .merge(
                .cancel(id: "TrackWalkerStreamID"),
+               .cancel(id: "TrackJourneyLogsStreamID"),
                .run { [trackingClient] _ in
                    do {
                        try await trackingClient.setSubscribeWalkSession(sessionID, false)
@@ -985,7 +1071,23 @@ struct MainMapFeature {
                }
            )
 
+
+      case let .sheet(.presented(.direction(.updateLocation(_, newMilestones)))):
+        guard let sessionID = state.userWalkSessionID else { return .none }
+        return .run { _ in
+            for milestone in newMilestones {
+                try? await self.trackingClient.addJourneyLog(sessionID, milestone)
+            }
+        }
+        
+      case let .sheet(.presented(.direction(.destinationReached(finalEntry)))):
+        guard let sessionID = state.userWalkSessionID else { return .none }
+        return .run { _ in
+            try? await self.trackingClient.addJourneyLog(sessionID, finalEntry)
+        }
+
       case .sheet, .delegate, .updateTrackingLocation:
+
         return .none
       }
     }
