@@ -249,16 +249,16 @@ struct MainFeature {
                 avatar = await ContactPhotoClient.liveValue.fetchContactPhotoByName(partnerProfile.name)
               }
               let avatarImageName = partnerProfile.name == "Awan" ? "AwanAvatar" : nil
-              people.append(Person(
-                id: Person.stableID(appleUserId: profile.appleUserId, cloudKitUserId: profile.cloudKitUserId),
-                name: profile.name,
-                status: Self.formatStatus(profile.status),
-                appleUserId: profile.appleUserId,
-                cloudKitUserId: profile.cloudKitUserId,
-                email: profile.email,
-                avatarData: avatar,
-                avatarImageName: avatarImageName
-              ))
+                people.append(Person(
+                    id: Person.stableID(appleUserId: partnerProfile.appleUserId, cloudKitUserId: partnerProfile.cloudKitUserId),
+                    name: partnerProfile.name,
+                    status: Self.formatStatus(partnerProfile.status),
+                    appleUserId: partnerProfile.appleUserId,
+                    cloudKitUserId: partnerProfile.cloudKitUserId,
+                    email: partnerProfile.email,
+                    avatarData: avatar,
+                    avatarImageName: avatarImageName
+                ))
             }
             await send(.fetchPeopleResponse(.success(people)))
           } catch {
