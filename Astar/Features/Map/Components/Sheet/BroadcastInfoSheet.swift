@@ -19,6 +19,7 @@ struct BroadcastInfoSheet: View {
                     .font(.system(size: 24, weight: .semibold))
                     .foregroundStyle(.blue)
             }
+            .accessibilityHidden(true)
             .padding(.top, 24)
 
             VStack(spacing: 8) {
@@ -26,13 +27,17 @@ struct BroadcastInfoSheet: View {
                     .font(.title3.weight(.bold))
                     .foregroundStyle(.primary)
                     .multilineTextAlignment(.center)
+                    .accessibilityLabel("Your journey has been broadcast")
 
                 Text("Your trusted contacts can now see your journey and help keep you safe along the way.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityLabel("Your trusted contacts can now see your journey and help keep you safe along the way.")
             }
+            .accessibilitySortPriority(1)
+            .accessibilityElement(children: .combine)
             .padding(.horizontal, 24)
 
             Spacer(minLength: 16)
