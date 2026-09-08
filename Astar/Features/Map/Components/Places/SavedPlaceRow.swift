@@ -26,6 +26,7 @@ struct SavedPlaceRow: View {
                                 .font(.body.weight(.semibold))
                                 .foregroundStyle(.white)
                         }
+                        .accessibilityHidden(true)
                         .frame(width: 40, height: 40)
 
                     VStack(alignment: .leading, spacing: 4) {
@@ -38,6 +39,8 @@ struct SavedPlaceRow: View {
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAddTraits(.isButton)
 
                     Spacer(minLength: 8)
                 }
