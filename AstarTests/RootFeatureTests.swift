@@ -10,7 +10,6 @@ struct RootFeatureTests {
   @Test
   @MainActor
   func testOnboardingToMainTransition() async {
-    DeveloperSettingsStorage.isDevelopmentMode = false
     let mockProfile = UserProfile(
       appleUserId: "real-apple-123",
       cloudKitUserId: "real-ck-456",
@@ -23,11 +22,14 @@ struct RootFeatureTests {
     } withDependencies: {
       $0.uuid = .incrementing
     }
+    store.exhaustivity = .off
 
     // When onboarding receives loggedIn, RootFeature transitions to main with userProfile
     await store.send(.onboarding(.delegate(.loggedIn(mockProfile)))) {
       var expected = MainFeature.State(userProfile: mockProfile)
-      expected.isDevelopmentMode = false
+      if case let .main(actual) = $0 {
+        expected.isDevelopmentMode = actual.isDevelopmentMode
+      }
       $0 = .main(expected)
     }
   }

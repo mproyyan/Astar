@@ -224,7 +224,7 @@ struct MapSheet: View {
                                     originIconName: walkerStore.originIconName,
                                     destinationPlaceName: walkerStore.destinationPlaceName,
                                     destinationIconName: walkerStore.destinationIconName,
-                                    recentLocations: walkerStore.journeyLogEntries.isEmpty ? WalkerSampleData.awanLocations : walkerStore.journeyLogEntries
+                                    recentLocations: walkerStore.journeyLogEntries
                                 ),
                                 initialTracked: walkerStore.activeParticipantID != nil,
                                 onDismiss: {
@@ -252,6 +252,7 @@ struct MapSheet: View {
                             .id(walkerStore.activeParticipantID != nil)
                             .padding(.horizontal, 16)
                             .padding(.top, 12)
+                            .task { walkerStore.send(.onAppear) }
                             .transition(.opacity)
                     }
                 }
@@ -282,6 +283,9 @@ struct MapSheet: View {
                     },
                     onSavedPlacesHeaderTapped: {
                         store.send(.savedPlacesHeaderTapped)
+                    },
+                    onProfileTapped: {
+                        store.send(.profileButtonTapped)
                     }
                 )
                 .transition(.opacity)

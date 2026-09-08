@@ -67,7 +67,7 @@ final class LocationManagerActor: NSObject, CLLocationManagerDelegate {
     super.init()
     manager.delegate = self
     manager.desiredAccuracy = kCLLocationAccuracyBest
-    manager.distanceFilter = 10
+    manager.distanceFilter = kCLDistanceFilterNone
     manager.allowsBackgroundLocationUpdates = true
     manager.showsBackgroundLocationIndicator = true
     manager.pausesLocationUpdatesAutomatically = false

@@ -13,9 +13,10 @@ struct TrustedPersonView: View {
     
     var body: some View {
         ScrollView {
-            RequestSection(store: store)
-            
-            TrustedPersonList(store: store)
+            VStack(spacing: 16) {
+                RequestSection(store: store)
+                TrustedPersonList(store: store)
+            }
         }
         .padding(16)
         .navigationTitle("Trusted Person")
@@ -88,19 +89,62 @@ struct TrustedPersonList: View {
 
     var body: some View {
         VStack {
-            ForEach(store.mutualConnections) { connectionProfile in
-                TrustedPersonRow(connectionProfile: connectionProfile)
-                Divider()
-                    .padding(.leading, 72)
+            if store.isLoading {
+                TrustedPersonListSkeleton()
+            } else {
+                ForEach(store.mutualConnections) { connectionProfile in
+                    TrustedPersonRow(connectionProfile: connectionProfile)
+                    Divider()
+                        .padding(.leading, 72)
+                }
+                AddParticipantButton(store: store)
             }
-            AddParticipantButton(store: store)
         }
         .padding(.vertical, 16)
         .clipShape(.rect(cornerRadius: 26))
         .overlay(
-        RoundedRectangle(cornerRadius: 26)
-            .stroke(Color(.systemGray6), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 26)
+                .stroke(Color(.systemGray6), lineWidth: 1)
         )
+    }
+}
+
+// MARK: Trusted Person List Skeleton
+
+struct TrustedPersonListSkeleton: View {
+    @State private var isAnimating = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(0..<3, id: \.self) { index in
+                HStack(spacing: 16) {
+                    Circle()
+                        .fill(Color(.systemGray5))
+                        .frame(width: 40, height: 40)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color(.systemGray5))
+                            .frame(width: 120, height: 12)
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color(.systemGray6))
+                            .frame(width: 80, height: 10)
+                    }
+
+                    Spacer()
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+
+                if index < 2 {
+                    Divider()
+                        .padding(.leading, 72)
+                }
+            }
+        }
+        .opacity(isAnimating ? 0.4 : 1.0)
+        .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: isAnimating)
+        .onAppear { isAnimating = true }
     }
 }
 
@@ -166,6 +210,58 @@ struct AddParticipantButton: View {
     }
 }
 
-#Preview {
-    TrustedPersonView(store: Store(initialState: TrustedPersonFeature.State()) { TrustedPersonFeature() })
+// MARK: - Previews
+
+#Preview("Populated") {
+    let mockProfile1 = ConnectionProfile(
+        connection: Connection(id: "1", member1RowID: "1", member2RowID: "2", initiatedByRowID: "1", status: "request", createdAt: Date(), updatedAt: Date()),
+        partnerProfile: UserProfile(appleUserId: "2", cloudKitUserId: "2", name: "chusen", email: "chusen@icloud.com", status: "request")
+    )
+    
+    let mockProfile2 = ConnectionProfile(
+        connection: Connection(id: "2", member1RowID: "1", member2RowID: "3", initiatedByRowID: "1", status: "mutual", createdAt: Date(), updatedAt: Date()),
+        partnerProfile: UserProfile(appleUserId: "3", cloudKitUserId: "3", name: "Nadia", email: "nadia@icloud.com", status: "mutual")
+    )
+
+    TrustedPersonView(
+        store: Store(
+            initialState: {
+                var state = TrustedPersonFeature.State()
+                state.connections = [mockProfile1, mockProfile2]
+                return state
+            }()
+        ) {
+            TrustedPersonFeature()
+        }
+    )
+}
+
+#Preview("Loading") {
+    TrustedPersonView(
+        store: Store(
+            initialState: {
+                var state = TrustedPersonFeature.State()
+                state.isLoading = true
+                return state
+            }()
+        ) {
+            TrustedPersonFeature()
+        }
+    )
+}
+
+#Preview("Skeleton") {
+    NavigationStack {
+        ScrollView {
+            TrustedPersonListSkeleton()
+                .padding(16)
+                .clipShape(.rect(cornerRadius: 26))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 26)
+                        .stroke(Color(.systemGray6), lineWidth: 1)
+                )
+                .padding(16)
+        }
+        .navigationTitle("Trusted Person")
+    }
 }

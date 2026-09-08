@@ -1,6 +1,8 @@
 import ComposableArchitecture
+import CloudKit
 import CoreLocation
 import MapKit
+import Foundation
 
 @Reducer
 struct MapDirectionSheetFeature {
@@ -14,12 +16,12 @@ struct MapDirectionSheetFeature {
   struct State: Equatable {
     var destination: SavedPlace
     var mode: Mode = .directions
-    
+
     var originPlace: SavedPlace?
     var activeRoute: MKRoute?
     var walkingRouteInfo: WalkingRouteInfo?
     var isCalculatingRoute: Bool = false
-    
+
     var isNavigating: Bool = false
     var isDestinationReached: Bool = false
     var isDevelopmentMode: Bool = DeveloperSettingsStorage.isDevelopmentMode
@@ -36,12 +38,12 @@ struct MapDirectionSheetFeature {
     case routeCalculated(WalkingRouteInfo)
     case originResolved(SavedPlace)
     case destinationResolved(CLLocationCoordinate2D)
-    
+
     case startNavigationTapped(currentLocation: CLLocationCoordinate2D?)
     case setBroadcastSheetPresented(Bool)
     case endJourneyTapped
     case cancelDirectionsTapped
-    
+
     case journeyLogTapped
     case dismissJourneyLogTapped
     case simulateArrivalTapped
@@ -49,9 +51,9 @@ struct MapDirectionSheetFeature {
     // Updates from parent
     case updateLocation(CLLocationCoordinate2D, newMilestones: [JourneyLogEntry])
     case destinationReached(finalEntry: JourneyLogEntry)
-    
+
     case delegate(Delegate)
-    
+
     enum Delegate: Equatable {
       case routeChanged(MKRoute?, MKPolyline?)
       case navigationStarted(sessionID: String?)
@@ -61,7 +63,9 @@ struct MapDirectionSheetFeature {
 
   @Dependency(\.directionRoute) var directionRoute
   @Dependency(\.trackingClient) var trackingClient
+  @Dependency(\.connectionsClient) var connectionsClient
   @Dependency(\.uuid) var uuid
+  @Dependency(\.watchConnectivity) var watchConnectivity
 
   var body: some Reducer<State, Action> {
     Reduce { state, action in
@@ -73,7 +77,7 @@ struct MapDirectionSheetFeature {
       case let .onAppear(currentLocation):
         state.isCalculatingRoute = true
         let originCoord = currentLocation ?? CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
-        
+
         state.originPlace = SavedPlace(
           id: uuid(),
           name: "Current Location",
@@ -83,6 +87,8 @@ struct MapDirectionSheetFeature {
         )
 
         return .run { [destination = state.destination] send in
+          try? await watchConnectivity.activateSession()
+
           async let originAddress = directionRoute.reverseGeocode(coordinate: originCoord)
 
           var destCoord = destination.coordinate
@@ -222,7 +228,7 @@ struct MapDirectionSheetFeature {
 
                 let destLat = destinationCopy.coordinate?.latitude ?? -6.2088
                 let destLon = destinationCopy.coordinate?.longitude ?? 106.8456
-                
+
                 let currentLat = originPlaceCopy?.coordinate?.latitude ?? -6.2088
                 let currentLon = originPlaceCopy?.coordinate?.longitude ?? 106.8456
                 let initialData = (try? JSONEncoder().encode([currentLat, currentLon])) ?? Data()
@@ -232,6 +238,27 @@ struct MapDirectionSheetFeature {
 
                     // Update user status
                     try await trackingClient.updateUserStatus(userRecordID, "walking", session.id, nil)
+
+                    // Broadcast to mutual connections
+                    do {
+                        let allConnections = try await connectionsClient.fetchConnections(CKRecord.ID(recordName: userRecordID))
+                        let mutualConnections = allConnections.filter { $0.connection.status == "mutual" }
+
+                        for connection in mutualConnections {
+                            let companionID = connection.connection.member1RowID == userRecordID
+                                ? connection.connection.member2RowID
+                                : connection.connection.member1RowID
+
+                            do {
+                                _ = try await trackingClient.inviteToWalkSession(session.id, companionID)
+                                print("📢 [Broadcast] Added mutual connection \(connection.partnerProfile.name) (\(companionID)) as participant for session \(session.id)")
+                            } catch {
+                                print("⚠️ [Broadcast] Failed adding participant \(companionID): \(error)")
+                            }
+                        }
+                    } catch {
+                        print("⚠️ [Broadcast] Failed fetching mutual connections: \(error)")
+                    }
 
                     await send(.delegate(.navigationStarted(sessionID: session.id)))
                     return
@@ -249,7 +276,11 @@ struct MapDirectionSheetFeature {
 
       case .endJourneyTapped, .cancelDirectionsTapped:
         return .run { send in
+            // Clear watch state immediately so it returns to idle
+            try? await watchConnectivity.updateState(WatchDirectionState())
+
             if let userProfile = UserProfileStorage.load() {
+
                 let userRecordID = "UserProfile_\(userProfile.appleUserId)_\(userProfile.cloudKitUserId)"
                   .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
 
@@ -272,7 +303,7 @@ struct MapDirectionSheetFeature {
       case let .updateLocation(_, newMilestones):
         // Remove previous live current location
         state.journeyLogEntries.removeAll(where: { $0.entryType == .currentLocation })
-        
+
         for milestone in newMilestones {
            state.journeyLogEntries.insert(milestone, at: 0)
         }
@@ -317,6 +348,30 @@ struct MapDirectionSheetFeature {
       case .delegate:
         return .none
       }
+    }
+    .onChange(of: { state -> WatchDirectionState in
+        WatchDirectionState(
+            destinationName: state.destination.name,
+            eta: state.walkingRouteInfo?.etaString ?? "--.--",
+            estimatedTime: state.walkingRouteInfo?.travelTimeString ?? "-- min",
+            totalDistance: state.walkingRouteInfo?.distanceString ?? state.destination.distance ?? "-- km",
+            isDone: state.isDestinationReached,
+            watchingPeople: state.watchingPeople.map { p in
+                WatchPerson(
+                    id: p.id.uuidString,
+                    name: p.name,
+                    status: p.status,
+                    avatarData: p.avatarData,
+                    joinedAt: "Recently" // Fallback since actual CloudKit joinedAt isn't on the model yet
+                )
+            }
+        )
+    }) { oldValue, newValue in
+        Reduce { state, action in
+            return .run { _ in
+                try? await watchConnectivity.updateState(newValue)
+            }
+        }
     }
   }
 }

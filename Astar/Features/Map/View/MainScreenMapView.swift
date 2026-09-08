@@ -224,11 +224,13 @@ struct MainScreenMapView: View {
     withAnimation(.easeInOut(duration: 0.8)) {
         let p1 = MKMapPoint(tracker)
         let p2 = MKMapPoint(destination)
+        let width = max(abs(p1.x - p2.x), 300)
+        let height = max(abs(p1.y - p2.y), 300)
         let mapRect = MKMapRect(
             x: min(p1.x, p2.x),
             y: min(p1.y, p2.y),
-            width: abs(p1.x - p2.x),
-            height: abs(p1.y - p2.y)
+            width: width,
+            height: height
         )
         // Add padding
         cameraPosition = .rect(mapRect.insetBy(dx: -mapRect.width * 0.3, dy: -mapRect.height * 0.3))

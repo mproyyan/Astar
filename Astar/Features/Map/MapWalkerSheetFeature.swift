@@ -36,6 +36,7 @@ struct MapWalkerSheetFeature {
   }
 
   enum Action: Equatable {
+    case onAppear
     case dismissWalkerTapped
     case viewAllHistoryTapped
     case selectHistoryTrip(WalkerHistoryTrip)
@@ -66,6 +67,32 @@ struct MapWalkerSheetFeature {
   var body: some Reducer<State, Action> {
     Reduce { state, action in
       switch action {
+      case .onAppear:
+        if state.walker.name == "Doe" || state.walker.name == "John Doe" || state.walker.id == Person.mockDoeID {
+            return .none
+        }
+
+        return .run { [walker = state.walker] send in
+            let walkerRecordID: String
+            if let cloudID = walker.cloudKitUserId, cloudID.hasPrefix("UserProfile_") {
+                walkerRecordID = cloudID
+            } else {
+                let appleUID = walker.appleUserId ?? "applemock"
+                let cloudUID = walker.cloudKitUserId ?? "cloudmock"
+                walkerRecordID = "UserProfile_\(appleUID)_\(cloudUID)"
+                    .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+            }
+
+            do {
+                if let sessionID = try await trackingClient.getWalkerActiveSessionID(walkerRecordID) {
+                    let logs = try await trackingClient.fetchJourneyLogs(sessionID)
+                    await send(.updateJourneyLog(logs))
+                }
+            } catch {
+                 print("Failed fetching initial journey logs (onAppear): \(error)")
+            }
+        }
+
       case .dismissWalkerTapped:
         return .send(.delegate(.dismissed))
         
@@ -108,10 +135,15 @@ struct MapWalkerSheetFeature {
 
         return .run { [walker = state.walker] send in
             // Fetch walker's `activeWalkSessionRef` from CloudKit Profile
-            let appleUID = walker.appleUserId ?? "applemock"
-            let cloudUID = walker.cloudKitUserId ?? "cloudmock"
-            let walkerRecordID = "UserProfile_\(appleUID)_\(cloudUID)"
-                .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+            let walkerRecordID: String
+            if let cloudID = walker.cloudKitUserId, cloudID.hasPrefix("UserProfile_") {
+                walkerRecordID = cloudID
+            } else {
+                let appleUID = walker.appleUserId ?? "applemock"
+                let cloudUID = walker.cloudKitUserId ?? "cloudmock"
+                walkerRecordID = "UserProfile_\(appleUID)_\(cloudUID)"
+                    .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+            }
 
             do {
                 if let sessionID = try await trackingClient.getWalkerActiveSessionID(walkerRecordID) {

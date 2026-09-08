@@ -26,6 +26,7 @@ struct RequestTrustedPersonView: View {
                     .stroke(Color(.systemGray6), lineWidth: 1)
             )
         }
+        .frame(maxWidth: .infinity)
         .padding(.horizontal, 16)
         .background(Color(.systemGroupedBackground))
         .navigationTitle("Request")
@@ -112,5 +113,13 @@ struct RequestButton : View {
 }
 
 #Preview {
-    RequestTrustedPersonView(store: Store(initialState: RequestTrustedPersonFeature.State()) { RequestTrustedPersonFeature() })
+    RequestTrustedPersonView(store: Store(initialState: RequestTrustedPersonFeature.State(
+        requests: [
+            ConnectionProfile(connection: Connection(id: "1", member1RowID: "1", member2RowID: "2", initiatedByRowID: "1", status: "request", createdAt: Date(), updatedAt: Date()), partnerProfile: UserProfile(appleUserId: "2", cloudKitUserId: "2", name: "chusen", email: "chusen@icloud.com", status: "request"))
+        ]
+    )
+    ) {
+        RequestTrustedPersonFeature()
+    }
+    )
 }

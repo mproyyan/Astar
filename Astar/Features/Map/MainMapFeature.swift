@@ -33,6 +33,8 @@ struct MainMapFeature {
     var mockDoeHistoryTrips: [WalkerHistoryTrip] = []
 
     var lastLoggedCoordinate: CLLocationCoordinate2D?
+    var lastLoggedTime: Date? = nil
+
     var lastLoggedStreet: String = ""
     var lastLoggedIcon: String = "figure.walk"
     var savedPlaces: [SavedPlace] = SavedPlacesStorage.load()
@@ -76,6 +78,9 @@ struct MainMapFeature {
 
     case sheet(PresentationAction<MapSheetFeature.Action>)
 
+    case internal_updateLastLogged(street: String, time: Date, icon: String)
+    case internal_updateCompanionJourneyLogs([JourneyLogEntry])
+
     case markTrackedWalkerFitted
     case setShowRouteGuide(Bool)
     case setTrackedWalkerRoute(MKRoute?)
@@ -99,6 +104,9 @@ struct MainMapFeature {
 
   @Dependency(\.locationManager) var locationManager
   @Dependency(\.trackingClient) var trackingClient
+  @Dependency(\.usersClient) var usersClient
+  @Dependency(\.connectionsClient) var connectionsClient
+  @Dependency(\.contactPhotoClient) var contactPhotoClient
   @Dependency(\.directionRoute) var directionRoute
   @Dependency(\.uuid) var uuid
   @Dependency(\.date.now) var now
@@ -136,7 +144,7 @@ struct MainMapFeature {
         return .none
 
       case let .selectSavedPlace(place):
-        state.sheet = .direction(MapDirectionSheetFeature.State(destination: place, watchingPeople: state.people))
+        state.sheet = .direction(MapDirectionSheetFeature.State(destination: place, watchingPeople: []))
         let currentLoc = state.currentLocation ?? CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
         return .send(.sheet(.presented(.direction(.onAppear(currentLocation: currentLoc)))))
 
@@ -210,6 +218,10 @@ struct MainMapFeature {
         return .none
 
       case let .selectPerson(person):
+        if state.isNavigating && state.userWalkSessionID != nil {
+          print("⚠️ [MainMapFeature] Ignoring selectPerson(\(person.name)) because user is actively navigating.")
+          return .none
+        }
         let isReached = person.status.caseInsensitiveCompare("Arrived") == .orderedSame
                      || person.status.caseInsensitiveCompare("Reached Destination") == .orderedSame
                      || person.status.caseInsensitiveCompare("Finished") == .orderedSame
@@ -279,7 +291,7 @@ struct MainMapFeature {
           originPlace: defaultOrigin,
           isCalculatingRoute: true,
           isNavigating: true,
-          watchingPeople: state.people
+          watchingPeople: []
         )
         state.sheet = .direction(directionState)
 
@@ -369,7 +381,7 @@ struct MainMapFeature {
           originPlace: defaultOrigin,
           isCalculatingRoute: true,
           isNavigating: true,
-          watchingPeople: state.people
+          watchingPeople: []
         )
         state.sheet = .direction(directionState)
 
@@ -492,13 +504,15 @@ struct MainMapFeature {
           isCalculatingRoute: false,
           isNavigating: true,
           isDestinationReached: false,
-          watchingPeople: state.people,
+          watchingPeople: [],
           journeyLogEntries: [currentEntry, startEntry]
         )
         state.sheet = .direction(directionState)
         state.lastLoggedCoordinate = originCoord
         state.lastLoggedStreet = streetName
         state.lastLoggedIcon = "figure.walk"
+        state.lastLoggedTime = now
+
         return .none
 
       case let .updateTrackingLocation(newCoord):
@@ -531,45 +545,78 @@ struct MainMapFeature {
           let lastCL = CLLocation(latitude: lastCoord.latitude, longitude: lastCoord.longitude)
           let distMoved = userCL.distance(from: lastCL)
 
-          if distMoved >= 60.0 {
+          if distMoved >= 250.0 {
             let previousStreet = state.lastLoggedStreet
             let previousIcon = state.lastLoggedIcon
+            let previousTime = state.lastLoggedTime ?? now
+
+            // Update local state right away so next tick triggers correctly
             state.lastLoggedCoordinate = newCoord
 
             return .run { send in
               let landmarkInfo = await LandmarkDetector.detectNearbyLandmark(coordinate: newCoord)
               let timeStr = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .short)
+                
+              let isDuplicateName = (landmarkInfo.name == previousStreet) || (landmarkInfo.name == previousStreet.replacingOccurrences(of: "Passed ", with: "").replacingOccurrences(of: "Near ", with: "").replacingOccurrences(of: "On ", with: "").replacingOccurrences(of: "Still on ", with: ""))
+              
+              let timeElapsed = Date().timeIntervalSince(previousTime)
+              let isTimeLimitExceeded = timeElapsed >= (10 * 60) // 10 minutes limit
+                
+              if !isDuplicateName || isTimeLimitExceeded {
+                  let passedTitle: String
+                  if isDuplicateName {
+                      passedTitle = "Still on \(landmarkInfo.name)"
+                  } else {
+                      let cleanPrev = previousStreet.replacingOccurrences(of: "Passed ", with: "").replacingOccurrences(of: "Near ", with: "").replacingOccurrences(of: "On ", with: "").replacingOccurrences(of: "Still on ", with: "")
+                      passedTitle = "Passed \(cleanPrev)"
+                  }
 
-              let passedTitle = previousStreet.hasPrefix("Passed") || previousStreet.hasPrefix("Near") || previousStreet.hasPrefix("On")
-                ? previousStreet
-                : "Passed \(previousStreet)"
+                  let passedEntry = JourneyLogEntry(
+                    landmarkName: passedTitle,
+                    address: landmarkInfo.address,
+                    timeString: timeStr,
+                    iconName: previousIcon,
+                    entryType: .checkpoint,
+                    coordinate: lastCoord
+                  )
 
-              let passedEntry = JourneyLogEntry(
-                landmarkName: passedTitle,
-                address: landmarkInfo.address,
-                timeString: timeStr,
-                iconName: previousIcon,
-                entryType: .checkpoint,
-                coordinate: lastCoord
-              )
+                  let currentEntry = JourneyLogEntry(
+                    landmarkName: "Near \(landmarkInfo.name)",
+                    address: landmarkInfo.address,
+                    timeString: "Now",
+                    iconName: "location.fill",
+                    entryType: .currentLocation,
+                    coordinate: newCoord
+                  )
+                  
+                  // Update the state for the next check!
+                  await send(.internal_updateLastLogged(street: landmarkInfo.name, time: Date(), icon: "figure.walk"))
 
-              let currentEntry = JourneyLogEntry(
-                landmarkName: "Near \(landmarkInfo.name)",
-                address: landmarkInfo.address,
-                timeString: "Now",
-                iconName: "location.fill",
-                entryType: .currentLocation,
-                coordinate: newCoord
-              )
-
-              await send(.sheet(.presented(.direction(.updateLocation(newCoord, newMilestones: [passedEntry, currentEntry])))))
+                  await send(.sheet(.presented(.direction(.updateLocation(newCoord, newMilestones: [passedEntry, currentEntry])))))
+              } else {
+                  // It's a duplicate but within time limit
+                  // We still update the "Current Location" entry to reflect movement but NO new checkpoint
+                  let currentEntry = JourneyLogEntry(
+                    landmarkName: "Near \(landmarkInfo.name)",
+                    address: landmarkInfo.address,
+                    timeString: "Now",
+                    iconName: "location.fill",
+                    entryType: .currentLocation,
+                    coordinate: newCoord
+                  )
+                  
+                  // Because we made progress, lastLoggedCoordinate is already updated to newCoord.
+                  // We DO NOT update `lastLoggedTime` here, so the 10 mins clock keeps ticking from the original entry!
+                  
+                  await send(.sheet(.presented(.direction(.updateLocation(newCoord, newMilestones: [currentEntry])))))
+              }
             }
           }
         }
         return .none
 
       case let .sheet(.presented(.search(.selectPlace(place)))):
-         state.sheet = .direction(MapDirectionSheetFeature.State(destination: place, watchingPeople: state.people))
+         state.sheet = .direction(MapDirectionSheetFeature.State(destination: place, watchingPeople: []))
          let currentLoc = state.currentLocation ?? CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
          return .send(.sheet(.presented(.direction(.onAppear(currentLocation: currentLoc)))))
 
@@ -599,7 +646,47 @@ struct MainMapFeature {
             state.lastLoggedCoordinate = state.sheet?.direction?.journeyLogEntries.last?.coordinate ?? state.currentLocation
             state.lastLoggedStreet = "Current Area"
             state.lastLoggedIcon = "figure.walk"
-            return .none
+            state.lastLoggedTime = self.now
+
+            var effects: [Effect<Action>] = []
+
+            if let sid = sessionID {
+              if case let .direction(dirState) = state.sheet {
+                  let logs = dirState.journeyLogEntries
+                  effects.append(.run { [sid, logs] _ in
+                      for log in logs {
+                          try? await self.trackingClient.addJourneyLog(sid, log)
+                      }
+                  })
+              }
+
+              effects.append(
+                .run { [trackingClient, usersClient, connectionsClient, contactPhotoClient] send in
+                  try? await trackingClient.setSubscribeSessionParticipants(sid, true)
+                  guard let stream = try? await trackingClient.subscribeToSessionParticipants(sid) else { return }
+                  for await participants in stream {
+                    let acceptedParticipants = participants.filter {
+                      $0.status.caseInsensitiveCompare("accept") == .orderedSame
+                    }
+                    var companions: [Person] = []
+                    for participant in acceptedParticipants {
+                      let person = await MainFeature.resolvePerson(
+                        recordRef: participant.companionRef,
+                        usersClient: usersClient,
+                        connectionsClient: connectionsClient,
+                        contactPhotoClient: contactPhotoClient,
+                        defaultStatus: "Accompanying"
+                      )
+                      companions.append(person)
+                    }
+                    await send(.sheet(.presented(.direction(.setWatchingPeople(companions)))))
+                  }
+                }
+                .cancellable(id: "WalkerSessionParticipantsStreamID", cancelInFlight: true)
+              )
+            }
+            return effects.isEmpty ? .none : .merge(effects)
+
          case .navigationEnded:
             let endingSessionID = state.userWalkSessionID
             state.isNavigating = false
@@ -609,12 +696,18 @@ struct MainMapFeature {
             state.activePolyline = nil
             state.sheet = nil
             
+            var effects: [Effect<Action>] = [
+              .cancel(id: "WalkerSessionParticipantsStreamID")
+            ]
             if let sid = endingSessionID {
-                return .run { [trackingClient] _ in
-                    try? await trackingClient.endWalkSession(sid)
+              effects.append(
+                .run { [trackingClient] _ in
+                  try? await trackingClient.setSubscribeSessionParticipants(sid, false)
+                  try? await trackingClient.endWalkSession(sid)
                 }
+              )
             }
-            return .none
+            return .merge(effects)
          }
 
       case .sheet(.presented(.search(.delegate(.dismissed)))):
@@ -717,41 +810,75 @@ struct MainMapFeature {
                 }
              }
 
-             return .run { send in
-                 print("🔍 Starting tracking for walker. Session ID: \(session.id)")
-                 if let profile = UserProfileStorage.load() {
-                     let selfRecordID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"
-                         .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+              if let coordData = session.currentCoordinate,
+                 let coords = try? JSONDecoder().decode([Double].self, from: coordData),
+                 coords.count >= 2 {
+                  state.trackedWalkerLocation = CLLocationCoordinate2D(latitude: coords[0], longitude: coords[1])
+              }
 
-                     do {
-                         print("👥 Joining session...")
-                         let sessionParticipant = try await trackingClient.joinWalkSession(session.id, selfRecordID)
-                         print("✅ Joined session: \(sessionParticipant.id)")
 
-                         print("🔄 Updating user status to accompany...")
-                         try await trackingClient.updateUserStatus(selfRecordID, "accompany", nil, session.id)
+              let walkerOrigin = state.trackedWalkerLocation
+              let destinationCoord = CLLocationCoordinate2D(latitude: session.destinationLatitude, longitude: session.destinationLongitude)
 
-                         // And subscribe
-                         print("Registering push subscription for session \(session.id)")
-                         
-                         try await trackingClient.setSubscribeWalkSession( session.id, true)
-                         print("Push subscription registered successfully.")
-                         
-                         
-                         let stream = try await trackingClient.subscribeToWalkSession(session.id)
-                         for await session in stream {
-                             await send(.walkSessionUpdated(session))
-                         }
-                         
-                         
-                         print("❌ Stream ended for session \(session.id)")
-                     } catch {
-                         print("❌ Tracking failed with error: \(error)")
-                     }
-                 } else {
-                     print("❌ User profile is nil. Cannot join tracking session!")
-                 }
-             }
+              var trackingEffects: [Effect<Action>] = []
+              
+              trackingEffects.append(.run { send in
+                  print("🔍 Starting tracking for walker. Session ID: \(session.id)")
+                  if let origin = walkerOrigin {
+                      let routeInfo = await directionRoute.calculateWalkingRoute(origin: origin, destination: destinationCoord)
+                      if let route = routeInfo.route {
+                          await send(.setTrackedWalkerRoute(route))
+                          await send(.setTrackedWalkerPolyline(route.polyline))
+                      } else if let fallback = routeInfo.fallbackPolyline {
+                          await send(.setTrackedWalkerPolyline(fallback))
+                      }
+                  }
+                  
+                  if let profile = UserProfileStorage.load() {
+                      let selfRecordID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"
+                          .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+
+                      do {
+                          print("👥 Joining session...")
+                          let sessionParticipant = try await trackingClient.updateParticipantStatus(session.id, selfRecordID, "accept")
+                          print("✅ Joined session: \(sessionParticipant.id)")
+
+                          print("🔄 Updating user status to accompany...")
+                          try await trackingClient.updateUserStatus(selfRecordID, "accompany", nil, session.id)
+
+                          print("Registering push subscription for session \(session.id)")
+                          try await trackingClient.setSubscribeWalkSession(session.id, true)
+                          print("Push subscription registered successfully.")
+                      } catch {
+                          print("⚠️ Tracking join setup failed with error: \(error)")
+                      }
+                  }
+
+                  do {
+                      let stream = try await trackingClient.subscribeToWalkSession(session.id)
+                      for await session in stream {
+                          await send(.walkSessionUpdated(session))
+                      }
+                      print("❌ Stream ended for session \(session.id)")
+                  } catch {
+                      print("❌ Tracking stream failed with error: \(error)")
+                  }
+              }
+              .cancellable(id: "TrackWalkerStreamID", cancelInFlight: true))
+              
+              trackingEffects.append(.run { [trackingClient] send in
+                  do {
+                      let stream = try await trackingClient.subscribeToJourneyLogs(session.id)
+                      for await logs in stream {
+                          await send(.internal_updateCompanionJourneyLogs(logs))
+                      }
+                  } catch {
+                      print("❌ JourneyLog stream failed: \(error)")
+                  }
+              }
+              .cancellable(id: "TrackJourneyLogsStreamID", cancelInFlight: true))
+              
+              return .merge(trackingEffects)
 
          case let .setTrackedWalkerRoute(route):
             state.trackedWalkerRoute = route
@@ -825,13 +952,15 @@ struct MainMapFeature {
                .send(.delegate(.walkerStatusChanged(id: Person.mockDoeID, newStatus: "Walking")))
             )
 
-         case .sheet(.presented(.walker(.delegate(.trackingEnded)))):
+         case .sheet(.presented(.walker(.delegate(.trackingEnded)))) :
             let endingSessionID = state.activeWalkSessionID
             state.activeWalkSessionID = nil
             state.trackedWalkerDestination = nil
             state.trackedWalkerRoute = nil
             state.trackedWalkerPolyline = nil
             return .merge(
+               .cancel(id: "TrackWalkerStreamID"),
+               .cancel(id: "TrackJourneyLogsStreamID"),
                .send(.delegate(.companionStatusChanged(newStatus: "idle"))),
                .run { [trackingClient] _ in
                   if let sessionID = endingSessionID {
@@ -841,6 +970,9 @@ struct MainMapFeature {
                      let selfRecordID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"
                         .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
                      try? await trackingClient.updateUserStatus(selfRecordID, "idle", nil, nil)
+                     if let sessionID = endingSessionID {
+                        _ = try? await trackingClient.updateParticipantStatus(sessionID, selfRecordID, "left")
+                     }
                   }
                }
             )
@@ -851,6 +983,19 @@ struct MainMapFeature {
                .send(.mockDoeReachedDestination),
                .send(.delegate(.walkerStatusChanged(id: walker.id, newStatus: "Idle")))
             )
+
+      case let .internal_updateLastLogged(street, time, icon):
+        state.lastLoggedStreet = street
+        state.lastLoggedTime = time
+        state.lastLoggedIcon = icon
+        return .none
+
+      case let .internal_updateCompanionJourneyLogs(logs):
+        if case var .walker(walkerState) = state.sheet {
+            walkerState.journeyLogEntries = logs
+            state.sheet = .walker(walkerState)
+        }
+        return .none
 
         case .markTrackedWalkerFitted:
            state.hasFittedTrackedWalker = true
@@ -868,6 +1013,7 @@ struct MainMapFeature {
               state.trackedWalkerPolyline = nil
               
               effects.append(.cancel(id: "TrackWalkerStreamID"))
+              effects.append(.cancel(id: "TrackJourneyLogsStreamID"))
               effects.append(.send(.delegate(.companionStatusChanged(newStatus: "idle"))))
               
               effects.append(.run { [trackingClient] _ in
@@ -894,22 +1040,54 @@ struct MainMapFeature {
               print("⚠️ [MainMapFeature] WalkSession \(session.id) had nil currentCoordinate at \(receiveTime)")
           }
           
+
+          
           return effects.isEmpty ? .none : .merge(effects)
           
-      case .stopTrackingTapped:
-          
-          guard let sessionID = state.activeWalkSessionID else { return .none }
-              
-              return .run { _ in
-                  do {
-                      try await trackingClient.setSubscribeWalkSession(sessionID, false)
-                      print("Unsubscribed CloudKit push for session \(sessionID)")
-                  } catch {
-                      print("Failed to unsubscribe: \(error)")
-                  }
-          }
+       case .stopTrackingTapped:
+           guard let sessionID = state.activeWalkSessionID else { return .none }
+           state.activeWalkSessionID = nil
+           state.trackedWalkerLocation = nil
+           state.trackedWalkerPolyline = nil
+           state.trackedWalkerRoute = nil
+           state.trackedWalkerDestination = nil
+           state.trackedWalkerDestinationName = nil
+
+           return .merge(
+               .cancel(id: "TrackWalkerStreamID"),
+               .cancel(id: "TrackJourneyLogsStreamID"),
+               .run { [trackingClient] _ in
+                   do {
+                       try await trackingClient.setSubscribeWalkSession(sessionID, false)
+                       print("Unsubscribed CloudKit push for session \(sessionID)")
+                       if let profile = UserProfileStorage.load() {
+                           let selfRecordID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"
+                              .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+                           _ = try? await trackingClient.updateParticipantStatus(sessionID, selfRecordID, "left")
+                       }
+                   } catch {
+                       print("Failed to unsubscribe: \(error)")
+                   }
+               }
+           )
+
+
+      case let .sheet(.presented(.direction(.updateLocation(_, newMilestones)))):
+        guard let sessionID = state.userWalkSessionID else { return .none }
+        return .run { _ in
+            for milestone in newMilestones {
+                try? await self.trackingClient.addJourneyLog(sessionID, milestone)
+            }
+        }
+        
+      case let .sheet(.presented(.direction(.destinationReached(finalEntry)))):
+        guard let sessionID = state.userWalkSessionID else { return .none }
+        return .run { _ in
+            try? await self.trackingClient.addJourneyLog(sessionID, finalEntry)
+        }
 
       case .sheet, .delegate, .updateTrackingLocation:
+
         return .none
       }
     }
