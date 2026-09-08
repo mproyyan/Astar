@@ -32,7 +32,10 @@ struct WalkerCardRecentLocations: View {
                 }
             }
             .padding(.horizontal, 14)
-            .background(.white, in: .rect(cornerRadius: 24))
+            .background(
+                Color(uiColor: .secondarySystemBackground),
+                in: .rect(cornerRadius: 24)
+            )
             .overlay {
                 RoundedRectangle(cornerRadius: 24)
                     .stroke(Color.primary.opacity(0.06), lineWidth: 1)
@@ -55,7 +58,7 @@ struct WalkerRecentLocationRow: View {
         case .destination:
             return .green
         case .checkpoint:
-            return Color(red: 0.15, green: 0.15, blue: 0.15)
+            return Color(uiColor: .secondaryLabel)
         }
     }
 
@@ -95,5 +98,5 @@ struct WalkerRecentLocationRow: View {
 #Preview {
     WalkerCardRecentLocations()
         .padding()
-        .background(Color(red: 0.95, green: 0.95, blue: 0.97))
+        .background(.background)
 }

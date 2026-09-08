@@ -149,7 +149,7 @@ struct WalkerCardIdle: View {
 
                                 Image(systemName: "chevron.right")
                                     .font(.footnote.weight(.semibold))
-                                    .foregroundStyle(Color(UIColor.tertiaryLabel))
+                                    .foregroundStyle(.tertiary)
                             }
                             .padding(.horizontal, 16)
                             .padding(.vertical, 14)
@@ -164,7 +164,10 @@ struct WalkerCardIdle: View {
                     }
                 }
             }
-            .background(Color.white, in: .rect(cornerRadius: 16))
+            .background(
+                Color(uiColor: .secondarySystemBackground),
+                in: .rect(cornerRadius: 24)
+            )
         }
         .padding(.top, 8)
         .task(id: email) {
@@ -185,5 +188,5 @@ struct WalkerCardIdle: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
     }
-    .background(Color(red: 0.95, green: 0.95, blue: 0.97))
+    .background(.background)
 }

@@ -62,7 +62,10 @@ struct WalkerCardHistoryDetail: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
-                .background(Color.white, in: .rect(cornerRadius: 16))
+                .background(
+                    Color(uiColor: .secondarySystemBackground),
+                    in: .rect(cornerRadius: 24)
+                )
 
                 // Distance Card
                 VStack(spacing: 4) {
@@ -82,7 +85,10 @@ struct WalkerCardHistoryDetail: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
-                .background(Color.white, in: .rect(cornerRadius: 16))
+                .background(
+                    Color(uiColor: .secondarySystemBackground),
+                    in: .rect(cornerRadius: 24)
+                )
             }
 
             // Milestones Timeline Card
@@ -238,7 +244,10 @@ struct WalkerCardHistoryDetail: View {
                     .padding(.bottom, 16)
                 }
             }
-            .background(Color.white, in: .rect(cornerRadius: 16))
+            .background(
+                Color(uiColor: .secondarySystemBackground),
+                in: .rect(cornerRadius: 24)
+            )
         }
         .padding(.top, 8)
     }
@@ -290,5 +299,5 @@ struct WalkerCardHistoryDetail: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
     }
-    .background(Color(red: 0.95, green: 0.95, blue: 0.97))
+    .background(.background)
 }

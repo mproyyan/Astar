@@ -36,7 +36,10 @@ struct SearchResultsCard: View {
                 }
             }
             .padding(.horizontal, 14)
-            .background(.white, in: .rect(cornerRadius: 24))
+            .background(
+                Color(uiColor: .secondarySystemBackground),
+                in: .rect(cornerRadius: 24)
+            )
             .overlay {
                 RoundedRectangle(cornerRadius: 24)
                     .stroke(Color.primary.opacity(0.06), lineWidth: 1)

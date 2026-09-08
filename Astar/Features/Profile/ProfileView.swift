@@ -14,7 +14,7 @@ struct ProfileView: View {
   var body: some View {
     ZStack {
       // Background
-      Color(red: 0.95, green: 0.95, blue: 0.97)
+        Color(.systemGroupedBackground)
         .ignoresSafeArea()
 
       VStack(spacing: 0) {
@@ -36,7 +36,7 @@ struct ProfileView: View {
                 Image(systemName: "chevron.right")
                   .font(.footnote)
                   .fontWeight(.semibold)
-                  .foregroundColor(Color(UIColor.tertiaryLabel))
+                  .foregroundStyle(.tertiary)
               }
               .padding(.vertical, 8)
               .contentShape(Rectangle())
@@ -69,7 +69,7 @@ struct ProfileView: View {
                 .padding(.vertical, 8)
             }
           }
-          .listRowBackground(Color.white)
+          .listRowBackground(Color(.secondarySystemGroupedBackground))
           // Note: Native list section corner radius is managed by iOS.
 
           Section("Settings") {
@@ -166,7 +166,7 @@ struct ProfileView: View {
               .buttonStyle(.plain)
             }
           }
-          .listRowBackground(Color.white)
+          .listRowBackground(Color(.secondarySystemGroupedBackground))
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
@@ -248,12 +248,12 @@ struct ProfileHeader: View {
       // 3. Profile Information
       Text(profile?.name ?? "Unknown User")
         .font(.title2.bold())
-        .foregroundColor(.primary)
+        .foregroundStyle(.primary)
         .multilineTextAlignment(.center)
 
       Text(profile?.email ?? "unknown@apple.com")
         .font(.footnote)
-        .tint(Color.gray)
+        .foregroundStyle(.secondary)
         .multilineTextAlignment(.center)
     }
     .task {

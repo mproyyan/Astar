@@ -45,7 +45,10 @@ struct WalkerCardHistoryList: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 32)
-                    .background(Color.white, in: .rect(cornerRadius: 16))
+                    .background(
+                        Color(uiColor: .secondarySystemBackground),
+                        in: .rect(cornerRadius: 24)
+                    )
             } else {
                 ForEach(sections) { section in
                     if !section.trips.isEmpty {
@@ -90,7 +93,7 @@ struct WalkerCardHistoryList: View {
 
                                             Image(systemName: "chevron.right")
                                                 .font(.footnote.weight(.semibold))
-                                                .foregroundStyle(Color(UIColor.tertiaryLabel))
+                                                .foregroundStyle(.tertiary)
                                         }
                                         .padding(.horizontal, 16)
                                         .padding(.vertical, 14)
@@ -104,7 +107,10 @@ struct WalkerCardHistoryList: View {
                                     }
                                 }
                             }
-                            .background(Color.white, in: .rect(cornerRadius: 16))
+                            .background(
+                                Color(uiColor: .secondarySystemBackground),
+                                in: .rect(cornerRadius: 24)
+                            )
                         }
                     }
                 }
@@ -120,5 +126,5 @@ struct WalkerCardHistoryList: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
     }
-    .background(Color(red: 0.95, green: 0.95, blue: 0.97))
+    .background(.background)
 }

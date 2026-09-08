@@ -73,7 +73,10 @@ struct WalkerCardRoute: View {
                 .padding(.bottom, 18)
             }
             .padding(.horizontal, 16)
-            .background(.white, in: .rect(cornerRadius: 24))
+            .background(
+                Color(uiColor: .secondarySystemBackground),
+                in: .rect(cornerRadius: 24)
+            )
             .overlay {
                 RoundedRectangle(cornerRadius: 24)
                     .stroke(Color.primary.opacity(0.06), lineWidth: 1)
@@ -85,5 +88,5 @@ struct WalkerCardRoute: View {
 #Preview {
     WalkerCardRoute()
         .padding()
-        .background(Color(red: 0.95, green: 0.95, blue: 0.97))
+        .background(.background)
 }
