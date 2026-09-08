@@ -55,12 +55,22 @@ public struct TrailWalkAttributes: ActivityAttributes, Equatable, Hashable {
       return formatter.string(from: estimatedArrivalDate)
     }
 
+    public var isArrived: Bool {
+      step.lowercased() == "arrived" || progressPercentage >= 1.0 || expectedTravelTime.lowercased() == "arrived"
+    }
+
     public var headerTitle: String {
-      "Walk \(expectedTravelTime) (\(formattedDistanceRemaining))"
+      if isArrived {
+        return "Arrived at destination"
+      }
+      return "Walk \(expectedTravelTime) (\(formattedDistanceRemaining))"
     }
 
     public func subtitle(destinationTitle: String) -> String {
       let landmark = currentLandmark.isEmpty ? destinationTitle : currentLandmark
+      if isArrived {
+        return "Completed · \(landmark)"
+      }
       return "Arrive \(formattedETA) · \(landmark)"
     }
   }

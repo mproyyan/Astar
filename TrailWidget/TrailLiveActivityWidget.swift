@@ -36,20 +36,20 @@ public struct TrailLiveActivityWidget: Widget {
           HStack(spacing: 6) {
             ZStack {
               Circle()
-                .fill(context.state.isApproaching ? Color.green.opacity(0.25) : Color.blue.opacity(0.25))
+                .fill((context.state.isArrived || context.state.isApproaching) ? Color.green.opacity(0.25) : Color.blue.opacity(0.25))
                 .frame(width: 28, height: 28)
-              Image(systemName: "figure.walk")
+              Image(systemName: context.state.isArrived ? "checkmark" : "figure.walk")
                 .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(context.state.isApproaching ? Color.green : Color(red: 0.20, green: 0.50, blue: 0.98))
+                .foregroundStyle((context.state.isArrived || context.state.isApproaching) ? Color.green : Color(red: 0.20, green: 0.50, blue: 0.98))
             }
             VStack(alignment: .leading, spacing: 1) {
               Text(context.attributes.walkerName)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.white)
                 .lineLimit(1)
-              Text(context.state.isApproaching ? "Arriving" : "Walking")
+              Text(context.state.isArrived ? "Arrived" : (context.state.isApproaching ? "Arriving" : "Walking"))
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(context.state.isApproaching ? Color.green : .white.opacity(0.7))
+                .foregroundStyle((context.state.isArrived || context.state.isApproaching) ? Color.green : .white.opacity(0.7))
             }
           }
           .padding(.leading, 4)
@@ -58,22 +58,37 @@ public struct TrailLiveActivityWidget: Widget {
         DynamicIslandExpandedRegion(.trailing) {
           HStack(spacing: 6) {
             VStack(alignment: .trailing, spacing: 1) {
-              Text("ETA \(context.state.formattedETA)")
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(.white)
-              Text(context.state.formattedDistanceRemaining)
-                .font(.system(size: 11, weight: .medium, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(.white.opacity(0.7))
+              if context.state.isArrived {
+                Text("Arrived")
+                  .font(.system(size: 12, weight: .bold, design: .rounded))
+                  .foregroundStyle(Color.green)
+                Text("Complete")
+                  .font(.system(size: 11, weight: .medium, design: .rounded))
+                  .foregroundStyle(.white.opacity(0.7))
+              } else {
+                Text("ETA \(context.state.formattedETA)")
+                  .font(.system(size: 12, weight: .bold, design: .rounded))
+                  .monospacedDigit()
+                  .foregroundStyle(.white)
+                Text(context.state.formattedDistanceRemaining)
+                  .font(.system(size: 11, weight: .medium, design: .rounded))
+                  .monospacedDigit()
+                  .foregroundStyle(.white.opacity(0.7))
+              }
             }
             ZStack {
               Circle()
                 .fill(Color.white.opacity(0.12))
                 .frame(width: 28, height: 28)
-              Image(systemName: "mappin.circle.fill")
-                .font(.system(size: 18))
-                .foregroundStyle(Color.red, Color.yellow)
+              if context.state.isArrived {
+                Image(systemName: "checkmark.circle.fill")
+                  .font(.system(size: 20))
+                  .foregroundStyle(Color.green)
+              } else {
+                Image(systemName: "mappin.circle.fill")
+                  .font(.system(size: 18))
+                  .foregroundStyle(Color.red, Color.yellow)
+              }
             }
           }
           .padding(.trailing, 4)
@@ -118,18 +133,24 @@ public struct TrailLiveActivityWidget: Widget {
                   .padding(.horizontal, 8)
 
                 Capsule()
-                  .fill(context.state.isApproaching ? Color.green : Color(red: 0.20, green: 0.50, blue: 0.98))
+                  .fill((context.state.isArrived || context.state.isApproaching) ? Color.green : Color(red: 0.20, green: 0.50, blue: 0.98))
                   .frame(width: max(0, indicatorX), height: 4)
                   .padding(.leading, 8)
 
                 ZStack {
                   Circle()
-                    .fill(context.state.isApproaching ? Color.green : Color(red: 0.20, green: 0.50, blue: 0.98))
+                    .fill((context.state.isArrived || context.state.isApproaching) ? Color.green : Color(red: 0.20, green: 0.50, blue: 0.98))
                     .frame(width: 18, height: 18)
-                  Image(systemName: "location.north.fill")
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(.white)
-                    .rotationEffect(.degrees(90))
+                  if context.state.isArrived {
+                    Image(systemName: "checkmark")
+                      .font(.system(size: 8, weight: .bold))
+                      .foregroundStyle(.white)
+                  } else {
+                    Image(systemName: "location.north.fill")
+                      .font(.system(size: 8, weight: .bold))
+                      .foregroundStyle(.white)
+                      .rotationEffect(.degrees(90))
+                  }
                 }
                 .offset(x: max(0, min(totalWidth - 20, indicatorX - 9)))
 
@@ -138,7 +159,7 @@ public struct TrailLiveActivityWidget: Widget {
                   ZStack {
                     Circle()
                       .strokeBorder(Color.white, lineWidth: 2)
-                      .background(Circle().fill(Color.black))
+                      .background(Circle().fill(context.state.isArrived ? Color.green : Color.black))
                       .frame(width: 10, height: 10)
                     Circle()
                       .fill(Color.white)
@@ -157,27 +178,42 @@ public struct TrailLiveActivityWidget: Widget {
       } compactLeading: {
         // Compact Leading (Home Screen Dynamic Island Left)
         HStack(spacing: 4) {
-          Image(systemName: "figure.walk")
-            .font(.system(size: 10, weight: .bold))
-            .foregroundStyle(context.state.isApproaching ? Color.green : Color(red: 0.20, green: 0.50, blue: 0.98))
-          Text(context.state.expectedTravelTime)
-            .font(.system(size: 12, weight: .bold, design: .rounded))
-            .monospacedDigit()
-            .foregroundStyle(.white)
+          if context.state.isArrived {
+            Image(systemName: "checkmark.circle.fill")
+              .font(.system(size: 11, weight: .bold))
+              .foregroundStyle(Color.green)
+            Text("Arrived")
+              .font(.system(size: 12, weight: .bold, design: .rounded))
+              .foregroundStyle(.white)
+          } else {
+            Image(systemName: "figure.walk")
+              .font(.system(size: 10, weight: .bold))
+              .foregroundStyle(context.state.isApproaching ? Color.green : Color(red: 0.20, green: 0.50, blue: 0.98))
+            Text(context.state.expectedTravelTime)
+              .font(.system(size: 12, weight: .bold, design: .rounded))
+              .monospacedDigit()
+              .foregroundStyle(.white)
+          }
         }
       } compactTrailing: {
         // Compact Trailing (Home Screen Dynamic Island Right)
-        Text(context.state.formattedDistanceRemaining)
-          .font(.system(size: 12, weight: .bold, design: .rounded))
-          .monospacedDigit()
-          .foregroundStyle(context.state.isApproaching ? Color.green : .white)
+        if context.state.isArrived {
+          Image(systemName: "flag.checkered")
+            .font(.system(size: 11, weight: .bold))
+            .foregroundStyle(Color.green)
+        } else {
+          Text(context.state.formattedDistanceRemaining)
+            .font(.system(size: 12, weight: .bold, design: .rounded))
+            .monospacedDigit()
+            .foregroundStyle(context.state.isApproaching ? Color.green : .white)
+        }
       } minimal: {
         // Minimal presentation
-        Image(systemName: "figure.walk")
+        Image(systemName: context.state.isArrived ? "checkmark.circle.fill" : "figure.walk")
           .font(.system(size: 11, weight: .bold))
-          .foregroundStyle(context.state.isApproaching ? Color.green : Color(red: 0.20, green: 0.50, blue: 0.98))
+          .foregroundStyle((context.state.isArrived || context.state.isApproaching) ? Color.green : Color(red: 0.20, green: 0.50, blue: 0.98))
       }
-      .keylineTint(context.state.isApproaching ? Color.green : Color(red: 0.20, green: 0.50, blue: 0.98))
+      .keylineTint((context.state.isArrived || context.state.isApproaching) ? Color.green : Color(red: 0.20, green: 0.50, blue: 0.98))
     }
   }
 }

@@ -51,25 +51,43 @@ public struct GoogleMapsLiveActivityCard: View {
     }
   }
 
+  public var isArrived: Bool {
+    expectedTravelTime.lowercased() == "arrived" || progress >= 1.0
+  }
+
   public var body: some View {
     VStack(alignment: .leading, spacing: 10) {
-      // Header: Walk Time & Distance + Destination Pin
+      // Header: Walk Time & Distance / Arrival Status + Destination Pin
       HStack(alignment: .top) {
         VStack(alignment: .leading, spacing: 3) {
           HStack(spacing: 6) {
-            Text("Walk \(expectedTravelTime) (\(formattedDistance))")
-              .font(.system(size: 19, weight: .bold, design: .rounded))
-              .monospacedDigit()
-              .foregroundStyle(.white)
+            if isArrived {
+              Text("\(walkerName) has arrived")
+                .font(.system(size: 19, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
 
-            if isApproaching {
-              Text("ARRIVING")
+              Text("ARRIVED")
                 .font(.system(size: 9, weight: .bold))
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
                 .background(Color.green.opacity(0.35))
                 .foregroundStyle(Color.green)
                 .clipShape(Capsule())
+            } else {
+              Text("Walk \(expectedTravelTime) (\(formattedDistance))")
+                .font(.system(size: 19, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(.white)
+
+              if isApproaching {
+                Text("ARRIVING")
+                  .font(.system(size: 9, weight: .bold))
+                  .padding(.horizontal, 6)
+                  .padding(.vertical, 2)
+                  .background(Color.green.opacity(0.35))
+                  .foregroundStyle(Color.green)
+                  .clipShape(Capsule())
+              }
             }
           }
 
@@ -84,23 +102,36 @@ public struct GoogleMapsLiveActivityCard: View {
             }
           } else {
             let displayLandmark = currentLandmark.isEmpty ? destinationTitle : currentLandmark
-            Text("ETA \(etaString) · \(displayLandmark)")
-              .font(.system(size: 13, weight: .medium))
-              .foregroundStyle(.white.opacity(0.82))
-              .lineLimit(1)
+            if isArrived {
+              Text("Completed · \(displayLandmark)")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.white.opacity(0.82))
+                .lineLimit(1)
+            } else {
+              Text("ETA \(etaString) · \(displayLandmark)")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.white.opacity(0.82))
+                .lineLimit(1)
+            }
           }
         }
 
         Spacer()
 
-        // Top-right Destination Pin Marker
+        // Top-right Destination Pin / Checkmark Marker
         ZStack {
           Circle()
             .fill(Color.white.opacity(0.12))
             .frame(width: 32, height: 32)
-          Image(systemName: "mappin.circle.fill")
-            .font(.system(size: 20))
-            .foregroundStyle(Color.red, Color.yellow)
+          if isArrived {
+            Image(systemName: "checkmark.circle.fill")
+              .font(.system(size: 22))
+              .foregroundStyle(Color.green)
+          } else {
+            Image(systemName: "mappin.circle.fill")
+              .font(.system(size: 20))
+              .foregroundStyle(Color.red, Color.yellow)
+          }
         }
       }
 
@@ -118,22 +149,28 @@ public struct GoogleMapsLiveActivityCard: View {
             .frame(height: 4)
             .padding(.horizontal, 12)
 
-          // Active Bright Blue Progress Line
+          // Active Progress Line (Green when arrived or approaching)
           Capsule()
-            .fill(isApproaching ? Color.green : Color(red: 0.20, green: 0.50, blue: 0.98))
+            .fill((isArrived || isApproaching) ? Color.green : Color(red: 0.20, green: 0.50, blue: 0.98))
             .frame(width: max(0, indicatorX), height: 4)
             .padding(.leading, 12)
 
           // Moving Navigation Indicator Circle
           ZStack {
             Circle()
-              .fill(isApproaching ? Color.green : Color(red: 0.20, green: 0.50, blue: 0.98))
+              .fill((isArrived || isApproaching) ? Color.green : Color(red: 0.20, green: 0.50, blue: 0.98))
               .frame(width: 22, height: 22)
               .shadow(color: Color.black.opacity(0.35), radius: 3, y: 1)
-            Image(systemName: "location.north.fill")
-              .font(.system(size: 10, weight: .bold))
-              .foregroundStyle(.white)
-              .rotationEffect(.degrees(90))
+            if isArrived {
+              Image(systemName: "checkmark")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(.white)
+            } else {
+              Image(systemName: "location.north.fill")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(.white)
+                .rotationEffect(.degrees(90))
+            }
           }
           .offset(x: max(0, min(totalWidth - 28, indicatorX - 11)))
           .animation(.spring(response: 0.45, dampingFraction: 0.8), value: progress)
@@ -144,7 +181,7 @@ public struct GoogleMapsLiveActivityCard: View {
             ZStack {
               Circle()
                 .strokeBorder(Color.white, lineWidth: 2.5)
-                .background(Circle().fill(Color.black))
+                .background(Circle().fill(isArrived ? Color.green : Color.black))
                 .frame(width: 12, height: 12)
               Circle()
                 .fill(Color.white)

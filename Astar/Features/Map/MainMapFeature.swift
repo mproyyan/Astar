@@ -947,6 +947,8 @@ struct MainMapFeature {
             let currentNow = now
             let isReturn = state.trackedWalkerDestinationName == "Autograph Tower"
             let finalCoord = isReturn ? MockDoeWalkSimulation.originCoordinate : MockDoeWalkSimulation.destinationCoordinate
+            let fallbackDest = isReturn ? "Agora Mall" : "Autograph Tower"
+            let destinationName = (state.trackedWalkerDestinationName?.isEmpty == false) ? (state.trackedWalkerDestinationName ?? fallbackDest) : fallbackDest
             state.isMockDoeWalking = false
             state.activeWalkSessionID = nil
             state.trackedWalkerPolyline = nil
@@ -976,12 +978,23 @@ struct MainMapFeature {
                walkerState.trips = state.mockDoeHistoryTrips
                state.sheet = .walker(walkerState)
             }
+
+            let finalArrivedState = TrailWalkAttributes.ContentState(
+               step: "Arrived",
+               progressPercentage: 1.0,
+               remainingDistanceMeters: 0,
+               currentLandmark: destinationName,
+               estimatedArrivalDate: currentNow,
+               expectedTravelTime: "Arrived",
+               isApproaching: false
+            )
+
             return .merge(
                .cancel(id: "MockDoeWalkCancelID"),
                .send(.delegate(.walkerStatusChanged(id: Person.mockDoeID, newStatus: "Idle"))),
                .send(.delegate(.companionStatusChanged(newStatus: "idle"))),
                .run { [liveActivityClient] _ in
-                  await liveActivityClient.endLiveActivity("mock-doe-session")
+                  await liveActivityClient.endLiveActivity("mock-doe-session", finalArrivedState)
                },
                .run { [trackingClient] _ in
                   if let profile = UserProfileStorage.load() {
@@ -1005,7 +1018,7 @@ struct MainMapFeature {
                .cancel(id: "MockDoeWalkCancelID"),
                .send(.delegate(.walkerStatusChanged(id: Person.mockDoeID, newStatus: "Walking"))),
                .run { [liveActivityClient] _ in
-                  await liveActivityClient.endLiveActivity("mock-doe-session")
+                  await liveActivityClient.endLiveActivity("mock-doe-session", nil)
                }
             )
 
@@ -1023,7 +1036,7 @@ struct MainMapFeature {
                .send(.delegate(.companionStatusChanged(newStatus: "idle"))),
                .run { [trackingClient, liveActivityClient] _ in
                   if let sessionID = endingSessionID {
-                     await liveActivityClient.endLiveActivity(sessionID)
+                     await liveActivityClient.endLiveActivity(sessionID, nil)
                      try? await trackingClient.setSubscribeWalkSession(sessionID, false)
                   }
                   if let profile = UserProfileStorage.load() {
@@ -1074,11 +1087,28 @@ struct MainMapFeature {
           
           if session.status == "completed" || session.status == "arrived" {
               print("🏁 [MainMapFeature] WalkSession \(session.id) completed. Cleaning up tracking.")
+              if case var .walker(walkerState) = state.sheet {
+                  walkerState.isDestinationReached = true
+                  walkerState.status = "Idle"
+                  state.sheet = .walker(walkerState)
+              }
+              
+              let destName = !session.destinationName.isEmpty ? session.destinationName : (state.trackedWalkerAttributes?.destinationTitle ?? "Destination")
+              let finalArrivedState = TrailWalkAttributes.ContentState(
+                  step: "Arrived",
+                  progressPercentage: 1.0,
+                  remainingDistanceMeters: 0,
+                  currentLandmark: destName,
+                  estimatedArrivalDate: now,
+                  expectedTravelTime: "Arrived",
+                  isApproaching: false
+              )
+
               state.activeWalkSessionID = nil
               state.trackedWalkerDestination = nil
               state.trackedWalkerRoute = nil
               state.trackedWalkerPolyline = nil
-              state.trackedWalkerLiveActivityState = nil
+              state.trackedWalkerLiveActivityState = finalArrivedState
               state.trackedWalkerAttributes = nil
               
               effects.append(.cancel(id: "TrackWalkerStreamID"))
@@ -1086,7 +1116,7 @@ struct MainMapFeature {
               effects.append(.send(.delegate(.companionStatusChanged(newStatus: "idle"))))
               
               effects.append(.run { [trackingClient, liveActivityClient] _ in
-                  await liveActivityClient.endLiveActivity(session.id)
+                  await liveActivityClient.endLiveActivity(session.id, finalArrivedState)
                   try? await trackingClient.setSubscribeWalkSession(session.id, false)
               })
               
@@ -1116,11 +1146,24 @@ struct MainMapFeature {
                           let progress = max(0.0, min(1.0, 1.0 - (remainingDist / totalDist)))
                           let isApproaching = remainingDist <= 100.0
 
-                          currentLiveState.remainingDistanceMeters = remainingDist
-                          currentLiveState.progressPercentage = progress
-                          currentLiveState.estimatedArrivalDate = Date().addingTimeInterval(remainingSecs)
-                          currentLiveState.expectedTravelTime = mins >= 60 ? "\(mins / 60) hr \(mins % 60) min" : "\(mins) min"
-                          currentLiveState.isApproaching = isApproaching
+                           if remainingDist <= 15.0 {
+                               currentLiveState.step = "Arrived"
+                               currentLiveState.remainingDistanceMeters = 0
+                               currentLiveState.progressPercentage = 1.0
+                               currentLiveState.expectedTravelTime = "Arrived"
+                               currentLiveState.isApproaching = false
+                               if case var .walker(walkerState) = state.sheet {
+                                   walkerState.isDestinationReached = true
+                                   walkerState.status = "Idle"
+                                   state.sheet = .walker(walkerState)
+                               }
+                           } else {
+                               currentLiveState.remainingDistanceMeters = remainingDist
+                               currentLiveState.progressPercentage = progress
+                               currentLiveState.estimatedArrivalDate = now.addingTimeInterval(remainingSecs)
+                               currentLiveState.expectedTravelTime = mins >= 60 ? "\(mins / 60) hr \(mins % 60) min" : "\(mins) min"
+                               currentLiveState.isApproaching = isApproaching
+                           }
                           effects.append(.send(.internal_updateTrackedWalkerLiveActivity(currentLiveState)))
                       }
                   }
@@ -1148,7 +1191,7 @@ struct MainMapFeature {
                .cancel(id: "TrackWalkerStreamID"),
                .cancel(id: "TrackJourneyLogsStreamID"),
                .run { [trackingClient, liveActivityClient] _ in
-                   await liveActivityClient.endLiveActivity(sessionID)
+                   await liveActivityClient.endLiveActivity(sessionID, nil)
                    do {
                        try await trackingClient.setSubscribeWalkSession(sessionID, false)
                        print("Unsubscribed CloudKit push for session \(sessionID)")

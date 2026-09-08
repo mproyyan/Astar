@@ -140,8 +140,8 @@ struct MapSheet: View {
                         .transition(.opacity)
                     } else if walkerStore.isDestinationReached {
                         WalkerCardReachDestination(
-                            walkerName: walkerStore.walker.name == "Awan" ? "\(walkerStore.walker.name) Mendung" : walkerStore.walker.name,
-                            avatarImageName: walkerStore.walker.name == "Awan" ? "AwanAvatar" : "\(walkerStore.walker.name)Avatar",
+                            walkerName: walkerStore.walker.name,
+                            avatarImageName: "\(walkerStore.walker.name)Avatar",
                             onDismiss: {
                                 walkerStore.send(.dismissWalkerTapped)
                                 withAnimation(.easeInOut(duration: 0.25)) {

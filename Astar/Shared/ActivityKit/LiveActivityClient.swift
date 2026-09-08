@@ -13,7 +13,7 @@ import Foundation
 public struct LiveActivityClient: Sendable {
   public var startLiveActivity: @Sendable (TrailWalkAttributes, TrailWalkAttributes.ContentState) async throws -> Void
   public var updateLiveActivity: @Sendable (String, TrailWalkAttributes.ContentState) async -> Void
-  public var endLiveActivity: @Sendable (String) async -> Void
+  public var endLiveActivity: @Sendable (String, TrailWalkAttributes.ContentState?) async -> Void
 }
 
 extension LiveActivityClient: DependencyKey {
@@ -50,9 +50,23 @@ extension LiveActivityClient: DependencyKey {
           await activity.update(content)
         }
       },
-      endLiveActivity: { sessionID in
+      endLiveActivity: { sessionID, finalState in
+        let finalContent: ActivityContent<TrailWalkAttributes.ContentState>?
+        if let finalState = finalState {
+          finalContent = ActivityContent(
+            state: finalState,
+            staleDate: nil,
+            relevanceScore: 100
+          )
+        } else {
+          finalContent = nil
+        }
         for activity in Activity<TrailWalkAttributes>.activities where activity.attributes.sessionID == sessionID {
-          await activity.end(nil, dismissalPolicy: .immediate)
+          if let finalContent = finalContent {
+            await activity.end(finalContent, dismissalPolicy: .default)
+          } else {
+            await activity.end(nil, dismissalPolicy: .immediate)
+          }
         }
       }
     )
@@ -61,12 +75,12 @@ extension LiveActivityClient: DependencyKey {
   public static let testValue: Self = Self(
     startLiveActivity: { _, _ in },
     updateLiveActivity: { _, _ in },
-    endLiveActivity: { _ in }
+    endLiveActivity: { _, _ in }
   )
   public static let previewValue: Self = Self(
     startLiveActivity: { _, _ in },
     updateLiveActivity: { _, _ in },
-    endLiveActivity: { _ in }
+    endLiveActivity: { _, _ in }
   )
 }
 

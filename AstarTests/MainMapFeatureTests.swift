@@ -1096,5 +1096,78 @@ struct MainMapFeatureTests {
       $0.trackedWalkerDestinationName = nil
     }
   }
+
+  @Test
+  @MainActor
+  func testWalkSessionCompletedMarksWalkerSheetDestinationReachedAndEndsLiveActivity() async {
+    let now = Date(timeIntervalSince1970: 5000)
+    let walker = Person(name: "Awan", status: "Walking")
+    let initialLiveState = TrailWalkAttributes.ContentState(
+      step: "Walking along Jl. Sudirman",
+      progressPercentage: 0.8,
+      remainingDistanceMeters: 100,
+      currentLandmark: "Autograph Tower",
+      estimatedArrivalDate: now.addingTimeInterval(120),
+      expectedTravelTime: "2 min",
+      isApproaching: true
+    )
+
+    let store = TestStore(initialState: MainMapFeature.State(
+      activeWalkSessionID: "session-completed-123",
+      trackedWalkerLocation: CLLocationCoordinate2D(latitude: -6.2000, longitude: 106.8166),
+      trackedWalkerDestination: CLLocationCoordinate2D(latitude: -6.1930, longitude: 106.8220),
+      trackedWalkerDestinationName: "Autograph Tower",
+      trackedWalkerLiveActivityState: initialLiveState,
+      sheet: .walker(MapWalkerSheetFeature.State(
+        walker: walker,
+        status: "Walking",
+        isDestinationReached: false
+      ))
+    )) {
+      MainMapFeature()
+    } withDependencies: {
+      $0.date.now = now
+      $0.trackingClient.setSubscribeWalkSession = { _, _ in }
+      $0.liveActivityClient.endLiveActivity = { _, _ in }
+    }
+
+    let completedSession = WalkSession(
+      id: "session-completed-123",
+      walkerRef: "walker-123",
+      status: "completed",
+      destinationName: "Autograph Tower",
+      destinationLatitude: -6.1930,
+      destinationLongitude: 106.8220,
+      routePolyline: nil,
+      startedAt: now.addingTimeInterval(-600),
+      endedAt: now,
+      currentCoordinate: nil,
+      lastPingAt: now
+    )
+
+    await store.send(.walkSessionUpdated(completedSession)) {
+      $0.activeWalkSessionID = nil
+      $0.trackedWalkerDestination = nil
+      $0.trackedWalkerRoute = nil
+      $0.trackedWalkerPolyline = nil
+      $0.trackedWalkerLiveActivityState = TrailWalkAttributes.ContentState(
+        step: "Arrived",
+        progressPercentage: 1.0,
+        remainingDistanceMeters: 0,
+        currentLandmark: "Autograph Tower",
+        estimatedArrivalDate: now,
+        expectedTravelTime: "Arrived",
+        isApproaching: false
+      )
+      $0.trackedWalkerAttributes = nil
+      $0.sheet = .walker(MapWalkerSheetFeature.State(
+        walker: walker,
+        status: "Idle",
+        isDestinationReached: true
+      ))
+    }
+
+    await store.receive(.delegate(.companionStatusChanged(newStatus: "idle")))
+  }
 }
 
