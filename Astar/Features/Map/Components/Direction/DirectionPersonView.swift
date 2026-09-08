@@ -24,12 +24,14 @@ struct DirectionPersonView: View {
                     .scaledToFill()
                     .frame(width: avatarSize, height: avatarSize)
                     .clipShape(Circle())
+                    .accessibilityLabel("Profile image of \(person.name)")
             } else if let avatarImageName = person.avatarImageName, let _ = UIImage(named: avatarImageName) {
                 Image(avatarImageName)
                     .resizable()
                     .scaledToFill()
                     .frame(width: avatarSize, height: avatarSize)
                     .clipShape(Circle())
+                    .accessibilityLabel("Profile image of \(person.name)")
             } else {
                 Circle()
                     .fill(Color(red: 0.77, green: 0.81, blue: 0.96))
@@ -43,11 +45,13 @@ struct DirectionPersonView: View {
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             ))
+                            .accessibilityHidden(true)
                     }
                     .overlay {
                         Text(initials)
                             .font(.title3.weight(.semibold))
                             .foregroundStyle(.white.opacity(0.92))
+                            .accessibilityHidden(true)
                     }
                     .frame(width: avatarSize, height: avatarSize)
             }
@@ -58,6 +62,7 @@ struct DirectionPersonView: View {
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
+                .accessibilityLabel(person.name)
         }
         .task(id: person.name) {
             if loadedAvatarData == nil && person.avatarData == nil && person.avatarImageName == nil {
