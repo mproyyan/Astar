@@ -63,6 +63,7 @@ struct PersonView: View {
                         .multilineTextAlignment(.center)
                         .lineLimit(1)
                         .truncationMode(.tail)
+                        .frame(width: avatarSize + 20)
 
                     Text(person.status)
                         .font(.caption)
@@ -71,6 +72,8 @@ struct PersonView: View {
                 }
                 .frame(maxWidth: .infinity)
             }
+            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

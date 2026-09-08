@@ -52,9 +52,12 @@ struct PeopleSection: View {
                                 }
                             )
                             .frame(maxWidth: .infinity)
+//                            .background(.blue)
                         }
                     }
                 }
+                .frame(maxWidth: .infinity)
+//                .background(.red)
                 .scrollBounceBehavior(.always)
             }
         }
