@@ -15,6 +15,7 @@ struct WalkSession: Equatable, Sendable {
     let startedAt: Date
     let endedAt: Date?
     let currentCoordinate: Data?
+    
     let lastPingAt: Date
 }
 
@@ -35,6 +36,9 @@ struct TrackingClient: Sendable {
     var updateParticipantStatus: @Sendable (_ sessionID: String, _ companionRecordID: String, _ status: String) async throws -> SessionParticipant
     var updateUserStatus: @Sendable (_ userRecordID: String, _ status: String, _ activeSessionID: String?, _ watchingSessionID: String?) async throws -> Void
     var pushLocationUpdate: @Sendable (_ sessionID: String, _ coordinatesData: Data) async throws -> Void
+    var addJourneyLog: @Sendable (_ sessionID: String, _ entry: JourneyLogEntry) async throws -> Void
+    var fetchJourneyLogs: @Sendable (_ sessionID: String) async throws -> [JourneyLogEntry]
+    var subscribeToJourneyLogs: @Sendable (_ sessionID: String) async throws -> AsyncStream<[JourneyLogEntry]>
     
     var setSubscribeWalkSession: @Sendable (_ sessionID: String, _ isSubscribed: Bool) async throws -> Void
     var subscribeToWalkSession: @Sendable (_ sessionID: String) async throws -> AsyncStream<WalkSession>
@@ -78,6 +82,7 @@ extension TrackingClient: DependencyKey {
                 startedAt: record["startedAt"] as? Date ?? Date(),
                 endedAt: nil,
                 currentCoordinate: initialCoordinateData,
+                
                 lastPingAt: record["lastPingAt"] as? Date ?? Date()
             )
         },
@@ -214,6 +219,134 @@ extension TrackingClient: DependencyKey {
                 throw error
             }
         },
+        addJourneyLog: { sessionID, entry in
+            let db = CKContainer.default().publicCloudDatabase
+            let record = CKRecord(recordType: "JourneyLogRecord")
+            record["sessionRef"] = CKRecord.Reference(recordID: CKRecord.ID(recordName: sessionID), action: .deleteSelf)
+            record["entryID"] = entry.id.uuidString
+            record["landmarkName"] = entry.landmarkName
+            record["address"] = entry.address
+            record["timeString"] = entry.timeString
+            record["iconName"] = entry.iconName
+            record["entryType"] = entry.entryType.rawValue
+            if let coord = entry.coordinate {
+                record["latitude"] = coord.latitude
+                record["longitude"] = coord.longitude
+            }
+            try await db.save(record)
+        },
+        fetchJourneyLogs: { sessionID in
+            let db = CKContainer.default().publicCloudDatabase
+            let predicate = NSPredicate(format: "sessionRef == %@", CKRecord.Reference(recordID: CKRecord.ID(recordName: sessionID), action: .deleteSelf))
+            let query = CKQuery(recordType: "JourneyLogRecord", predicate: predicate)
+            // No sortDescriptors on query to avoid "creationDate not sortable" error
+
+            let (results, _) = try await db.records(matching: query)
+            var tempLogs: [(entry: JourneyLogEntry, date: Date)] = []
+            for (_, result) in results {
+                if let record = try? result.get() {
+                    let log = JourneyLogEntry(
+                        id: UUID(uuidString: record["entryID"] as? String ?? "") ?? UUID(),
+                        landmarkName: record["landmarkName"] as? String ?? "",
+                        address: record["address"] as? String ?? "",
+                        timeString: record["timeString"] as? String ?? "",
+                        iconName: record["iconName"] as? String ?? "",
+                        entryType: JourneyLogEntryType(rawValue: record["entryType"] as? String ?? "") ?? .checkpoint,
+                        coordinate: {
+                            if let lat = record["latitude"] as? Double, let lon = record["longitude"] as? Double {
+                                return CLLocationCoordinate2D(latitude: lat, longitude: lon)
+                            }
+                            return nil
+                        }()
+                    )
+                    tempLogs.append((entry: log, date: record.creationDate ?? Date.distantPast))
+                }
+            }
+            return tempLogs.sorted(by: { $0.date > $1.date }).map(\.entry)
+        },
+        subscribeToJourneyLogs: { sessionID in
+            let db = CKContainer.default().publicCloudDatabase
+            let predicate = NSPredicate(format: "sessionRef == %@", CKRecord.Reference(recordID: CKRecord.ID(recordName: sessionID), action: .deleteSelf))
+            let subscriptionID = "journey-logs-\(sessionID)"
+            
+            // Register subscription
+            do {
+                _ = try await db.subscription(for: subscriptionID)
+            } catch {
+                let subscription = CKQuerySubscription(
+                    recordType: "JourneyLogRecord",
+                    predicate: predicate,
+                    subscriptionID: subscriptionID,
+                    options: [.firesOnRecordCreation]
+                )
+                let info = CKSubscription.NotificationInfo()
+                info.shouldSendContentAvailable = true
+                subscription.notificationInfo = info
+                try? await db.save(subscription)
+            }
+            
+            // We just return an AsyncStream that yields result every time there's a new log
+            return AsyncStream { continuation in
+                let internalFetch: @Sendable () async -> [JourneyLogEntry]? = {
+                    let fetchQuery = CKQuery(recordType: "JourneyLogRecord", predicate: predicate)
+                    // Retrieve records without CloudKit-level sort, then sort locally to avoid "creationDate not sortable" error
+                    do {
+                        let (results, _) = try await db.records(matching: fetchQuery)
+                        var tempLogs: [(entry: JourneyLogEntry, date: Date)] = []
+                        for (_, result) in results {
+                            if let record = try? result.get() {
+                                let log = JourneyLogEntry(
+                                    id: UUID(uuidString: record["entryID"] as? String ?? "") ?? UUID(),
+                                    landmarkName: record["landmarkName"] as? String ?? "",
+                                    address: record["address"] as? String ?? "",
+                                    timeString: record["timeString"] as? String ?? "",
+                                    iconName: record["iconName"] as? String ?? "",
+                                    entryType: JourneyLogEntryType(rawValue: record["entryType"] as? String ?? "") ?? .checkpoint,
+                                    coordinate: (record["latitude"] as? Double).flatMap { lat in
+                                        (record["longitude"] as? Double).map { lon in CLLocationCoordinate2D(latitude: lat, longitude: lon) }
+                                    }
+                                )
+                                tempLogs.append((entry: log, date: record.creationDate ?? Date.distantPast))
+                            }
+                        }
+                        return tempLogs.sorted(by: { $0.date > $1.date }).map(\.entry)
+                    } catch {
+                        print("❌ [TrackingClient.subscribeToJourneyLogs] internalFetch Error: \(error)")
+                        return nil
+                    }
+                }
+
+                let pollingTask = Task {
+                    while !Task.isCancelled {
+                        try? await Task.sleep(nanoseconds: 10_000_000_000)
+                        guard !Task.isCancelled else { break }
+                        if let db = await internalFetch() {
+                            continuation.yield(db)
+                        }
+                    }
+                }
+
+                let listenerTask = Task {
+                    // Initial fetch
+                    if let db = await internalFetch() {
+                        continuation.yield(db)
+                    }
+
+                    // APNs push notification listener for instant updates
+                    for await _ in NotificationCenter.default.publisher(for: AppDelegate.journeyLogUpdateNotification).values {
+                        guard !Task.isCancelled else { break }
+                        if let db = await internalFetch() {
+                            continuation.yield(db)
+                        }
+                    }
+                }
+
+                continuation.onTermination = { @Sendable _ in
+                    pollingTask.cancel()
+                    listenerTask.cancel()
+                }
+            }
+        },
         setSubscribeWalkSession: { sessionID, isSubscribed in
             let container = CKContainer.default()
             let db = container.publicCloudDatabase
@@ -232,17 +365,8 @@ extension TrackingClient: DependencyKey {
                 return
             }
             
-            print("[TrackingClient] Checking existing subscription: \(subscriptionID)")
-            do {
-                _ = try await db.subscription(for: subscriptionID)
-                print("Already subscribed to session: \(sessionID)")
-                return
-            } catch let error as CKError where error.code == .unknownItem {
-                print("[TrackingClient] Subscription missing, creating new one...")
-            } catch {
-                print("[TrackingClient] Subscription check error: \(error.localizedDescription)")
-                throw error
-            }
+            // Always delete previous subscription first to guarantee old alertBody is replaced
+            try? await db.deleteSubscription(withID: subscriptionID)
             
             let sessionRecordID = CKRecord.ID(recordName: sessionID)
             let predicate = NSPredicate(format: "recordID == %@", sessionRecordID)
@@ -256,10 +380,7 @@ extension TrackingClient: DependencyKey {
             
             let info = CKSubscription.NotificationInfo()
             info.shouldSendContentAvailable = true
-            info.alertBody = "Walk session was updated."
-            info.soundName = "default"
-            info.category = "WALK_INVITATION"
-            info.desiredKeys = ["currentCoordinate", "status", "lastPingAt"]
+            info.desiredKeys = ["status", "lastPingAt"]
             
             subscription.notificationInfo = info
             
@@ -287,6 +408,7 @@ extension TrackingClient: DependencyKey {
                             startedAt: record["startedAt"] as? Date ?? Date(),
                             endedAt: record["endedAt"] as? Date,
                             currentCoordinate: record["currentCoordinate"] as? Data,
+                
                             lastPingAt: record["lastPingAt"] as? Date ?? Date()
                         )
                     } catch {
@@ -399,6 +521,7 @@ extension TrackingClient: DependencyKey {
                 startedAt: record["startedAt"] as? Date ?? Date(),
                 endedAt: record["endedAt"] as? Date,
                 currentCoordinate: record["currentCoordinate"] as? Data,
+                
                 lastPingAt: record["lastPingAt"] as? Date ?? Date()
             )
         },
@@ -496,7 +619,28 @@ extension TrackingClient: DependencyKey {
         }
     )
     
-    static let testValue = Self()
+    static let testValue = Self(
+        startWalkSession: { _, _, _, _, _, _ in
+            WalkSession(id: "test", walkerRef: "w", status: "active", destinationName: "dest", destinationLatitude: 0, destinationLongitude: 0, routePolyline: nil, startedAt: Date(), endedAt: nil, currentCoordinate: nil, lastPingAt: Date())
+        },
+        endWalkSession: { _ in },
+        inviteToWalkSession: { _, _ in },
+        updateParticipantStatus: { s, c, st in SessionParticipant(id: "p", sessionRef: s, companionRef: c, status: st) },
+        updateUserStatus: { _, _, _, _ in },
+        pushLocationUpdate: { _, _ in },
+        addJourneyLog: { _, _ in },
+        fetchJourneyLogs: { _ in [] },
+        subscribeToJourneyLogs: { _ in AsyncStream { $0.finish() } },
+        setSubscribeWalkSession: { _, _ in },
+        subscribeToWalkSession: { _ in AsyncStream { $0.finish() } },
+        setupInvitationSubscription: { _ in },
+        getWalkSession: { s in WalkSession(id: s, walkerRef: "w", status: "active", destinationName: "dest", destinationLatitude: 0, destinationLongitude: 0, routePolyline: nil, startedAt: Date(), endedAt: nil, currentCoordinate: nil, lastPingAt: Date()) },
+        getWalkerActiveSessionID: { _ in nil },
+        fetchSessionParticipant: { p in SessionParticipant(id: p, sessionRef: "s", companionRef: "c", status: "notDetermined") },
+        fetchSessionParticipants: { _ in [] },
+        setSubscribeSessionParticipants: { _, _ in },
+        subscribeToSessionParticipants: { _ in AsyncStream { $0.finish() } }
+    )
 }
 
 private func querySessionParticipants(sessionID: String) async throws -> [SessionParticipant] {

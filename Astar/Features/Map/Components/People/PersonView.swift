@@ -28,12 +28,14 @@ struct PersonView: View {
                         .scaledToFill()
                         .frame(width: avatarSize, height: avatarSize)
                         .clipShape(Circle())
+                        .accessibilityHidden(true)
                 } else if let avatarImageName = person.avatarImageName, let _ = UIImage(named: avatarImageName) {
                     Image(avatarImageName)
                         .resizable()
                         .scaledToFill()
                         .frame(width: avatarSize, height: avatarSize)
                         .clipShape(Circle())
+                        .accessibilityHidden(true)
                 } else {
                     Circle()
                         .fill(Color(red: 0.77, green: 0.81, blue: 0.96))
@@ -54,6 +56,7 @@ struct PersonView: View {
                                 .foregroundStyle(.white.opacity(0.92))
                         }
                         .frame(width: avatarSize, height: avatarSize)
+                        .accessibilityHidden(true)
                 }
 
                 VStack(spacing: 2) {
@@ -63,6 +66,7 @@ struct PersonView: View {
                         .multilineTextAlignment(.center)
                         .lineLimit(1)
                         .truncationMode(.tail)
+                        .frame(width: avatarSize + 20)
 
                     Text(person.status)
                         .font(.caption)
@@ -71,7 +75,10 @@ struct PersonView: View {
                 }
                 .frame(maxWidth: .infinity)
             }
+            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
             .contentShape(Rectangle())
+            .accessibilityElement(children: .combine)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(person.name), \(person.status)")

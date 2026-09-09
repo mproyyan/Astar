@@ -85,6 +85,7 @@ struct RootFeatureTests {
   @Test
   @MainActor
   func testPendingDeepLinkExecutedAfterLogin() async {
+    UserProfileStorage.clear()
     let mockProfile = UserProfile(
       appleUserId: "real-apple-123",
       cloudKitUserId: "real-ck-456",
@@ -99,6 +100,8 @@ struct RootFeatureTests {
       RootFeature()
     } withDependencies: {
       $0.uuid = .incrementing
+      $0.date.now = Date(timeIntervalSince1970: 1000)
+      $0.locationManager.getCurrentLocation = { CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456) }
       $0.directionRoute.reverseGeocode = { _ in "Current Location" }
       $0.directionRoute.calculateWalkingRoute = { _, _ in
         WalkingRouteInfo(travelTimeString: "12 min", etaString: "11.00 ETA", distanceString: "850 m", rawTravelTime: 720, rawDistanceMeters: 850, route: nil, fallbackPolyline: nil)

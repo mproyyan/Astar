@@ -9,6 +9,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     static let walkInvitationNotification = Notification.Name("walkInvitationNotification")
     static let walkInvitationAcceptedNotification = Notification.Name("walkInvitationAcceptedNotification")
     static let walkInvitationDismissedNotification = Notification.Name("walkInvitationDismissedNotification")
+    static let journeyLogUpdateNotification = Notification.Name("journeyLogUpdateNotification")
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
 
@@ -39,6 +40,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             if granted {
                 DispatchQueue.main.async {
                     application.registerForRemoteNotifications()
+                }
+            }
+        }
+
+        // Purge legacy noisy subscriptions from Apple's CloudKit servers
+        Task {
+            let db = CKContainer.default().publicCloudDatabase
+            if let subs = try? await db.allSubscriptions() {
+                for sub in subs where sub.subscriptionID.hasPrefix("walk-session-") {
+                    if let querySub = sub as? CKQuerySubscription, querySub.notificationInfo?.alertBody != nil {
+                        try? await db.deleteSubscription(withID: sub.subscriptionID)
+                        print("🧹 [AppDelegate] Purged legacy noisy subscription: \(sub.subscriptionID)")
+                    }
                 }
             }
         }
@@ -80,6 +94,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                         object: nil,
                         userInfo: ["recordID": recordID, "receivedAt": receiveTime]
                     )
+                } else if subID.hasPrefix("journey-logs-") {
+                    NotificationCenter.default.post(
+                        name: AppDelegate.journeyLogUpdateNotification,
+                        object: nil,
+                        userInfo: ["recordID": recordID, "receivedAt": receiveTime]
+                    )
                 } else {
                     NotificationCenter.default.post(
                         name: AppDelegate.walkSessionUpdateNotification,
@@ -97,8 +117,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
     // MARK: - UNUserNotificationCenterDelegate
 
-    // Show banner even if the app is currently in the foreground
+    // Show banner even if the app is currently in the foreground, but strictly suppress noisy walk session updates
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        let content = notification.request.content
+        let body = content.body
+        let title = content.title
+
+        if body.localizedCaseInsensitiveContains("Walk session was updated") ||
+            title.localizedCaseInsensitiveContains("Walk session was updated") ||
+            body.localizedCaseInsensitiveContains("walk-session") {
+            print("🔕 [AppDelegate] Suppressed foreground banner for walk session update")
+            completionHandler([])
+            return
+        }
+
         completionHandler([.banner, .sound, .badge])
     }
 

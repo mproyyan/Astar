@@ -13,8 +13,9 @@ struct SearchBarView: View {
             Image(systemName: "magnifyingglass")
                 .font(.body.weight(.semibold))
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
 
-            Text("Search Place")
+            Text("Search Destination")
                 .font(.body)
                 .foregroundStyle(.secondary)
 
@@ -23,6 +24,7 @@ struct SearchBarView: View {
             Image(systemName: "mic")
                 .font(.body.weight(.semibold))
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
         }
         .padding(.horizontal, 16)
         .frame(height: 40)

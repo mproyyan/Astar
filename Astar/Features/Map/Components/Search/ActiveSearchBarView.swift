@@ -16,11 +16,13 @@ struct ActiveSearchBarView: View {
             Image(systemName: "magnifyingglass")
                 .font(.body.weight(.semibold))
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
 
-            TextField("Search Place", text: $searchText)
+            TextField("Search Destination", text: $searchText)
                 .font(.body)
                 .focused($isFocused)
                 .autocorrectionDisabled()
+                .accessibilityHint(Text("Search for a destination"))
 
             if !searchText.isEmpty {
                 Button {

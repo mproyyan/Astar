@@ -19,6 +19,7 @@ struct MainFeature {
     var map: MainMapFeature.State = .init()
     var path = StackState<Path.State>()
     var people: [Person] = []
+    var isPeopleLoading: Bool = false
     var isDevelopmentMode: Bool = DeveloperSettingsStorage.isDevelopmentMode
     var isShowRouteGuide: Bool = DeveloperSettingsStorage.isShowRouteGuide
     var isDoeWalkingMock: Bool = DeveloperSettingsStorage.isDoeWalkingMockEnabled
@@ -57,8 +58,8 @@ struct MainFeature {
   }
   
   @Dependency(\.usersClient) var usersClient
-  @Dependency(\.trackingClient) var trackingClient
   @Dependency(\.connectionsClient) var connectionsClient
+  @Dependency(\.trackingClient) var trackingClient
   @Dependency(\.contactPhotoClient) var contactPhotoClient
   
   var body: some Reducer<State, Action> {
@@ -170,6 +171,7 @@ struct MainFeature {
         }
 
       case .onAppear:
+        state.isPeopleLoading = true
         let currentUser = state.login.userProfile ?? UserProfileStorage.load()
         return .run { [trackingClient] send in
           // 1. Setup invitation subscription for companion
@@ -229,27 +231,34 @@ struct MainFeature {
       case .refreshPeople:
         return .run { [currentUser = state.login.userProfile, contactPhotoClient] send in
           do {
-            let profiles = try await usersClient.fetchAllUsers()
+            guard let profile = UserProfileStorage.load() else {
+              await send(.fetchPeopleResponse(.success([])))
+              return
+            }
+            let connectionProfiles = try await connectionsClient.fetchConnections(profile.recordID)
+            let mutualProfiles = connectionProfiles.filter { $0.connection.status == "mutual" }
             var people: [Person] = []
-            for profile in profiles.filter({ $0.appleUserId != currentUser?.appleUserId }) {
-              var avatar = profile.avatarData
+            for cp in mutualProfiles {
+              let partnerProfile = cp.partnerProfile
+              guard partnerProfile.appleUserId != currentUser?.appleUserId else { continue }
+              var avatar = partnerProfile.avatarData
               if avatar == nil {
-                avatar = await contactPhotoClient.fetchContactPhotoByEmail(profile.email)
+                avatar = await ContactPhotoClient.liveValue.fetchContactPhotoByEmail(partnerProfile.email)
               }
               if avatar == nil {
-                avatar = await contactPhotoClient.fetchContactPhotoByName(profile.name)
+                avatar = await ContactPhotoClient.liveValue.fetchContactPhotoByName(partnerProfile.name)
               }
-              let avatarImageName = profile.name == "Awan" ? "AwanAvatar" : nil
-              people.append(Person(
-                id: Person.stableID(appleUserId: profile.appleUserId, cloudKitUserId: profile.cloudKitUserId),
-                name: profile.name,
-                status: Self.formatStatus(profile.status),
-                appleUserId: profile.appleUserId,
-                cloudKitUserId: profile.cloudKitUserId,
-                email: profile.email,
-                avatarData: avatar,
-                avatarImageName: avatarImageName
-              ))
+              let avatarImageName = partnerProfile.name == "Awan" ? "AwanAvatar" : nil
+                people.append(Person(
+                    id: Person.stableID(appleUserId: partnerProfile.appleUserId, cloudKitUserId: partnerProfile.cloudKitUserId),
+                    name: partnerProfile.name,
+                    status: Self.formatStatus(partnerProfile.status),
+                    appleUserId: partnerProfile.appleUserId,
+                    cloudKitUserId: partnerProfile.cloudKitUserId,
+                    email: partnerProfile.email,
+                    avatarData: avatar,
+                    avatarImageName: avatarImageName
+                ))
             }
             await send(.fetchPeopleResponse(.success(people)))
           } catch {
@@ -284,6 +293,7 @@ struct MainFeature {
           state.people = updatedPeople.filter { $0.id != Person.mockDoeID }
         }
         state.map.people = state.people
+        state.isPeopleLoading = false
         return .none
         
       case .fetchPeopleResponse(.failure):
@@ -294,6 +304,7 @@ struct MainFeature {
           state.people = []
         }
         state.map.people = state.people
+        state.isPeopleLoading = false
         return .none
         
       case .profileButtonTapped:

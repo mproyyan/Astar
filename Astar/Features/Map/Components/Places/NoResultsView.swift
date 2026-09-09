@@ -16,10 +16,12 @@ struct NoResultsView: View {
                 .font(.largeTitle)
                 .foregroundStyle(.secondary)
                 .padding(.top, 24)
+                .accessibilityHidden(true)
 
             Text("No Places Found")
                 .font(.headline)
                 .foregroundStyle(.primary)
+                
 
             Text("No results matching \"\(searchText)\".")
                 .font(.subheadline)
@@ -28,13 +30,17 @@ struct NoResultsView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 24)
-        .background(
-            Color(uiColor: .secondarySystemBackground),
-            in: .rect(cornerRadius: 24)
-        )
+        .background(Color(uiColor: .secondarySystemBackground, in: .rect(cornerRadius: 24))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("No Places Found. No results matching \(searchText).")
         .overlay {
             RoundedRectangle(cornerRadius: 24)
                 .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+        }
+        
+        .onAppear {
+            AccessibilityNotification.Announcement(
+                "No Places Found. No results matching \(searchText).").post()
         }
     }
 }

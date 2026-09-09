@@ -10,24 +10,88 @@ import SwiftUI
 struct WalkerCardRecentLocations: View {
     var locations: [JourneyLogEntry] = WalkerSampleData.awanLocations
 
+    var sortedLocations: [JourneyLogEntry] {
+        var current: [JourneyLogEntry] = []
+        var checkpoints: [JourneyLogEntry] = []
+        var starts: [JourneyLogEntry] = []
+
+        for loc in locations {
+            switch loc.entryType {
+            case .currentLocation, .destination:
+                current.append(loc)
+            case .checkpoint:
+                checkpoints.append(loc)
+            case .start:
+                starts.append(loc)
+            }
+        }
+
+        var effectiveTop: [JourneyLogEntry] = []
+        var demotedCheckpoints: [JourneyLogEntry] = []
+
+        if let topEntry = current.first {
+            effectiveTop = [topEntry]
+            for extra in current.dropFirst() {
+                let cleanLandmark = extra.landmarkName
+                    .replacingOccurrences(of: "Near ", with: "")
+                    .replacingOccurrences(of: "Passed ", with: "")
+                let newTitle = "Passed \(cleanLandmark)"
+                demotedCheckpoints.append(
+                    JourneyLogEntry(
+                        id: extra.id,
+                        landmarkName: newTitle,
+                        address: extra.address,
+                        timeString: extra.timeString,
+                        iconName: extra.iconName == "location.fill" ? "figure.walk" : extra.iconName,
+                        entryType: .checkpoint,
+                        coordinate: extra.coordinate
+                    )
+                )
+            }
+        }
+
+        let sanitizedCheckpoints = (demotedCheckpoints + checkpoints).map { cp -> JourneyLogEntry in
+            if cp.landmarkName.hasPrefix("Near ") {
+                let cleanLandmark = cp.landmarkName.replacingOccurrences(of: "Near ", with: "")
+                return JourneyLogEntry(
+                    id: cp.id,
+                    landmarkName: "Passed \(cleanLandmark)",
+                    address: cp.address,
+                    timeString: cp.timeString,
+                    iconName: cp.iconName == "location.fill" ? "figure.walk" : cp.iconName,
+                    entryType: .checkpoint,
+                    coordinate: cp.coordinate
+                )
+            }
+            return cp
+        }
+
+        let effectiveStarts = starts.prefix(1)
+
+        return effectiveTop + sanitizedCheckpoints + effectiveStarts
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Recent locations")
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.primary)
 
-            VStack(spacing: 0) {
-                ForEach(locations.enumerated(), id: \.element.id) { index, entry in
-                    WalkerRecentLocationRow(
-                        entry: entry,
-                        isFirst: index == 0,
-                        isLast: index == locations.count - 1
-                    )
+            let entries = sortedLocations
+            if !entries.isEmpty {
+                VStack(spacing: 0) {
+                    ForEach(entries.enumerated(), id: \.element.id) { index, entry in
+                        WalkerRecentLocationRow(
+                            entry: entry,
+                            isFirst: index == 0,
+                            isLast: index == entries.count - 1
+                        )
 
-                    if index < locations.count - 1 {
-                        Divider()
-                            .padding(.leading, 52)
-                            .opacity(0.5)
+                        if index < entries.count - 1 {
+                            Divider()
+                                .padding(.leading, 52)
+                                .opacity(0.5)
+                        }
                     }
                 }
             }
@@ -58,7 +122,7 @@ struct WalkerRecentLocationRow: View {
         case .destination:
             return .green
         case .checkpoint:
-            return Color(uiColor: .secondaryLabel)
+            return SavedPlace.categoryColor(for: entry.iconName)
         }
     }
 

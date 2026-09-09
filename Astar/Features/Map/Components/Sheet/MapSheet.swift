@@ -140,8 +140,8 @@ struct MapSheet: View {
                         .transition(.opacity)
                     } else if walkerStore.isDestinationReached {
                         WalkerCardReachDestination(
-                            walkerName: walkerStore.walker.name == "Awan" ? "\(walkerStore.walker.name) Mendung" : walkerStore.walker.name,
-                            avatarImageName: walkerStore.walker.name == "Awan" ? "AwanAvatar" : "\(walkerStore.walker.name)Avatar",
+                            walkerName: walkerStore.walker.name,
+                            avatarImageName: "\(walkerStore.walker.name)Avatar",
                             onDismiss: {
                                 walkerStore.send(.dismissWalkerTapped)
                                 withAnimation(.easeInOut(duration: 0.25)) {
@@ -224,7 +224,7 @@ struct MapSheet: View {
                                     originIconName: walkerStore.originIconName,
                                     destinationPlaceName: walkerStore.destinationPlaceName,
                                     destinationIconName: walkerStore.destinationIconName,
-                                    recentLocations: walkerStore.journeyLogEntries.isEmpty ? WalkerSampleData.awanLocations : walkerStore.journeyLogEntries
+                                    recentLocations: walkerStore.journeyLogEntries
                                 ),
                                 initialTracked: walkerStore.activeParticipantID != nil,
                                 onDismiss: {
@@ -252,6 +252,7 @@ struct MapSheet: View {
                             .id(walkerStore.activeParticipantID != nil)
                             .padding(.horizontal, 16)
                             .padding(.top, 12)
+                            .task { walkerStore.send(.onAppear) }
                             .transition(.opacity)
                     }
                 }
@@ -282,12 +283,16 @@ struct MapSheet: View {
                     },
                     onSavedPlacesHeaderTapped: {
                         store.send(.savedPlacesHeaderTapped)
+                    },
+                    onProfileTapped: {
+                        store.send(.profileButtonTapped)
                     }
                 )
                 .transition(.opacity)
             }
         }
         .scrollDismissesKeyboard(.interactively)
+        
     }
 }
 

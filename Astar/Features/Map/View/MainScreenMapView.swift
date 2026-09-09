@@ -69,6 +69,7 @@ struct MainScreenMapView: View {
         VStack(spacing: 12) {
           // North Compass
           MapCompass(scope: mapScope)
+                .accessibilityLabel("Map Compass")
 
           // Recenter Button under North Compass
           Button {
@@ -91,11 +92,13 @@ struct MainScreenMapView: View {
           .glassEffect(.regular.interactive(), in: .circle)
           .contentShape(Circle())
           .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
-          .accessibilityLabel("Re-center to user location")
+          .accessibilityLabel("Recenter Map")
+          .accessibilityValue(isFarFromUser ? "Map scrolled away" : "Centered")
         }
         .padding(.trailing, 16)
         .padding(.top, 60)
       }
+        
       .sheet(isPresented: isSheetPresented) {
         MapSheet(
           store: store,
@@ -109,6 +112,7 @@ struct MainScreenMapView: View {
         .presentationBackgroundInteraction(.enabled(upThrough: .large))
         .presentationCornerRadius(34)
         .interactiveDismissDisabled(true)
+        
       }
       .task {
         store.send(.map(.onAppear))

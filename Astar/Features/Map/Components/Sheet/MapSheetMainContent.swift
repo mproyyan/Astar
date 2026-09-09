@@ -15,9 +15,11 @@ struct MapSheetMainContent: View {
     var onSelectPlace: ((SavedPlace) -> Void)? = nil
     var onSelectPerson: ((Person) -> Void)? = nil
     var onSavedPlacesHeaderTapped: (() -> Void)? = nil
+    var onProfileTapped: (() -> Void)? = nil
 
     private var people: [Person] { store.people }
     private var savedPlaces: [SavedPlace] { store.map.savedPlaces }
+    private var isPeopleLoading: Bool { store.isPeopleLoading }
 
     var body: some View {
         WithPerceptionTracking {
@@ -33,7 +35,12 @@ struct MapSheetMainContent: View {
             .padding(.top, 8)
 
             VStack(spacing: 32) {
-                PeopleSection(people: people, onSelectPerson: onSelectPerson)
+                PeopleSection(
+                    people: people,
+                    isLoading: isPeopleLoading,
+                    onSelectPerson: onSelectPerson,
+                    onProfileTapped: onProfileTapped
+                )
 
                 SavedSection(
                     savedPlaces: savedPlaces,

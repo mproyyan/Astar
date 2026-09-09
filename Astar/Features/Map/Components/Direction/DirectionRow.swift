@@ -22,6 +22,7 @@ struct DirectionRow: View {
                         .foregroundStyle(.white)
                 }
                 .frame(width: 40, height: 40)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(place.name)
@@ -35,6 +36,7 @@ struct DirectionRow: View {
                         .lineLimit(1)
                 }
             }
+            .accessibilityElement(children: .combine)
 
             Spacer(minLength: 8)
 
