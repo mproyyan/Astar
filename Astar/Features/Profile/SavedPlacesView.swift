@@ -16,7 +16,7 @@ struct SavedPlacesView: View {
     var body: some View {
         WithPerceptionTracking {
             ZStack {
-                Color(red: 0.95, green: 0.95, blue: 0.97)
+                Color(.systemGroupedBackground)
                     .ignoresSafeArea()
 
                 VStack(alignment: .leading, spacing: 0) {
@@ -132,7 +132,7 @@ private struct SavedPlaceGroupedRow: View {
                             if !place.subtitle.isEmpty && place.subtitle.lowercased() != place.name.lowercased() {
                                 Text(place.subtitle)
                                     .font(.caption2)
-                                    .foregroundStyle(Color.gray)
+                                    .foregroundStyle(.secondary)
                                     .lineLimit(1)
                             }
                         } else {
@@ -294,7 +294,10 @@ private struct PinPlaceSheet: View {
                                         }
                                     }
                                 }
-                                .background(Color.white, in: .rect(cornerRadius: 18))
+                                .background(
+                                    Color(uiColor: .secondarySystemBackground),
+                                    in: .rect(cornerRadius: 24)
+                                )
                                 .overlay {
                                     RoundedRectangle(cornerRadius: 18)
                                         .stroke(Color.primary.opacity(0.06), lineWidth: 1)
@@ -353,7 +356,10 @@ private struct PinPlaceSheet: View {
                             .buttonStyle(.plain)
                         }
                         .padding(16)
-                        .background(Color.white, in: .rect(cornerRadius: 18))
+                        .background(
+                            Color(uiColor: .secondarySystemBackground),
+                            in: .rect(cornerRadius: 24)
+                        )
                         .overlay {
                             RoundedRectangle(cornerRadius: 18)
                                 .stroke(Color.primary.opacity(0.06), lineWidth: 1)
@@ -365,7 +371,7 @@ private struct PinPlaceSheet: View {
                     }
                 }
             }
-            .background(Color(red: 0.96, green: 0.96, blue: 0.98).ignoresSafeArea())
+            .background(.background)
             .navigationTitle("Pin Place")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -394,7 +400,7 @@ private struct PinPlaceSheet: View {
                                 .foregroundStyle(
                                     store.hasChanges
                                         ? Color(red: 0.00, green: 0.55, blue: 0.95)
-                                        : Color.gray.opacity(0.4)
+                                        : Color(uiColor: .tertiaryLabel)
                                 )
                         }
                         .disabled(!store.hasChanges)

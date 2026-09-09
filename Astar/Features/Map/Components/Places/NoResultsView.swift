@@ -30,7 +30,7 @@ struct NoResultsView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 24)
-        .background(.white, in: .rect(cornerRadius: 24))
+        .background(Color(uiColor: .secondarySystemBackground, in: .rect(cornerRadius: 24))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("No Places Found. No results matching \(searchText).")
         .overlay {

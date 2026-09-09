@@ -159,7 +159,7 @@ struct WalkerCardWalking: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
     }
-    .background(Color(red: 0.95, green: 0.95, blue: 0.97))
+    .background(.background)
 }
 
 #Preview("Tracked - Available") {
@@ -168,7 +168,7 @@ struct WalkerCardWalking: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
     }
-    .background(Color(red: 0.95, green: 0.95, blue: 0.97))
+    .background(.background)
 }
 
 #Preview("Tracked - Not Moving") {
@@ -177,7 +177,7 @@ struct WalkerCardWalking: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
     }
-    .background(Color(red: 0.95, green: 0.95, blue: 0.97))
+    .background(.background)
 }
 
 #Preview("Tracked - No Response") {
@@ -186,5 +186,5 @@ struct WalkerCardWalking: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
     }
-    .background(Color(red: 0.95, green: 0.95, blue: 0.97))
+    .background(.background)
 }

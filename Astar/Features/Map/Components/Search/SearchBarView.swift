@@ -28,7 +28,7 @@ struct SearchBarView: View {
         }
         .padding(.horizontal, 16)
         .frame(height: 40)
-        .background(.white, in: .capsule)
+        .background(.background, in: .capsule)
         .overlay {
             Capsule()
                 .stroke(Color.primary.opacity(0.08), lineWidth: 1)

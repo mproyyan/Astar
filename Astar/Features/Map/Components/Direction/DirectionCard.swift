@@ -126,7 +126,10 @@ struct DirectionCard: View {
                 .padding(.horizontal, 2)
             }
             .padding(.horizontal, 14)
-            .background(.white, in: .rect(cornerRadius: 24))
+            .background(
+                Color(uiColor: .secondarySystemBackground),
+                in: .rect(cornerRadius: 24)
+            )
             .overlay {
                 RoundedRectangle(cornerRadius: 24)
                     .stroke(Color.primary.opacity(0.06), lineWidth: 1)
@@ -147,5 +150,5 @@ struct DirectionCard: View {
         onCancel: {}
     )
     .padding()
-    .background(Color(red: 0.95, green: 0.95, blue: 0.97))
+    .background(.background)
 }

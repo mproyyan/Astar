@@ -127,7 +127,10 @@ struct DirectionProgress: View {
                             .foregroundStyle(.primary)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
-                            .background(Color.primary.opacity(0.06), in: .capsule)
+                            .background(
+                                Color(uiColor: .secondarySystemFill),
+                                in: .capsule
+                            )
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Journey Log")
@@ -365,11 +368,11 @@ struct DirectionPersonAvatar: View {
         isDone: false
     )
     .padding()
-    .background(Color(red: 0.95, green: 0.95, blue: 0.97))
+    .background(.background)
 }
 
 #Preview("Done") {
     DirectionProgress(isDone: true)
         .padding()
-        .background(Color(red: 0.95, green: 0.95, blue: 0.97))
+        .background(.background)
 }
