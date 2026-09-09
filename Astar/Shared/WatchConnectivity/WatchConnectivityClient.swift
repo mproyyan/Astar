@@ -22,6 +22,24 @@ public enum WatchConnectivityClientError: Error {
 extension WatchConnectivityClient: DependencyKey {
     public static let liveValue = WatchConnectivityClient.live()
 
+    public static let testValue: Self = Self(
+        isSupported: { false },
+        activateSession: {},
+        updateState: { _ in },
+        sendMessage: { _ in },
+        stateStream: { .finished },
+        messageStream: { .finished }
+    )
+
+    public static let previewValue: Self = Self(
+        isSupported: { false },
+        activateSession: {},
+        updateState: { _ in },
+        sendMessage: { _ in },
+        stateStream: { .finished },
+        messageStream: { .finished }
+    )
+
     public static func live() -> Self {
         final class Delegate: NSObject, WCSessionDelegate, Sendable {
             let stateContinuation: AsyncStream<WatchDirectionState>.Continuation

@@ -44,6 +44,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             }
         }
 
+        // Purge legacy noisy subscriptions from Apple's CloudKit servers
+        Task {
+            let db = CKContainer.default().publicCloudDatabase
+            if let subs = try? await db.allSubscriptions() {
+                for sub in subs where sub.subscriptionID.hasPrefix("walk-session-") {
+                    if let querySub = sub as? CKQuerySubscription, querySub.notificationInfo?.alertBody != nil {
+                        try? await db.deleteSubscription(withID: sub.subscriptionID)
+                        print("🧹 [AppDelegate] Purged legacy noisy subscription: \(sub.subscriptionID)")
+                    }
+                }
+            }
+        }
+
         return true
     }
 
@@ -104,8 +117,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
 
     // MARK: - UNUserNotificationCenterDelegate
 
-    // Show banner even if the app is currently in the foreground
+    // Show banner even if the app is currently in the foreground, but strictly suppress noisy walk session updates
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        let content = notification.request.content
+        let body = content.body
+        let title = content.title
+
+        if body.localizedCaseInsensitiveContains("Walk session was updated") ||
+            title.localizedCaseInsensitiveContains("Walk session was updated") ||
+            body.localizedCaseInsensitiveContains("walk-session") {
+            print("🔕 [AppDelegate] Suppressed foreground banner for walk session update")
+            completionHandler([])
+            return
+        }
+
         completionHandler([.banner, .sound, .badge])
     }
 

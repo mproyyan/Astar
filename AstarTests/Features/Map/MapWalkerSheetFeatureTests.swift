@@ -398,6 +398,21 @@ final class MapWalkerSheetFeatureTests: XCTestCase {
             $0.map.trackedWalkerDestination = CLLocationCoordinate2D(latitude: -6.1950, longitude: 106.8200)
             $0.map.trackedWalkerLocation = CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
             $0.map.hasFittedTrackedWalker = false
+            $0.map.trackedWalkerAttributes = TrailWalkAttributes(
+                sessionID: "session-888",
+                walkerName: "Dimas Prihady",
+                originTitle: "Starting Point",
+                destinationTitle: "Grand Indonesia"
+            )
+            $0.map.trackedWalkerLiveActivityState = TrailWalkAttributes.ContentState(
+                step: "Walking",
+                progressPercentage: 0.0,
+                remainingDistanceMeters: 650.0,
+                currentLandmark: "Grand Indonesia",
+                estimatedArrivalDate: Date(timeIntervalSince1970: 6 * 60),
+                expectedTravelTime: "6 min",
+                isApproaching: false
+            )
         }
     }
 

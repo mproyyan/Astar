@@ -365,17 +365,8 @@ extension TrackingClient: DependencyKey {
                 return
             }
             
-            print("[TrackingClient] Checking existing subscription: \(subscriptionID)")
-            do {
-                _ = try await db.subscription(for: subscriptionID)
-                print("Already subscribed to session: \(sessionID)")
-                return
-            } catch let error as CKError where error.code == .unknownItem {
-                print("[TrackingClient] Subscription missing, creating new one...")
-            } catch {
-                print("[TrackingClient] Subscription check error: \(error.localizedDescription)")
-                throw error
-            }
+            // Always delete previous subscription first to guarantee old alertBody is replaced
+            try? await db.deleteSubscription(withID: subscriptionID)
             
             let sessionRecordID = CKRecord.ID(recordName: sessionID)
             let predicate = NSPredicate(format: "recordID == %@", sessionRecordID)
@@ -389,9 +380,6 @@ extension TrackingClient: DependencyKey {
             
             let info = CKSubscription.NotificationInfo()
             info.shouldSendContentAvailable = true
-            info.alertBody = "Walk session was updated."
-            info.soundName = "default"
-            info.category = "WALK_INVITATION"
             info.desiredKeys = ["status", "lastPingAt"]
             
             subscription.notificationInfo = info
@@ -631,7 +619,28 @@ extension TrackingClient: DependencyKey {
         }
     )
     
-    static let testValue = Self()
+    static let testValue = Self(
+        startWalkSession: { _, _, _, _, _, _ in
+            WalkSession(id: "test", walkerRef: "w", status: "active", destinationName: "dest", destinationLatitude: 0, destinationLongitude: 0, routePolyline: nil, startedAt: Date(), endedAt: nil, currentCoordinate: nil, lastPingAt: Date())
+        },
+        endWalkSession: { _ in },
+        inviteToWalkSession: { _, _ in },
+        updateParticipantStatus: { s, c, st in SessionParticipant(id: "p", sessionRef: s, companionRef: c, status: st) },
+        updateUserStatus: { _, _, _, _ in },
+        pushLocationUpdate: { _, _ in },
+        addJourneyLog: { _, _ in },
+        fetchJourneyLogs: { _ in [] },
+        subscribeToJourneyLogs: { _ in AsyncStream { $0.finish() } },
+        setSubscribeWalkSession: { _, _ in },
+        subscribeToWalkSession: { _ in AsyncStream { $0.finish() } },
+        setupInvitationSubscription: { _ in },
+        getWalkSession: { s in WalkSession(id: s, walkerRef: "w", status: "active", destinationName: "dest", destinationLatitude: 0, destinationLongitude: 0, routePolyline: nil, startedAt: Date(), endedAt: nil, currentCoordinate: nil, lastPingAt: Date()) },
+        getWalkerActiveSessionID: { _ in nil },
+        fetchSessionParticipant: { p in SessionParticipant(id: p, sessionRef: "s", companionRef: "c", status: "notDetermined") },
+        fetchSessionParticipants: { _ in [] },
+        setSubscribeSessionParticipants: { _, _ in },
+        subscribeToSessionParticipants: { _ in AsyncStream { $0.finish() } }
+    )
 }
 
 private func querySessionParticipants(sessionID: String) async throws -> [SessionParticipant] {

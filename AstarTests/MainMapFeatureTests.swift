@@ -152,6 +152,7 @@ struct MainMapFeatureTests {
   @Test
   @MainActor
   func testStartAlwaysHomeNavigation() async {
+    let now = Date(timeIntervalSince1970: 1000)
     let mockCoord = CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
     let mockRouteInfo = WalkingRouteInfo(
       travelTimeString: "15 min",
@@ -167,6 +168,7 @@ struct MainMapFeatureTests {
       MainMapFeature()
     } withDependencies: {
       $0.uuid = .incrementing
+      $0.date.now = now
       $0.locationManager.getCurrentLocation = { mockCoord }
       $0.directionRoute.reverseGeocode = { _ in "Jl. Sudirman, Central Jakarta" }
       $0.directionRoute.calculateWalkingRoute = { _, _ in mockRouteInfo }
@@ -198,6 +200,7 @@ struct MainMapFeatureTests {
       $0.lastLoggedCoordinate = mockCoord
       $0.lastLoggedStreet = "Jl. Sudirman"
       $0.lastLoggedIcon = "figure.walk"
+      $0.lastLoggedTime = now
       let streetName = "Jl. Sudirman"
       let startTimeString = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .short)
       let startEntry = JourneyLogEntry(
@@ -251,6 +254,7 @@ struct MainMapFeatureTests {
   @Test
   @MainActor
   func testStartDirectNavigationOffice() async {
+    let now = Date(timeIntervalSince1970: 1000)
     let mockCoord = CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
     let mockRouteInfo = WalkingRouteInfo(
       travelTimeString: "12 min",
@@ -266,6 +270,7 @@ struct MainMapFeatureTests {
       MainMapFeature()
     } withDependencies: {
       $0.uuid = .incrementing
+      $0.date.now = now
       $0.locationManager.getCurrentLocation = { mockCoord }
       $0.directionRoute.reverseGeocode = { _ in "Jl. M.H. Thamrin, Central Jakarta" }
       $0.directionRoute.calculateWalkingRoute = { _, _ in mockRouteInfo }
@@ -297,6 +302,7 @@ struct MainMapFeatureTests {
       $0.lastLoggedCoordinate = mockCoord
       $0.lastLoggedStreet = "Jl. M.H. Thamrin"
       $0.lastLoggedIcon = "figure.walk"
+      $0.lastLoggedTime = now
       let streetName = "Jl. M.H. Thamrin"
       let startTimeString = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .short)
       let startEntry = JourneyLogEntry(
@@ -485,6 +491,7 @@ struct MainMapFeatureTests {
       lastPingAt: Date()
     )
 
+    let now = Date(timeIntervalSince1970: 1000)
     let store = TestStore(initialState: MainMapFeature.State(
       activeWalkSessionID: nil,
       trackedWalkerLocation: currentWalkLocation,
@@ -498,7 +505,7 @@ struct MainMapFeatureTests {
     )) {
       MainMapFeature()
     } withDependencies: {
-      $0.date.now = Date(timeIntervalSince1970: 1000)
+      $0.date.now = now
       $0.directionRoute.calculateWalkingRoute = { _, _ in
         WalkingRouteInfo(travelTimeString: "8 min", etaString: "11.00 ETA", distanceString: "500 m", rawTravelTime: 480, rawDistanceMeters: 500, route: nil)
       }
@@ -509,6 +516,21 @@ struct MainMapFeatureTests {
       $0.trackedWalkerDestinationName = mockSession.destinationName
       $0.trackedWalkerDestination = CLLocationCoordinate2D(latitude: mockSession.destinationLatitude, longitude: mockSession.destinationLongitude)
       $0.hasFittedTrackedWalker = false
+      $0.trackedWalkerAttributes = TrailWalkAttributes(
+        sessionID: "mock-doe-session",
+        walkerName: "Doe",
+        originTitle: "Autograph Tower",
+        destinationTitle: "Home"
+      )
+      $0.trackedWalkerLiveActivityState = TrailWalkAttributes.ContentState(
+        step: "Walking",
+        progressPercentage: 0.0,
+        remainingDistanceMeters: 650.0,
+        currentLandmark: "Home",
+        estimatedArrivalDate: now.addingTimeInterval(6 * 60),
+        expectedTravelTime: "6 min",
+        isApproaching: false
+      )
       // Doe is already walking: retains existing location and isMockDoeWalking flag
       $0.trackedWalkerLocation = currentWalkLocation
       $0.isMockDoeWalking = true
@@ -644,6 +666,7 @@ struct MainMapFeatureTests {
   @Test
   @MainActor
   func testNavigationStartedClearsTrackedWalkerAndSetsUserWalkSession() async {
+    let now = Date(timeIntervalSince1970: 1000)
     let mockDestination = CLLocationCoordinate2D(latitude: -6.2125, longitude: 106.8166)
     let destinationPlace = SavedPlace(name: "Home", subtitle: "Bendungan Hilir, South Jakarta", iconName: "house.fill", coordinate: mockDestination)
 
@@ -660,6 +683,7 @@ struct MainMapFeatureTests {
     )) {
       MainMapFeature()
     } withDependencies: {
+      $0.date.now = now
       $0.trackingClient.endWalkSession = { _ in }
       $0.trackingClient.setSubscribeSessionParticipants = { _, _ in }
       $0.trackingClient.subscribeToSessionParticipants = { _ in
@@ -675,8 +699,9 @@ struct MainMapFeatureTests {
       $0.trackedWalkerRoute = nil
       $0.trackedWalkerDestination = nil
       $0.lastLoggedCoordinate = nil
-      $0.lastLoggedStreet = "Current Area"
+      $0.lastLoggedStreet = "Start Position"
       $0.lastLoggedIcon = "figure.walk"
+      $0.lastLoggedTime = now
     }
 
     await store.send(.sheet(.presented(.direction(.delegate(.navigationEnded))))) {
@@ -691,6 +716,7 @@ struct MainMapFeatureTests {
   @Test
   @MainActor
   func testWalkerNavigationSubscribesToAcceptedCompanionsWatching() async {
+    let now = Date(timeIntervalSince1970: 1000)
     let mockDestination = CLLocationCoordinate2D(latitude: -6.2125, longitude: 106.8166)
     let destinationPlace = SavedPlace(name: "Home", subtitle: "Bendungan Hilir", iconName: "house.fill", coordinate: mockDestination)
 
@@ -712,6 +738,7 @@ struct MainMapFeatureTests {
     )) {
       MainMapFeature()
     } withDependencies: {
+      $0.date.now = now
       $0.trackingClient.endWalkSession = { _ in }
       $0.trackingClient.setSubscribeSessionParticipants = { _, _ in }
       $0.trackingClient.subscribeToSessionParticipants = { _ in
@@ -731,8 +758,9 @@ struct MainMapFeatureTests {
     await store.send(.sheet(.presented(.direction(.delegate(.navigationStarted(sessionID: "user-session-abc")))))) {
       $0.isNavigating = true
       $0.userWalkSessionID = "user-session-abc"
-      $0.lastLoggedStreet = "Current Area"
+      $0.lastLoggedStreet = "Start Position"
       $0.lastLoggedIcon = "figure.walk"
+      $0.lastLoggedTime = now
     }
 
     // 1. Emit list with mixed statuses: only "accept" should be included
@@ -842,6 +870,7 @@ struct MainMapFeatureTests {
   @Test
   @MainActor
   func testRealWalkerTrackingStartedImmediatelySetsLocationAndRoute() async {
+    UserProfileStorage.clear()
     let now = Date(timeIntervalSince1970: 1000)
     let walkerLat = -6.2125
     let walkerLon = 106.8166
@@ -911,6 +940,9 @@ struct MainMapFeatureTests {
       $0.trackingClient.subscribeToWalkSession = { _ in
         AsyncStream { $0.finish() }
       }
+      $0.trackingClient.subscribeToJourneyLogs = { _ in
+        AsyncStream { $0.finish() }
+      }
     }
 
     await store.send(.sheet(.presented(.walker(.delegate(.trackingStarted(testPerson, testSession)))))) {
@@ -919,6 +951,21 @@ struct MainMapFeatureTests {
       $0.trackedWalkerDestination = CLLocationCoordinate2D(latitude: destLat, longitude: destLon)
       $0.trackedWalkerLocation = CLLocationCoordinate2D(latitude: walkerLat, longitude: walkerLon)
       $0.hasFittedTrackedWalker = false
+      $0.trackedWalkerAttributes = TrailWalkAttributes(
+        sessionID: "session-real-123",
+        walkerName: "Mentari",
+        originTitle: "Starting Point",
+        destinationTitle: "Grand Indonesia"
+      )
+      $0.trackedWalkerLiveActivityState = TrailWalkAttributes.ContentState(
+        step: "Walking",
+        progressPercentage: 0.0,
+        remainingDistanceMeters: 650.0,
+        currentLandmark: "Grand Indonesia",
+        estimatedArrivalDate: now.addingTimeInterval(6 * 60),
+        expectedTravelTime: "6 min",
+        isApproaching: false
+      )
     }
 
     await store.receive(.setTrackedWalkerPolyline(fallbackPoly)) {
@@ -1048,6 +1095,264 @@ struct MainMapFeatureTests {
       $0.trackedWalkerDestination = nil
       $0.trackedWalkerDestinationName = nil
     }
+  }
+
+  @Test
+  @MainActor
+  func testWalkSessionCompletedMarksWalkerSheetDestinationReachedAndEndsLiveActivity() async {
+    let now = Date(timeIntervalSince1970: 5000)
+    let walker = Person(name: "Awan", status: "Walking")
+    let initialLiveState = TrailWalkAttributes.ContentState(
+      step: "Walking along Jl. Sudirman",
+      progressPercentage: 0.8,
+      remainingDistanceMeters: 100,
+      currentLandmark: "Autograph Tower",
+      estimatedArrivalDate: now.addingTimeInterval(120),
+      expectedTravelTime: "2 min",
+      isApproaching: true
+    )
+
+    let store = TestStore(initialState: MainMapFeature.State(
+      activeWalkSessionID: "session-completed-123",
+      trackedWalkerLocation: CLLocationCoordinate2D(latitude: -6.2000, longitude: 106.8166),
+      trackedWalkerDestination: CLLocationCoordinate2D(latitude: -6.1930, longitude: 106.8220),
+      trackedWalkerDestinationName: "Autograph Tower",
+      trackedWalkerLiveActivityState: initialLiveState,
+      sheet: .walker(MapWalkerSheetFeature.State(
+        walker: walker,
+        status: "Walking",
+        isDestinationReached: false
+      ))
+    )) {
+      MainMapFeature()
+    } withDependencies: {
+      $0.date.now = now
+      $0.trackingClient.setSubscribeWalkSession = { _, _ in }
+      $0.liveActivityClient.endLiveActivity = { _, _ in }
+    }
+
+    let completedSession = WalkSession(
+      id: "session-completed-123",
+      walkerRef: "walker-123",
+      status: "completed",
+      destinationName: "Autograph Tower",
+      destinationLatitude: -6.1930,
+      destinationLongitude: 106.8220,
+      routePolyline: nil,
+      startedAt: now.addingTimeInterval(-600),
+      endedAt: now,
+      currentCoordinate: nil,
+      lastPingAt: now
+    )
+
+    await store.send(.walkSessionUpdated(completedSession)) {
+      $0.activeWalkSessionID = nil
+      $0.trackedWalkerDestination = nil
+      $0.trackedWalkerRoute = nil
+      $0.trackedWalkerPolyline = nil
+      $0.trackedWalkerLiveActivityState = TrailWalkAttributes.ContentState(
+        step: "Arrived",
+        progressPercentage: 1.0,
+        remainingDistanceMeters: 0,
+        currentLandmark: "Autograph Tower",
+        estimatedArrivalDate: now,
+        expectedTravelTime: "Arrived",
+        isApproaching: false
+      )
+      $0.trackedWalkerAttributes = nil
+      $0.sheet = .walker(MapWalkerSheetFeature.State(
+        walker: walker,
+        status: "Idle",
+        isDestinationReached: true
+      ))
+    }
+
+    await store.receive(.delegate(.companionStatusChanged(newStatus: "idle")))
+  }
+
+  @Test
+  @MainActor
+  func testWalkerCardRecentLocationsOrderTopToBottom() {
+    let start = JourneyLogEntry(
+      landmarkName: "Start Position",
+      address: "Jl. Sudirman",
+      timeString: "9:00 AM",
+      iconName: "figure.walk.motion",
+      entryType: .start
+    )
+    let cp1 = JourneyLogEntry(
+      landmarkName: "Passed Checkpoint 1",
+      address: "Jl. Sudirman",
+      timeString: "9:05 AM",
+      iconName: "figure.walk",
+      entryType: .checkpoint
+    )
+    let cp2 = JourneyLogEntry(
+      landmarkName: "Passed Checkpoint 2",
+      address: "Jl. Sudirman",
+      timeString: "9:10 AM",
+      iconName: "figure.walk",
+      entryType: .checkpoint
+    )
+    let current = JourneyLogEntry(
+      landmarkName: "Near Landmark",
+      address: "Jl. Sudirman",
+      timeString: "Now",
+      iconName: "location.fill",
+      entryType: .currentLocation
+    )
+
+    // Pass mixed array
+    let view = WalkerCardRecentLocations(locations: [start, cp1, current, cp2])
+    let sorted = view.sortedLocations
+
+    #expect(sorted.count == 4)
+    #expect(sorted[0].entryType == .currentLocation)
+    #expect(sorted[1].entryType == .checkpoint)
+    #expect(sorted[2].entryType == .checkpoint)
+    #expect(sorted[3].entryType == .start)
+  }
+
+  @Test
+  @MainActor
+  func testWalkerCardRecentLocationsSingleNearAndSanitizesHistoricalNearEntries() {
+    let start = JourneyLogEntry(
+      landmarkName: "Start Position",
+      address: "Jl. Thamrin",
+      timeString: "9:00 AM",
+      iconName: "figure.walk.motion",
+      entryType: .start
+    )
+    let oldCurrent1 = JourneyLogEntry(
+      landmarkName: "Near Landmark A",
+      address: "Jl. Thamrin",
+      timeString: "9:05 AM",
+      iconName: "location.fill",
+      entryType: .currentLocation
+    )
+    let cp1 = JourneyLogEntry(
+      landmarkName: "Near Landmark B",
+      address: "Jl. Thamrin",
+      timeString: "9:10 AM",
+      iconName: "building.fill",
+      entryType: .checkpoint
+    )
+    let latestCurrent = JourneyLogEntry(
+      landmarkName: "Near Landmark C",
+      address: "Jl. Thamrin",
+      timeString: "Now",
+      iconName: "location.fill",
+      entryType: .currentLocation
+    )
+
+    let view = WalkerCardRecentLocations(locations: [latestCurrent, oldCurrent1, cp1, start])
+    let sorted = view.sortedLocations
+
+    #expect(sorted.count == 4)
+    // Only the top item is current location and keeps "Near "
+    #expect(sorted[0].entryType == .currentLocation)
+    #expect(sorted[0].landmarkName == "Near Landmark C")
+
+    // Historical items are converted to "Passed "
+    #expect(sorted[1].entryType == .checkpoint)
+    #expect(sorted[1].landmarkName == "Passed Landmark A")
+
+    #expect(sorted[2].entryType == .checkpoint)
+    #expect(sorted[2].landmarkName == "Passed Landmark B")
+
+    #expect(sorted[3].entryType == .start)
+    #expect(sorted[3].landmarkName == "Start Position")
+  }
+
+  @Test
+  @MainActor
+  func testDismissWalkerSheetClearsLiveActivityAndDynamicIsland() async {
+    var state = MainMapFeature.State()
+    state.sheet = .walker(MapWalkerSheetFeature.State(walker: Person(name: "Awan", status: "Walking"), status: "Walking"))
+    state.activeWalkSessionID = "test-session-123"
+    state.trackedWalkerLiveActivityState = TrailWalkAttributes.ContentState(
+      step: "Arrived",
+      progressPercentage: 1.0,
+      remainingDistanceMeters: 0,
+      currentLandmark: "Home",
+      estimatedArrivalDate: Date(),
+      expectedTravelTime: "Arrived",
+      isApproaching: false
+    )
+    state.trackedWalkerAttributes = TrailWalkAttributes(
+      sessionID: "test-session-123",
+      walkerName: "Awan",
+      originTitle: "Start",
+      destinationTitle: "Home"
+    )
+
+    var endLiveActivityCalled = false
+    var endAllLiveActivitiesCalled = false
+
+    let store = TestStore(initialState: state) {
+      MainMapFeature()
+    } withDependencies: {
+      $0.liveActivityClient.endLiveActivity = { sessionID, _ in
+        if sessionID == "test-session-123" {
+          endLiveActivityCalled = true
+        }
+      }
+      $0.liveActivityClient.endAllLiveActivities = {
+        endAllLiveActivitiesCalled = true
+      }
+    }
+
+    await store.send(.sheet(.presented(.walker(.delegate(.dismissed))))) {
+      $0.sheet = nil
+      $0.trackedWalkerLiveActivityState = nil
+      $0.trackedWalkerAttributes = nil
+      $0.trackedWalkerDestination = nil
+      $0.trackedWalkerRoute = nil
+      $0.trackedWalkerPolyline = nil
+    }
+
+    #expect(endLiveActivityCalled)
+    #expect(endAllLiveActivitiesCalled)
+  }
+
+  @Test
+  @MainActor
+  func testNavigationEndedClearsNavigationStateAndDispatchesCleanup() async {
+    var state = MainMapFeature.State()
+    state.isNavigating = true
+    state.userWalkSessionID = "user-walk-123"
+    state.sheet = .direction(MapDirectionSheetFeature.State(destination: SavedPlace(name: "Home", subtitle: "Jakarta", iconName: "house.fill")))
+
+    var sessionEnded = false
+    var userStatusUpdated = false
+
+    let store = TestStore(initialState: state) {
+      MainMapFeature()
+    } withDependencies: {
+      $0.trackingClient.setSubscribeSessionParticipants = { _, _ in }
+      $0.trackingClient.endWalkSession = { sessionID in
+        if sessionID == "user-walk-123" {
+          sessionEnded = true
+        }
+      }
+      $0.trackingClient.updateUserStatus = { _, status, _, _ in
+        if status == "idle" {
+          userStatusUpdated = true
+        }
+      }
+    }
+
+    await store.send(.sheet(.presented(.direction(.delegate(.navigationEnded))))) {
+      $0.isNavigating = false
+      $0.userWalkSessionID = nil
+      $0.sheet = nil
+      $0.activeWalkSessionID = nil
+      $0.activeRoute = nil
+      $0.activePolyline = nil
+    }
+
+    #expect(sessionEnded)
+    #expect(userStatusUpdated)
   }
 }
 

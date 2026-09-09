@@ -193,7 +193,10 @@ struct MapDirectionSheetFeature {
 
         let originCoord = currentLocation ?? CLLocationCoordinate2D(latitude: -6.2088, longitude: 106.8456)
         let originAddress = state.originPlace?.subtitle ?? "Current Location"
-        let streetName = originAddress.components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces) ?? "Current Area"
+        let rawStreet = originAddress.components(separatedBy: ",").first?.trimmingCharacters(in: .whitespaces) ?? ""
+        let originName = state.originPlace?.name != "Current Location" ? (state.originPlace?.name ?? "") : ""
+        let streetCandidate = !originName.isEmpty ? originName : rawStreet
+        let streetName = (streetCandidate.isEmpty || streetCandidate == "Locating current area..." || streetCandidate == "Current Location" || streetCandidate == "Current Area") ? "Start Position" : streetCandidate
         let startTimeString = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .short)
 
         let startEntry = JourneyLogEntry(
@@ -208,7 +211,7 @@ struct MapDirectionSheetFeature {
 
         let currentEntry = JourneyLogEntry(
           id: uuid(),
-          landmarkName: "Near \(streetName)",
+          landmarkName: streetName == "Start Position" ? "Near Start Position" : "Near \(streetName)",
           address: originAddress,
           timeString: "Now",
           iconName: "location.fill",
@@ -275,22 +278,7 @@ struct MapDirectionSheetFeature {
         return .none
 
       case .endJourneyTapped, .cancelDirectionsTapped:
-        return .run { send in
-            // Clear watch state immediately so it returns to idle
-            try? await watchConnectivity.updateState(WatchDirectionState())
-
-            if let userProfile = UserProfileStorage.load() {
-
-                let userRecordID = "UserProfile_\(userProfile.appleUserId)_\(userProfile.cloudKitUserId)"
-                  .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
-
-                do {
-                    // Revert status to Idle
-                    try await trackingClient.updateUserStatus(userRecordID, "idle", nil, nil)
-                } catch { }
-            }
-            await send(.delegate(.navigationEnded))
-        }
+        return .send(.delegate(.navigationEnded))
 
       case .journeyLogTapped:
         state.mode = .journeyLog

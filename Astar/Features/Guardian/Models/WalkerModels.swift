@@ -127,21 +127,21 @@ enum WalkerSampleData {
             entryType: .currentLocation
         ),
         JourneyLogEntry(
-            landmarkName: "Near Grand Indonesia",
+            landmarkName: "Passed Grand Indonesia",
             address: "Heading toward Bundaran HI",
             timeString: "9:39 PM",
             iconName: "building.2.fill",
             entryType: .checkpoint
         ),
         JourneyLogEntry(
-            landmarkName: "UOB Plaza",
+            landmarkName: "Passed UOB Plaza",
             address: "Walking east to Jl. M.H. Thamrin",
             timeString: "9:33 PM",
             iconName: "building.fill",
             entryType: .checkpoint
         ),
         JourneyLogEntry(
-            landmarkName: "Autograph Tower",
+            landmarkName: "Start: Autograph Tower",
             address: "Started journey",
             timeString: "9:30 PM",
             iconName: "mappin.fill",
@@ -151,37 +151,37 @@ enum WalkerSampleData {
 
     static let defaultHistoryCheckpoints: [JourneyLogEntry] = [
         JourneyLogEntry(
-            landmarkName: "Destination",
+            landmarkName: "Destination: Home",
             address: "Reached destination",
             timeString: "9:45 PM",
             iconName: "house.fill",
             entryType: .destination
         ),
         JourneyLogEntry(
-            landmarkName: "Near Plaza Indonesia",
+            landmarkName: "Passed Plaza Indonesia",
             address: "Walking north on Jl. M.H. Thamrin",
             timeString: "9:45 PM",
             iconName: "building.fill",
             entryType: .checkpoint
         ),
         JourneyLogEntry(
-            landmarkName: "Near Plaza Indonesia",
+            landmarkName: "Passed Grand Indonesia",
             address: "Walking north on Jl. M.H. Thamrin",
-            timeString: "9:45 PM",
+            timeString: "9:40 PM",
             iconName: "building.fill",
             entryType: .checkpoint
         ),
         JourneyLogEntry(
-            landmarkName: "Near Plaza Indonesia",
+            landmarkName: "Passed UOB Plaza",
             address: "Walking north on Jl. M.H. Thamrin",
-            timeString: "9:45 PM",
+            timeString: "9:35 PM",
             iconName: "building.fill",
             entryType: .checkpoint
         ),
         JourneyLogEntry(
-            landmarkName: "Start position",
+            landmarkName: "Start: Autograph Tower",
             address: "Started journey",
-            timeString: "9:45 PM",
+            timeString: "9:30 PM",
             iconName: "mappin.fill",
             entryType: .start
         )
