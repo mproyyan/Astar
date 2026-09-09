@@ -30,6 +30,7 @@ struct DirectionCard: View {
                 Text("Directions")
                     .font(.title.weight(.bold))
                     .foregroundStyle(.primary)
+                    .accessibilitySortPriority(1)
 
                 Spacer()
 
@@ -41,6 +42,8 @@ struct DirectionCard: View {
                 }
                 .buttonStyle(.plain)
                 .glassEffect(.regular.interactive(), in: .circle)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityRemoveTraits(.isImage)
                 .accessibilityLabel("Cancel directions")
             }
 
@@ -75,24 +78,30 @@ struct DirectionCard: View {
                             Text("Calculating...")
                                 .font(.title3.weight(.semibold))
                                 .foregroundStyle(.secondary)
+                                .accessibilityLabel("Calculating route...")
                         } else {
                             Text(walkingRoute?.travelTimeString ?? "12 min")
                                 .font(.title3.weight(.semibold))
                                 .foregroundStyle(.primary)
+                                .accessibilityLabel("The journey duration is \(walkingRoute?.travelTimeString ?? "12 min")")
                         }
 
                         HStack(spacing: 6) {
                             Text(walkingRoute?.etaString ?? "--.-- ETA")
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
+                                .accessibilityLabel("Estimated Time Arrival is \(walkingRoute?.etaString ?? "unknown")")
 
                             Circle()
                                 .fill(Color.secondary.opacity(0.6))
                                 .frame(width: 4, height: 4)
+                                .accessibilityHidden(true)
+                                
 
                             Text(walkingRoute?.distanceString ?? destination.distance ?? "-- km")
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
+                                .accessibilityLabel("The journey distance is \(walkingRoute?.distanceString ?? "The journey distance is unavailable")")
                         }
                     }
 
@@ -109,7 +118,8 @@ struct DirectionCard: View {
                             .background(Color.green, in: .capsule)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Start navigation")
+                    .accessibilityLabel("Start journey")
+                    .accessibilityAddTraits(.isButton)
                 }
                 .padding(.top, 16)
                 .padding(.bottom, 20)

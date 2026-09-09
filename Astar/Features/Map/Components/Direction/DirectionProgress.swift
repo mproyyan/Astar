@@ -33,6 +33,8 @@ struct DirectionProgress: View {
             Text("To \(destination.name)")
                 .font(.title.weight(.bold))
                 .foregroundStyle(.primary)
+                .accessibilityLabel("To \(destination.name)")
+                .accessibilitySortPriority(1.0)
 
             VStack(alignment: .leading, spacing: 0) {
                 VStack(spacing: 16) {
@@ -43,11 +45,14 @@ struct DirectionProgress: View {
                                 .scaledToFit()
                                 .foregroundStyle(Color(red: 0.19, green: 0.82, blue: 0.35))
                                 .frame(width: 82, height: 70)
+                                .accessibilityHidden(true)
 
                             Text("You’ve reached your destination.")
                                 .font(.headline.weight(.semibold))
                                 .foregroundStyle(.primary)
                                 .multilineTextAlignment(.center)
+                                .accessibilityLabel("You’ve reached your destination.")
+                                .accessibilitySortPriority(1)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.top, 8)
@@ -56,6 +61,7 @@ struct DirectionProgress: View {
                             Text("Calculating...")
                                 .font(.title3.weight(.semibold))
                                 .foregroundStyle(.secondary)
+                                
 
                             Spacer()
 
@@ -72,12 +78,15 @@ struct DirectionProgress: View {
                                     .font(.callout)
                                     .foregroundStyle(.secondary)
                             }
+                            .accessibilityLabel("Calculating journey detail")
+                            .accessibilityHidden(true)
                         }
                     } else {
                         HStack {
                             Text(estimatedTime)
                                 .font(.title3.weight(.semibold))
                                 .foregroundStyle(.primary)
+                                .accessibilityLabel("The journey duration is \(estimatedTime)")
 
                             Spacer()
 
@@ -85,6 +94,7 @@ struct DirectionProgress: View {
                                 Text(eta)
                                     .font(.callout)
                                     .foregroundStyle(.secondary)
+                                    .accessibilityLabel("Estimated Time Arrival is \(eta)")
 
                                 Circle()
                                     .fill(Color.secondary.opacity(0.6))
@@ -93,6 +103,7 @@ struct DirectionProgress: View {
                                 Text(totalDistance)
                                     .font(.callout)
                                     .foregroundStyle(.secondary)
+                                    .accessibilityLabel("The journey distance is \(totalDistance)")
                             }
                         }
                     }
@@ -107,9 +118,11 @@ struct DirectionProgress: View {
                                     .scaledToFit()
                                     .fontWeight(.semibold)
                                     .frame(width: 24, height: 24)
+                                    .accessibilityHidden(true)
 
                                 Text("Journey Log")
                                     .font(.subheadline.weight(.semibold))
+                                    
                             }
                             .foregroundStyle(.primary)
                             .frame(maxWidth: .infinity)
@@ -118,6 +131,7 @@ struct DirectionProgress: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Journey Log")
+                        .accessibilityHint("Tap to view your journey log")
                     }
                 }
 
@@ -172,6 +186,7 @@ struct DirectionProgress: View {
                         .background(isDone ? Color.blue : Color.red, in: .capsule)
                 }
                 .buttonStyle(.plain)
+                .accessibilityHint("Tap to end your journey")
                 .accessibilityLabel(isDone ? "Done" : "End journey")
                 .padding(.top, isDone ? 16 : 8)
                 .padding(.bottom, 20)
@@ -203,6 +218,7 @@ private struct DirectionProgressHeroRowCard: View {
                         Text("0 Connected")
                             .font(.caption2.weight(.bold))
                             .foregroundStyle(Color.secondary)
+                            .accessibilityLabel("No companion watching")
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
@@ -215,6 +231,7 @@ private struct DirectionProgressHeroRowCard: View {
                         Text("\(watchingPeople.count) Connected")
                             .font(.caption2.weight(.bold))
                             .foregroundStyle(Color.green)
+                            .accessibilityLabel("\(watchingPeople.count) companion watching")
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
@@ -227,6 +244,7 @@ private struct DirectionProgressHeroRowCard: View {
                     Text("No companions have joined yet.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .accessibilityLabel("No companion watching")
                     Spacer()
                 }
                 .padding(.vertical, 4)
@@ -241,13 +259,16 @@ private struct DirectionProgressHeroRowCard: View {
                                         .fill(Color.green)
                                         .frame(width: 11, height: 11)
                                         .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                                        .accessibilityValue("active")
                                 }
 
                                 Text(person.name.split(separator: " ").first.map(String.init) ?? person.name)
                                     .font(.caption.weight(.medium))
                                     .foregroundStyle(.primary)
                                     .lineLimit(1)
+                                    .accessibilityLabel(person.name)
                             }
+                            .accessibilityElement(children: .combine)
                         }
                     }
                     .padding(.vertical, 2)
@@ -290,12 +311,14 @@ struct DirectionPersonAvatar: View {
                     .scaledToFill()
                     .frame(width: size, height: size)
                     .clipShape(Circle())
+                    .accessibilityHidden(true)
             } else if let avatarImageName = person.avatarImageName, let _ = UIImage(named: avatarImageName) {
                 Image(avatarImageName)
                     .resizable()
                     .scaledToFill()
                     .frame(width: size, height: size)
                     .clipShape(Circle())
+                    .accessibilityHidden(true)
             } else {
                 Circle()
                     .fill(Color(red: 0.77, green: 0.81, blue: 0.96))
@@ -305,6 +328,7 @@ struct DirectionPersonAvatar: View {
                             .foregroundStyle(.white)
                     }
                     .frame(width: size, height: size)
+                    .accessibilityHidden(true)
             }
         }
         .overlay {
