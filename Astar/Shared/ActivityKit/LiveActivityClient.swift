@@ -14,6 +14,7 @@ public struct LiveActivityClient: Sendable {
   public var startLiveActivity: @Sendable (TrailWalkAttributes, TrailWalkAttributes.ContentState) async throws -> Void
   public var updateLiveActivity: @Sendable (String, TrailWalkAttributes.ContentState) async -> Void
   public var endLiveActivity: @Sendable (String, TrailWalkAttributes.ContentState?) async -> Void
+  public var endAllLiveActivities: @Sendable () async -> Void
 }
 
 extension LiveActivityClient: DependencyKey {
@@ -68,6 +69,11 @@ extension LiveActivityClient: DependencyKey {
             await activity.end(nil, dismissalPolicy: .immediate)
           }
         }
+      },
+      endAllLiveActivities: {
+        for activity in Activity<TrailWalkAttributes>.activities {
+          await activity.end(nil, dismissalPolicy: .immediate)
+        }
       }
     )
   }()
@@ -75,12 +81,14 @@ extension LiveActivityClient: DependencyKey {
   public static let testValue: Self = Self(
     startLiveActivity: { _, _ in },
     updateLiveActivity: { _, _ in },
-    endLiveActivity: { _, _ in }
+    endLiveActivity: { _, _ in },
+    endAllLiveActivities: { }
   )
   public static let previewValue: Self = Self(
     startLiveActivity: { _, _ in },
     updateLiveActivity: { _, _ in },
-    endLiveActivity: { _, _ in }
+    endLiveActivity: { _, _ in },
+    endAllLiveActivities: { }
   )
 }
 

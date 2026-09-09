@@ -132,7 +132,7 @@ enum JourneyLogSampleData {
             entryType: .destination
         ),
         JourneyLogEntry(
-            landmarkName: "Near Plaza Indonesia",
+            landmarkName: "Passed Plaza Indonesia",
             address: "Jl. M.H. Thamrin No. 28-30, Central Jakarta",
             timeString: "9:45 PM",
             iconName: "figure.walk",

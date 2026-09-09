@@ -278,22 +278,7 @@ struct MapDirectionSheetFeature {
         return .none
 
       case .endJourneyTapped, .cancelDirectionsTapped:
-        return .run { send in
-            // Clear watch state immediately so it returns to idle
-            try? await watchConnectivity.updateState(WatchDirectionState())
-
-            if let userProfile = UserProfileStorage.load() {
-
-                let userRecordID = "UserProfile_\(userProfile.appleUserId)_\(userProfile.cloudKitUserId)"
-                  .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
-
-                do {
-                    // Revert status to Idle
-                    try await trackingClient.updateUserStatus(userRecordID, "idle", nil, nil)
-                } catch { }
-            }
-            await send(.delegate(.navigationEnded))
-        }
+        return .send(.delegate(.navigationEnded))
 
       case .journeyLogTapped:
         state.mode = .journeyLog

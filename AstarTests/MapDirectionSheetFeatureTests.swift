@@ -13,11 +13,21 @@ struct MapDirectionSheetFeatureTests {
     let dest = SavedPlace(name: "Dest", subtitle: "Sub", iconName: "star", coordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0))
     let store = TestStore(initialState: MapDirectionSheetFeature.State(destination: dest)) {
       MapDirectionSheetFeature()
-    } withDependencies: {
-      $0.trackingClient.updateUserStatus = { _, _, _, _ in }
     }
 
     await store.send(.cancelDirectionsTapped)
+    await store.receive(.delegate(.navigationEnded))
+  }
+
+  @Test
+  @MainActor
+  func testEndJourneyTapped() async {
+    let dest = SavedPlace(name: "Dest", subtitle: "Sub", iconName: "star", coordinate: CLLocationCoordinate2D(latitude: 0, longitude: 0))
+    let store = TestStore(initialState: MapDirectionSheetFeature.State(destination: dest)) {
+      MapDirectionSheetFeature()
+    }
+
+    await store.send(.endJourneyTapped)
     await store.receive(.delegate(.navigationEnded))
   }
 

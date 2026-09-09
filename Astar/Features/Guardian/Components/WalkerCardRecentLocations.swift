@@ -25,7 +25,50 @@ struct WalkerCardRecentLocations: View {
                 starts.append(loc)
             }
         }
-        return current + checkpoints + starts
+
+        var effectiveTop: [JourneyLogEntry] = []
+        var demotedCheckpoints: [JourneyLogEntry] = []
+
+        if let topEntry = current.first {
+            effectiveTop = [topEntry]
+            for extra in current.dropFirst() {
+                let cleanLandmark = extra.landmarkName
+                    .replacingOccurrences(of: "Near ", with: "")
+                    .replacingOccurrences(of: "Passed ", with: "")
+                let newTitle = "Passed \(cleanLandmark)"
+                demotedCheckpoints.append(
+                    JourneyLogEntry(
+                        id: extra.id,
+                        landmarkName: newTitle,
+                        address: extra.address,
+                        timeString: extra.timeString,
+                        iconName: extra.iconName == "location.fill" ? "figure.walk" : extra.iconName,
+                        entryType: .checkpoint,
+                        coordinate: extra.coordinate
+                    )
+                )
+            }
+        }
+
+        let sanitizedCheckpoints = (demotedCheckpoints + checkpoints).map { cp -> JourneyLogEntry in
+            if cp.landmarkName.hasPrefix("Near ") {
+                let cleanLandmark = cp.landmarkName.replacingOccurrences(of: "Near ", with: "")
+                return JourneyLogEntry(
+                    id: cp.id,
+                    landmarkName: "Passed \(cleanLandmark)",
+                    address: cp.address,
+                    timeString: cp.timeString,
+                    iconName: cp.iconName == "location.fill" ? "figure.walk" : cp.iconName,
+                    entryType: .checkpoint,
+                    coordinate: cp.coordinate
+                )
+            }
+            return cp
+        }
+
+        let effectiveStarts = starts.prefix(1)
+
+        return effectiveTop + sanitizedCheckpoints + effectiveStarts
     }
 
     var body: some View {

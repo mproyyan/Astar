@@ -113,6 +113,7 @@ struct MainMapFeature {
   @Dependency(\.contactPhotoClient) var contactPhotoClient
   @Dependency(\.directionRoute) var directionRoute
   @Dependency(\.liveActivityClient) var liveActivityClient
+  @Dependency(\.watchConnectivity) var watchConnectivity
   @Dependency(\.uuid) var uuid
   @Dependency(\.date.now) var now
 
@@ -219,8 +220,19 @@ struct MainMapFeature {
         return .none
 
       case .dismissWalker:
-        state.sheet = nil
-        return .none
+         let endingSessionID = state.activeWalkSessionID
+         state.sheet = nil
+         state.trackedWalkerLiveActivityState = nil
+         state.trackedWalkerAttributes = nil
+         state.trackedWalkerDestination = nil
+         state.trackedWalkerRoute = nil
+         state.trackedWalkerPolyline = nil
+         return .run { [liveActivityClient] _ in
+           if let sessionID = endingSessionID {
+             await liveActivityClient.endLiveActivity(sessionID, nil)
+           }
+           await liveActivityClient.endAllLiveActivities()
+         }
 
       case let .selectPerson(person):
         if state.isNavigating && state.userWalkSessionID != nil {
@@ -712,7 +724,7 @@ struct MainMapFeature {
             }
             return effects.isEmpty ? .none : .merge(effects)
 
-         case .navigationEnded:
+          case .navigationEnded:
             let endingSessionID = state.userWalkSessionID
             state.isNavigating = false
             state.userWalkSessionID = nil
@@ -722,7 +734,15 @@ struct MainMapFeature {
             state.sheet = nil
             
             var effects: [Effect<Action>] = [
-              .cancel(id: "WalkerSessionParticipantsStreamID")
+              .cancel(id: "WalkerSessionParticipantsStreamID"),
+              .run { [trackingClient, watchConnectivity] _ in
+                try? await watchConnectivity.updateState(WatchDirectionState())
+                if let userProfile = UserProfileStorage.load() {
+                  let userRecordID = "UserProfile_\(userProfile.appleUserId)_\(userProfile.cloudKitUserId)"
+                    .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
+                  try? await trackingClient.updateUserStatus(userRecordID, "idle", nil, nil)
+                }
+              }
             ]
             if let sid = endingSessionID {
               effects.append(
@@ -740,8 +760,19 @@ struct MainMapFeature {
          return .none
 
         case .sheet(.presented(.walker(.delegate(.dismissed)))):
+           let endingSessionID = state.activeWalkSessionID
            state.sheet = nil
-           return .none
+           state.trackedWalkerLiveActivityState = nil
+           state.trackedWalkerAttributes = nil
+           state.trackedWalkerDestination = nil
+           state.trackedWalkerRoute = nil
+           state.trackedWalkerPolyline = nil
+           return .run { [liveActivityClient] _ in
+             if let sessionID = endingSessionID {
+               await liveActivityClient.endLiveActivity(sessionID, nil)
+             }
+             await liveActivityClient.endAllLiveActivities()
+           }
 
         case let .sheet(.presented(.walker(.delegate(.trackingStarted(walker, session))))):
            // Handle joining session
@@ -1059,6 +1090,7 @@ struct MainMapFeature {
                      await liveActivityClient.endLiveActivity(sessionID, nil)
                      try? await trackingClient.setSubscribeWalkSession(sessionID, false)
                   }
+                  await liveActivityClient.endAllLiveActivities()
                   if let profile = UserProfileStorage.load() {
                      let selfRecordID = "UserProfile_\(profile.appleUserId)_\(profile.cloudKitUserId)"
                         .replacingOccurrences(of: "[^a-zA-Z0-9]", with: "_", options: .regularExpression)
