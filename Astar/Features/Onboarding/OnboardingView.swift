@@ -10,147 +10,203 @@ import ComposableArchitecture
 import AuthenticationServices
 
 private extension String {
-  var nilIfBlank: String? {
-    let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
-    return trimmed.isEmpty ? nil : trimmed
-  }
+    var nilIfBlank: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
 }
 
 struct OnboardingView: View {
-  @Bindable var store: StoreOf<OnboardingFeature>
+    @Environment(\.colorScheme) private var colorScheme
+    @Bindable var store: StoreOf<OnboardingFeature>
 
-  var body: some View {
-    VStack {
-      Spacer()
+    var body: some View {
+        VStack(spacing: 0) {
 
-      TabView(selection: $store.currentIndex.sending(\.setIndex)) {
-        ForEach(Array(store.contents.enumerated()), id: \.element.id) { index, content in
-          VStack(spacing: 24) {
-            Image(systemName: content.imageName)
-              .scaledToFit()
-              .font(.system(size: 64))
-              .foregroundColor(.accentColor)
+            // MARK: - Content
+            TabView(selection: $store.currentIndex.sending(\.setIndex)) {
+                ForEach(
+                    Array(store.contents.enumerated()),
+                    id: \.element.id
+                ) { index, content in
 
-            VStack(spacing: 16) {
-              Text(content.title)
-                .font(.title)
-                .fontWeight(.bold)
-                .multilineTextAlignment(.center)
+                    VStack(spacing: 0) {
+                        Spacer(minLength: 20)
 
-                
-                switch content.body {
-                case .paragraph(let text):
-                    Text(text)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 32)
-                    
-                case .glossary(let items):
-                    VStack (spacing: 16) {
-                        ForEach(items) { item in
-                            HStack {
-                                Text(item.term)
-                                    .font(.caption)
-                                    .foregroundStyle(.primary)
-                                    .fontWeight(.medium)
-                                    .frame(width: 100, alignment: .leading)
-                                    .multilineTextAlignment(.leading)
-                                
-                                Text(item.definition)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .multilineTextAlignment(.leading)
+                        // MARK: Icon
+                        Group {
+                            if index == 0 {
+                                Image("TrailLogo")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 120, height: 120)
+                            } else {
+                                Image(systemName: content.imageName)
+                                    .font(.system(size: 56, weight: .medium))
+                                    .foregroundStyle(.tint)
+                                    .frame(width: 120, height: 120)
                             }
                         }
+
+                        Spacer()
+                            .frame(height: 16)
+
+                        // MARK: Title
+                        Text(content.title)
+                            .font(.title2.weight(.bold))
+                            .foregroundStyle(.primary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 24)
+
+                        Spacer()
+                            .frame(height: 16)
+
+                        // MARK: Body
+                        switch content.body {
+                        case .paragraph(let text):
+                            Text(text)
+                                .font(.body)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                                .lineSpacing(3)
+                                .padding(.horizontal, 32)
+
+                        case .glossary(let items):
+                            VStack(alignment: .leading, spacing: 20) {
+                                ForEach(items) { item in
+                                    HStack(alignment: .top, spacing: 16) {
+                                        Text(item.term)
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(.primary)
+                                            .frame(
+                                                width: 104,
+                                                alignment: .leading
+                                            )
+
+                                        Text(item.definition)
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                            .multilineTextAlignment(.leading)
+                                            .frame(
+                                                maxWidth: .infinity,
+                                                alignment: .leading
+                                            )
+                                    }
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 28)
+                        }
+
+                        Spacer()
                     }
-                    .padding(.horizontal, 32)
+                    .tag(index)
                 }
             }
-          }
-          .tag(index)
-        }
-      }
-      .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-      .frame(height: 400)
+            .tabViewStyle(.page(indexDisplayMode: .never))
 
-      HStack(spacing: 8) {
-        ForEach(0..<store.contents.count, id: \.self) { index in
-          Circle()
-            .fill(index == store.currentIndex ? Color.primary : Color.secondary.opacity(0.3))
-            .frame(width: 8, height: 8)
-            .animation(.easeInOut, value: store.currentIndex)
-        }
-      }
-      .padding(.top, 16)
-
-      Spacer()
-
-      if let errorMessage = store.login.errorMessage {
-        Text(errorMessage)
-          .font(.caption)
-          .foregroundStyle(.red)
-          .multilineTextAlignment(.center)
-          .padding(.horizontal, 24)
-          .padding(.bottom, 8)
-      }
-
-      if store.login.isLoading {
-        HStack(spacing: 12) {
-          ProgressView()
-            .tint(.white)
-          Text("Signing in...")
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.white)
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 50)
-        .background(Color.black)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .padding(.horizontal, 24)
-        .padding(.bottom, 40)
-      } else {
-        SignInWithAppleButton(
-          .signIn,
-          onRequest: { request in
-            request.requestedScopes = [.fullName, .email]
-          },
-          onCompletion: { result in
-            switch result {
-            case .success(let authorization):
-              if let credential = authorization.credential as? ASAuthorizationAppleIDCredential {
-                let formatter = PersonNameComponentsFormatter()
-                let payload = AppleSignInCredential(
-                  appleUserId: credential.user,
-                  name: credential.fullName.map(formatter.string(from:))?.nilIfBlank,
-                  email: credential.email?.nilIfBlank
-                )
-                store.send(.login(.appleSignInCompleted(payload)))
-              }
-            case .failure(let error):
-              print("Sign in with Apple failed: \(error.localizedDescription)")
+            // MARK: - Page Indicator
+            HStack(spacing: 8) {
+                ForEach(
+                    0..<store.contents.count,
+                    id: \.self
+                ) { index in
+                    Circle()
+                        .fill(
+                            index == store.currentIndex
+                            ? Color.primary
+                            : Color.secondary.opacity(0.3)
+                        )
+                        .frame(width: 8, height: 8)
+                }
             }
-          }
-        )
-        .signInWithAppleButtonStyle(.black)
-        .frame(height: 50)
-        .padding(.horizontal, 24)
-        .padding(.bottom, 40)
-      }
+            .padding(.bottom, 28)
+
+            // MARK: - Sign in with Apple
+            if store.login.isLoading {
+                HStack(spacing: 10) {
+                    ProgressView()
+                        .tint(.white)
+
+                    Text("Signing in…")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.white)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                .background(.black)
+                .clipShape(Capsule())
+                .padding(.horizontal, 24)
+                .padding(.bottom, 32)
+
+            } else {
+                SignInWithAppleButton(
+                    .signIn,
+                    onRequest: { request in
+                        request.requestedScopes = [
+                            .fullName,
+                            .email
+                        ]
+                    },
+                    onCompletion: { result in
+                        switch result {
+                        case .success(let authorization):
+                            if let credential =
+                                authorization.credential
+                                as? ASAuthorizationAppleIDCredential {
+
+                                let formatter =
+                                    PersonNameComponentsFormatter()
+
+                                let payload = AppleSignInCredential(
+                                    appleUserId: credential.user,
+                                    name: credential.fullName
+                                        .map {
+                                            formatter.string(from: $0)
+                                        }
+                                        .flatMap(\.nilIfBlank),
+                                    email: credential.email?.nilIfBlank
+                                )
+
+                                store.send(
+                                    .login(
+                                        .appleSignInCompleted(payload)
+                                    )
+                                )
+                            }
+
+                        case .failure(let error):
+                            print(
+                                "Sign in with Apple failed: \(error.localizedDescription)"
+                            )
+                        }
+                    }
+                )
+                .signInWithAppleButtonStyle(
+                    colorScheme == .dark ? .white : .black
+                )
+                .frame(height: 50)
+                .clipShape(Capsule())
+                .padding(.horizontal, 24)
+                .padding(.bottom, 32)
+            }
+        }
+        .background(.background)
+        .onAppear {
+            store.send(.onAppear)
+        }
+        .onDisappear {
+            store.send(.onDisappear)
+        }
     }
-    .onAppear {
-      store.send(.onAppear)
-    }
-    .onDisappear {
-      store.send(.onDisappear)
-    }
-  }
 }
 
 #Preview {
-  OnboardingView(
-    store: Store(initialState: OnboardingFeature.State()) {
-      OnboardingFeature()
-    }
-  )
+    OnboardingView(
+        store: Store(
+            initialState: OnboardingFeature.State()
+        ) {
+            OnboardingFeature()
+        }
+    )
 }
