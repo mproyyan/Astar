@@ -8,6 +8,18 @@
 import ComposableArchitecture
 import Foundation
 
+/// ============================================================================
+/// 🏛️ REPOSITORY PATTERN INTERFACE (SavedPlacesRepositoryProtocol)
+/// ============================================================================
+///
+/// 💡 TEORI & ANALOGI PYTHON / COMPUTER SCIENCE:
+/// - Mengimplementasikan **Repository Pattern** dari Domain-Driven Design (DDD):
+///   Memisahkan logika bisnis dari teknologi persistence spesifik.
+/// - Protokol `SavedPlacesRepositoryProtocol` serupa dengan Abstract Base Class (ABC)
+///   di Python (`from abc import ABC, abstractmethod`).
+/// - Jika di masa depan penyimpanan dipindahkan dari `UserDefaults` ke CoreData,
+///   SwiftData, atau CloudKit, kita cukup membuat struct baru tanpa mengubah Reducer.
+/// ============================================================================
 protocol SavedPlacesRepositoryProtocol: Sendable {
     func load(for userId: String) async -> [SavedPlace]
     func save(_ places: [SavedPlace], for userId: String) async
@@ -15,6 +27,7 @@ protocol SavedPlacesRepositoryProtocol: Sendable {
     func updateLabel(id: UUID, newLabel: String, for userId: String) async -> [SavedPlace]
 }
 
+/// Implementasi Konkret berbasis UserDefaults:
 struct UserDefaultsSavedPlacesRepository: SavedPlacesRepositoryProtocol {
     init() {}
 
@@ -60,7 +73,7 @@ struct UserDefaultsSavedPlacesRepository: SavedPlacesRepositoryProtocol {
     }
 }
 
-// MARK: - TCA Dependency Key
+// MARK: - TCA Dependency Key & Service Locator
 enum SavedPlacesRepositoryKey: DependencyKey {
     static let liveValue: any SavedPlacesRepositoryProtocol = UserDefaultsSavedPlacesRepository()
 }

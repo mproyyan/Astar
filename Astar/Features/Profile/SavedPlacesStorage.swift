@@ -1,13 +1,29 @@
 import Foundation
 import CoreLocation
 
+/// ============================================================================
+/// 📍 PERSISTENT STORAGE: SAVED PLACES (Home & Office)
+/// ============================================================================
+///
+/// 💡 TEORI & ANALOGI PYTHON / COMPUTER SCIENCE:
+/// - Menerapkan **Data Access Object (DAO) / Active Record Pattern**:
+///   Menyediakan fungsi CRUD statis (`load`, `save`, `clear`) yang mengabstraksikan
+///   serialisasi JSON biner ke `UserDefaults`.
+/// - Mendukung multi-user namespace (setiap Apple User ID memiliki key database terpisah:
+///   `saved_places_<appleUserId>`).
+/// - Reaktivitas berbasis Pub/Sub: Setiap mutasi data memancarkan
+///   `NotificationCenter.default.post(name: savedPlacesDidChangeNotification)`
+///   sehingga UI yang sedang menampilkan daftar tempat favorit langsung ter-update.
+/// ============================================================================
 enum SavedPlacesStorage {
     static let defaultUserId = "default_user"
     static let savedPlacesDidChangeNotification = Notification.Name("SavedPlacesDidChangeNotification")
 
+    // ID Deterministik untuk lokasi default Home dan Office
     static let defaultHomeId = UUID(uuidString: "00000000-0000-0000-0001-000000000001")!
     static let defaultOfficeId = UUID(uuidString: "00000000-0000-0000-0001-000000000002")!
 
+    /// Nilai benih (Seed Data) awal saat aplikasi baru dipasang
     static var defaultInitialPlaces: [SavedPlace] {
         [
             SavedPlace(
@@ -38,7 +54,7 @@ enum SavedPlacesStorage {
         return defaultUserId
     }
 
-    /// Loads saved places for a specific user ID
+    /// Membaca array tempat tersimpan dari disk lokal:
     static func load(for userId: String = defaultUserId) -> [SavedPlace] {
         let rawId = userId.trimmingCharacters(in: .whitespacesAndNewlines)
         let effectiveId = rawId.isEmpty || rawId == defaultUserId ? currentEffectiveUserId : rawId
@@ -46,7 +62,7 @@ enum SavedPlacesStorage {
         guard let data = UserDefaults.standard.data(forKey: userKey),
               let places = try? JSONDecoder().decode([SavedPlace].self, from: data),
               !places.isEmpty else {
-            // Check fallback default_user key
+            // Cek data cadangan default_user jika namespace spesifik kosong
             if effectiveId != defaultUserId,
                let fallbackData = UserDefaults.standard.data(forKey: "saved_places_\(defaultUserId)"),
                let fallbackPlaces = try? JSONDecoder().decode([SavedPlace].self, from: fallbackData),
@@ -58,7 +74,7 @@ enum SavedPlacesStorage {
         return places
     }
 
-    /// Saves places array for a specific user ID
+    /// Menyimpan array tempat ke disk lokal dan memancarkan notifikasi perubahan:
     static func save(_ places: [SavedPlace], for userId: String = defaultUserId) {
         let rawId = userId.trimmingCharacters(in: .whitespacesAndNewlines)
         let effectiveId = rawId.isEmpty || rawId == defaultUserId ? currentEffectiveUserId : rawId
@@ -68,10 +84,11 @@ enum SavedPlacesStorage {
         if effectiveId != defaultUserId {
             UserDefaults.standard.set(data, forKey: "saved_places_\(defaultUserId)")
         }
+        // Kirim event agar UI merender ulang daftar lokasi tersimpan
         NotificationCenter.default.post(name: savedPlacesDidChangeNotification, object: places)
     }
 
-    /// Clears saved places for a specific user ID
+    /// Menghapus seluruh data lokasi tersimpan:
     static func clear(for userId: String = defaultUserId) {
         let rawId = userId.trimmingCharacters(in: .whitespacesAndNewlines)
         let effectiveId = rawId.isEmpty || rawId == defaultUserId ? currentEffectiveUserId : rawId

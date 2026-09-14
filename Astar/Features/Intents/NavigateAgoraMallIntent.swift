@@ -8,6 +8,9 @@
 import AppIntents
 import Foundation
 
+/// ============================================================================
+/// 🛍️ SIRI INTENT: NAVIGASI KE AGORA MALL
+/// ============================================================================
 struct NavigateAgoraMallIntent: AppIntent {
   static var title: LocalizedStringResource = "Navigate to Agora Mall"
   static var description = IntentDescription("Directly start walking navigation from your current location to Agora Mall.")
@@ -15,6 +18,7 @@ struct NavigateAgoraMallIntent: AppIntent {
 
   @MainActor
   func perform() async throws -> some IntentResult {
+    // Mengirim payload "destination": "Agora Mall" via NotificationCenter
     NotificationCenter.default.post(
       name: .startDirectNavigation,
       object: nil,

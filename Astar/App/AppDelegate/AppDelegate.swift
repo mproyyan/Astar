@@ -2,30 +2,44 @@ import UIKit
 import CloudKit
 import ComposableArchitecture
 
+/// ============================================================================
+/// 🔔 SYSTEM DELEGATE & NOTIFICATION DISPATCHER (AppDelegate)
+/// ============================================================================
+///
+/// 💡 TEORI & ANALOGI PYTHON / COMPUTER SCIENCE:
+/// - Dalam arsitektur sistem operasi, `AppDelegate` adalah jembatan callback (Hook)
+///   antara Kernel / WindowServer iOS dengan memori aplikasi kita.
+/// - Berfungsi sebagai **Event Demultiplexer / Dispatcher**:
+///   Menerima paket raw APNs (Apple Push Notification service), mengurai payload
+///   CloudKit Notification (`CKNotification`), lalu meneruskannya ke subscriber internal
+///   melalui Publisher/Subscriber pattern (`NotificationCenter`).
+/// ============================================================================
 class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterDelegate {
 
-    // We can store a reference to the global store here if needed, or pass notification info via publishers
+    // MARK: - Notification Event Keys (Pub/Sub Event Topics)
     static let walkSessionUpdateNotification = Notification.Name("walkSessionUpdateNotification")
     static let walkInvitationNotification = Notification.Name("walkInvitationNotification")
     static let walkInvitationAcceptedNotification = Notification.Name("walkInvitationAcceptedNotification")
     static let walkInvitationDismissedNotification = Notification.Name("walkInvitationDismissedNotification")
     static let journeyLogUpdateNotification = Notification.Name("journeyLogUpdateNotification")
 
+    /// Callback saat proses peluncuran aplikasi di OS selesai:
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
 
         let center = UNUserNotificationCenter.current()
         center.delegate = self
 
-        // Register Actionable Notification Category for Walk Invitations
+        // 1. Daftarkan Kategori Notifikasi Interaktif (Actionable Notifications)
+        // Pengguna dapat langsung memilih "Accompany" atau "Dismiss" dari banner pop-up tanpa membuka app
         let acceptAction = UNNotificationAction(
             identifier: "ACCEPT_WALK_ACTION",
             title: "Accompany",
-            options: [.foreground]
+            options: [.foreground] // Membuka aplikasi ke foreground saat ditekan
         )
         let dismissAction = UNNotificationAction(
             identifier: "DISMISS_WALK_ACTION",
             title: "Dismiss",
-            options: [.destructive]
+            options: [.destructive] // Ditandai warna merah
         )
         let walkCategory = UNNotificationCategory(
             identifier: "WALK_INVITATION",
@@ -35,16 +49,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         )
         center.setNotificationCategories([walkCategory])
 
-        // Request Notification Permission
+        // 2. Minta Izin Notifikasi Pengguna (Alert, Sound, Badge)
         center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
             if granted {
                 DispatchQueue.main.async {
+                    // Mendaftarkan device token ke server Apple APNs
                     application.registerForRemoteNotifications()
                 }
             }
         }
 
-        // Purge legacy noisy subscriptions from Apple's CloudKit servers
+        // 3. Housekeeping: Bersihkan subscription query lama/duplikat di server CloudKit
+        // Agar perangkat tidak menerima notifikasi berulang yang membuat bising
         Task {
             let db = CKContainer.default().publicCloudDatabase
             if let subs = try? await db.allSubscriptions() {
@@ -68,15 +84,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         print("Failed to register for remote notifications: \(error)")
     }
 
+    /// Callback saat menerima Silent Remote Notification / CloudKit Push di latar belakang (Background Fetch):
     func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable : Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
 
         let receiveTime = Date()
+        // Parsing payload JSON menjadi objek typed CloudKit notification
         guard let notification = CKNotification(fromRemoteNotificationDictionary: userInfo) else {
             print("⚠️ [AppDelegate] Received remote notification but could not parse CKNotification at \(receiveTime)")
             completionHandler(.noData)
             return
         }
 
+        // Evaluasi tipe event query CloudKit (apakah ada record dibuat atau diubah)
         if let queryNotification = notification as? CKQueryNotification,
            (queryNotification.queryNotificationReason == .recordCreated || queryNotification.queryNotificationReason == .recordUpdated) {
 
@@ -85,22 +104,25 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
                 let subID = queryNotification.subscriptionID ?? ""
                 print("📬 [AppDelegate] APNs Remote Notification received at \(receiveTime) | Reason: \(reasonStr) | SubID: \(subID) | RecordID: \(recordID.recordName)")
 
+                // Routing event berdasarkan prefix subscription ID:
                 if subID.hasPrefix("session-participants-") {
-                    // Participant status update for the walker's session - handled by walker's participant stream
                     print("ℹ️ [AppDelegate] Session participants update received for session: \(subID)")
                 } else if subID.hasPrefix("session-participant-invitation-") || recordID.recordName.hasPrefix("SessionParticipant_") {
+                    // Ada undangan pengawalan masuk untuk user ini
                     NotificationCenter.default.post(
                         name: AppDelegate.walkInvitationNotification,
                         object: nil,
                         userInfo: ["recordID": recordID, "receivedAt": receiveTime]
                     )
                 } else if subID.hasPrefix("journey-logs-") {
+                    // Ada milestone checkpoint jalan baru
                     NotificationCenter.default.post(
                         name: AppDelegate.journeyLogUpdateNotification,
                         object: nil,
                         userInfo: ["recordID": recordID, "receivedAt": receiveTime]
                     )
                 } else {
+                    // Pembaruan koordinat atau status WalkSession
                     NotificationCenter.default.post(
                         name: AppDelegate.walkSessionUpdateNotification,
                         object: nil,
@@ -115,14 +137,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
         }
     }
 
-    // MARK: - UNUserNotificationCenterDelegate
+    // MARK: - UNUserNotificationCenterDelegate (Tampilan Notifikasi Foreground)
 
-    // Show banner even if the app is currently in the foreground, but strictly suppress noisy walk session updates
+    /// Menentukan perilaku saat notifikasi tiba saat aplikasi sedang terbuka di layar:
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         let content = notification.request.content
         let body = content.body
         let title = content.title
 
+        // Redam banner jika itu sekadar update posisi walk session rutin agar tidak menutupi UI peta
         if body.localizedCaseInsensitiveContains("Walk session was updated") ||
             title.localizedCaseInsensitiveContains("Walk session was updated") ||
             body.localizedCaseInsensitiveContains("walk-session") {
@@ -131,10 +154,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
             return
         }
 
+        // Tampilkan banner, bunyikan audio, dan perbarui badge app icon
         completionHandler([.banner, .sound, .badge])
     }
 
-    // Handle user tap on notification action buttons ("Accompany" vs "Dismiss")
+    /// Menangani respons user saat mengetuk tombol aksi pada banner ("Accompany" vs "Dismiss"):
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
         let actionID = response.actionIdentifier
         let userInfo = response.notification.request.content.userInfo

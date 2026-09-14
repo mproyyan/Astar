@@ -8,6 +8,18 @@
 import ComposableArchitecture
 import Foundation
 
+/// ============================================================================
+/// 👤 PROFILE & SETTINGS REDUCER (ProfileFeature)
+/// ============================================================================
+///
+/// 💡 TEORI & ANALOGI PYTHON / COMPUTER SCIENCE:
+/// - Mengelola state akun pengguna saat ini, konfigurasi lingkungan runtime (Dev Mode),
+///   dan integrasi foto avatar lokal.
+/// - **Delegate Pattern dalam TCA**:
+///   Tipe `enum Delegate` adalah cara type-safe bagi child reducer untuk berkomunikasi
+///   ke parent reducer (`MainFeature`). Mirip dengan emitting event ke parent component
+///   di Vue/React atau callback function di Python.
+/// ============================================================================
 @Reducer
 struct ProfileFeature {
   @ObservableState
@@ -30,6 +42,7 @@ struct ProfileFeature {
     case savedPlacesUpdated([SavedPlace])
     case delegate(Delegate)
 
+    // Aksi delegasi yang dikomunikasikan ke parent (MainFeature):
     enum Delegate: Equatable {
       case signedOut
       case developmentModeChanged(Bool)
@@ -44,6 +57,7 @@ struct ProfileFeature {
   var body: some Reducer<State, Action> {
     Reduce { state, action in
       switch action {
+      // 1. Saat layar Profil muncul, ambil foto kontak lokal Me Card secara asinkron
       case .onAppear:
         if state.userProfile == nil {
           state.userProfile = UserProfileStorage.load()
@@ -54,6 +68,7 @@ struct ProfileFeature {
           }
         }
 
+      // 2. Simpan binary foto avatar ke state dan persist ke storage
       case let .avatarLoaded(avatar):
         if var profile = state.userProfile {
           profile.avatarData = avatar
@@ -62,10 +77,12 @@ struct ProfileFeature {
         }
         return .none
 
+      // 3. Hapus sesi lokal dan beritahu parent untuk mereset navigasi ke Onboarding
       case .signOutButtonTapped:
         UserProfileStorage.clear()
         return .send(.delegate(.signedOut))
 
+      // 4. Pengaturan Mode Developer
       case let .setDevelopmentMode(enabled):
         state.isDevelopmentMode = enabled
         DeveloperSettingsStorage.isDevelopmentMode = enabled

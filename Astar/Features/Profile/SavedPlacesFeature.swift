@@ -11,6 +11,20 @@ import Foundation
 import MapKit
 import SwiftUI
 
+/// ============================================================================
+/// 📍 SAVED PLACES MANAGEMENT REDUCER (SavedPlacesFeature)
+/// ============================================================================
+///
+/// 💡 TEORI & ANALOGI PYTHON / COMPUTER SCIENCE:
+/// - Mengelola operasi **CRUD (Create, Read, Update, Delete)** untuk lokasi favorit pengguna.
+/// - Multi-Step Wizard Flow dimodelkan menggunakan Enum:
+///   `PinStep: .chooseLocation -> .renamePlace`.
+/// - Menjaga konsistensi data (Data Invariants):
+///   Kategori unik seperti "Home" dan "Office" hanya boleh memiliki 1 entri.
+///   Jika user memperbarui lokasi "Home", lokasi lama otomatis ditimpa (`removeAll`).
+/// - Menerapkan **Optimistic UI Updates**: State lokal di-update terlebih dahulu,
+///   lalu disimpan secara paralel via repository di latar belakang (`.merge`).
+/// ============================================================================
 @Reducer
 struct SavedPlacesFeature {
     @ObservableState
@@ -26,6 +40,8 @@ struct SavedPlacesFeature {
         var selectedPlaceForLabel: SavedPlace? = nil
         var customLabel: String = ""
         var editingPlaceId: UUID? = nil
+
+        /// Evaluasi apakah form memiliki perubahan data (Dirty Checking / Diffing)
         var hasChanges: Bool {
             guard let editingId = editingPlaceId,
                   let originalPlace = places.first(where: { $0.id == editingId }) else {
@@ -33,12 +49,10 @@ struct SavedPlacesFeature {
             }
 
             let currentLabel = customLabel.trimmingCharacters(in: .whitespacesAndNewlines)
-
             let originalLabel = (originalPlace.label ?? originalPlace.name)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
 
             let isLabelChanged = !currentLabel.isEmpty && currentLabel != originalLabel
-
             let isLocationChanged = selectedPlaceForLabel?.id != originalPlace.id
 
             return isLabelChanged || isLocationChanged
@@ -108,6 +122,7 @@ struct SavedPlacesFeature {
     var body: some Reducer<State, Action> {
         Reduce { state, action in
             switch action {
+            // 1. Muat data dari repository saat layar dibuka
             case .onAppear:
                 let userId = state.userId
                 return .run { send in
@@ -119,6 +134,7 @@ struct SavedPlacesFeature {
                 state.places = places
                 return .none
 
+            // 2. Tampilkan form penambahan tempat baru
             case let .addPlaceButtonTapped(preset):
                 state.targetPresetForAdd = preset
                 state.isAddingPlace = true
@@ -131,6 +147,7 @@ struct SavedPlacesFeature {
                 state.editingPlaceId = nil
                 return .none
 
+            // 3. Ubah lokasi tempat yang sudah ada
             case let .changeLocationTapped(place, preset):
                 state.targetPresetForAdd = preset ?? (place.isHome ? .home : (place.isOffice ? .office : .custom))
                 state.isAddingPlace = true
@@ -153,6 +170,7 @@ struct SavedPlacesFeature {
                 state.isLoading = false
                 return .cancel(id: "savedPlacesSearchDebounce")
 
+            // 4. Pencarian lokasi dengan debouncing 300ms
             case let .searchQueryChanged(query):
                 state.searchQuery = query
                 let cleanQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -213,6 +231,7 @@ struct SavedPlacesFeature {
                 state.customLabel = label
                 return .none
 
+            // 5. Konfirmasi Simpan: Invariant Resolution & Persistence
             case .confirmSavePlace:
                 guard let selectedPlace = state.selectedPlaceForLabel else { return .none }
                 let labelText = state.customLabel.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -261,7 +280,7 @@ struct SavedPlacesFeature {
 
                 let targetId = state.editingPlaceId ?? selectedPlace.id
 
-                // Remove existing place if replacing Home/Office preset OR if we are updating an existing place by ID
+                // Hapus duplikasi jika menimpa Home/Office yang sudah ada sebelumnya
                 if iconName == "house.fill" || categoryLabel.lowercased() == "home" {
                     state.places.removeAll { $0.isHome || $0.id == targetId }
                 } else if iconName == "briefcase.fill" || iconName == "building.2.fill" || categoryLabel.lowercased() == "office" {
@@ -280,7 +299,7 @@ struct SavedPlacesFeature {
                     label: categoryLabel
                 )
 
-                // Place Home & Office at the beginning if appropriate
+                // Posisi Home & Office selalu diletakkan paling atas (indeks 0 dan 1)
                 if iconName == "house.fill" || categoryLabel.lowercased() == "home" {
                     state.places.insert(savedPlaceToStore, at: 0)
                 } else if iconName == "briefcase.fill" || iconName == "building.2.fill" || categoryLabel.lowercased() == "office" {
@@ -302,6 +321,7 @@ struct SavedPlacesFeature {
                 state.searchQuery = ""
                 state.searchResults = []
 
+                // Simpan ke disk dan kirim event pembaruan ke parent view
                 return .merge(
                     .send(.delegate(.savedPlacesUpdated(updatedPlaces))),
                     .run { _ in
@@ -309,6 +329,7 @@ struct SavedPlacesFeature {
                     }
                 )
 
+            // 6. Hapus lokasi berdasarkan UUID
             case let .deletePlaceById(id):
                 state.places.removeAll { $0.id == id }
                 let userId = state.userId

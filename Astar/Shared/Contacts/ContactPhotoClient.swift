@@ -10,6 +10,18 @@ import ComposableArchitecture
 import Foundation
 import UIKit
 
+/// ============================================================================
+/// 📇 LOCAL ADDRESS BOOK AVATAR RESOLVER (ContactPhotoClient)
+/// ============================================================================
+///
+/// 💡 TEORI & ANALOGI PYTHON / COMPUTER SCIENCE:
+/// - Mengakses database SQLite internal kontak Apple via framework `Contacts`.
+/// - Menerapkan algoritma pencocokan bertingkat (**Multi-Stage Fuzzy Matching**):
+///   1. Exact Email Match (Pencarian presisi O(1) indeks hash).
+///   2. Exact Full Name Match.
+///   3. Tokenized N-Gram / Substring Matching (Memecah nama menjadi token-token dan
+///      memeriksa irisannya dengan set nama depan, nama belakang, atau nama panggilan).
+/// ============================================================================
 @DependencyClient
 struct ContactPhotoClient: Sendable {
     var fetchMeCardPhoto: @Sendable (_ email: String?, _ name: String?) async -> Data?
@@ -46,6 +58,7 @@ extension ContactPhotoClient: DependencyKey {
                     return nil
                 }
 
+                // Cek izin akses privasi kontak pengguna
                 let status = CNContactStore.authorizationStatus(for: .contacts)
                 guard status == .authorized || status == .notDetermined else { return nil }
                 
@@ -66,7 +79,7 @@ extension ContactPhotoClient: DependencyKey {
                         guard granted else { return nil }
                     }
 
-                    // 1. Match by Email exact address
+                    // Tahap 1: Pencocokan Berdasarkan Alamat Email Persis
                     if let cleanEmail {
                         let predicate = CNContact.predicateForContacts(matchingEmailAddress: cleanEmail)
                         let contacts = try store.unifiedContacts(matching: predicate, keysToFetch: keysToFetch)
@@ -77,7 +90,7 @@ extension ContactPhotoClient: DependencyKey {
                         }
                     }
 
-                    // 2. Match by Name exact/full match
+                    // Tahap 2: Pencocokan Berdasarkan Nama Lengkap Persis
                     if let cleanName {
                         let predicate = CNContact.predicateForContacts(matchingName: cleanName)
                         let contacts = try store.unifiedContacts(matching: predicate, keysToFetch: keysToFetch)
@@ -91,7 +104,7 @@ extension ContactPhotoClient: DependencyKey {
                         }
                     }
 
-                    // 3. Match by Name Tokens (e.g. "Dimas" or "Prihady" or "Setyawan")
+                    // Tahap 3: Tokenized Name Matching (Fuzzy Set Intersect)
                     if let cleanName {
                         let userTokens = Set(cleanName.lowercased().split(separator: " ").filter { $0.count >= 3 }.map(String.init))
                         if !userTokens.isEmpty {
@@ -104,9 +117,10 @@ extension ContactPhotoClient: DependencyKey {
                                     let contactFamily = contact.familyName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
                                     let contactNick = contact.nickname.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
 
+                                    // Jika salah satu token cocok dengan nama depan/keluarga/panggilan
                                     if userTokens.contains(contactGiven) || userTokens.contains(contactFamily) || userTokens.contains(contactNick) {
                                         matchedPhoto = data
-                                        stop.pointee = true
+                                        stop.pointee = true // Berhenti iterasi
                                         return
                                     }
 
@@ -130,7 +144,7 @@ extension ContactPhotoClient: DependencyKey {
                         }
                     }
                 } catch {
-                    // Ignore
+                    // Ignore error gracefully
                 }
                 return nil
             },

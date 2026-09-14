@@ -1,5 +1,18 @@
 import Foundation
 
+/// ============================================================================
+/// ⌚ WATCH DATA TRANSFER OBJECTS (WatchModels)
+/// ============================================================================
+///
+/// 💡 TEORI & ANALOGI PYTHON / COMPUTER SCIENCE:
+/// - Dalam jaringan terdistribusi dan IPC (Inter-Process Communication),
+///   data yang dikirim antar-node harus diserialisasi menjadi format binary atau JSON.
+/// - Protokol `Codable` di Swift menggabungkan `Encodable` dan `Decodable` (mirip `pydantic.BaseModel`
+///   atau modul `pickle`/`json` di Python), memungkinkan struct dikonversi bolak-balik
+///   menjadi kamus raw (`[String: Any]`) untuk paket bluetooth `WCSession`.
+/// ============================================================================
+
+/// Model representasi ringkas seorang user/pendamping di layar jam tangan:
 public struct WatchPerson: Codable, Identifiable, Equatable {
     public let id: String
     public let name: String
@@ -16,6 +29,7 @@ public struct WatchPerson: Codable, Identifiable, Equatable {
     }
 }
 
+/// Telemetri navigasi rute yang disinkronkan ke layar Apple Watch:
 public struct WatchDirectionState: Codable, Equatable {
     public var destinationName: String
     public var eta: String
@@ -41,6 +55,7 @@ public struct WatchDirectionState: Codable, Equatable {
     }
 }
 
+/// Pesan interaksi cepat / SOS antara iPhone dan Apple Watch:
 public enum WatchActionMessage: Codable, Equatable {
     case areYouSafe
     case imSafe

@@ -8,12 +8,27 @@
 import ActivityKit
 import Foundation
 
+/// ============================================================================
+/// 📲 LIVE ACTIVITY & DYNAMIC ISLAND SCHEMA (TrailWalkAttributes)
+/// ============================================================================
+///
+/// 💡 TEORI & ANALOGI PYTHON / COMPUTER SCIENCE:
+/// - ActivityKit Apple memisahkan data menjadi dua domain:
+///   1. **Static Data (Attributes)**: Nilai invarian yang tidak pernah berubah
+///      selama sesi (nama tujuan, ID sesi, nama user).
+///   2. **Dynamic Data (ContentState)**: Time-series telemetry yang berubah
+///      secara kontinu (posisi jalan, jarak tersisa, persentase ETA).
+/// - Protokol `ActivityAttributes`: Kontrak type-safe antara proses utama aplikasi
+///   dengan proses ekstensi widget sistem iOS.
+/// ============================================================================
 public struct TrailWalkAttributes: ActivityAttributes, Equatable, Hashable {
+  // MARK: - Static Attributes (Data Konstan Selama Perjalanan)
   public var sessionID: String
   public var walkerName: String
   public var originTitle: String
   public var destinationTitle: String
 
+  // MARK: - Dynamic State (Data Telemetri Berubah-Ubah)
   public struct ContentState: Codable, Hashable, Equatable {
     public var step: String
     public var progressPercentage: Double
@@ -41,6 +56,7 @@ public struct TrailWalkAttributes: ActivityAttributes, Equatable, Hashable {
       self.isApproaching = isApproaching
     }
 
+    /// Format jarak ramah baca (misal: "1.2 km" atau "450 m")
     public var formattedDistanceRemaining: String {
       if remainingDistanceMeters >= 1000 {
         return String(format: "%.1f km", remainingDistanceMeters / 1000.0)
@@ -49,12 +65,14 @@ public struct TrailWalkAttributes: ActivityAttributes, Equatable, Hashable {
       }
     }
 
+    /// Format waktu estimasi tiba jam:menit
     public var formattedETA: String {
       let formatter = DateFormatter()
       formatter.dateFormat = "HH.mm"
       return formatter.string(from: estimatedArrivalDate)
     }
 
+    /// Deteksi apakah pejalan kaki sudah sampai di tujuan
     public var isArrived: Bool {
       step.lowercased() == "arrived" || progressPercentage >= 1.0 || expectedTravelTime.lowercased() == "arrived"
     }

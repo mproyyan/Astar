@@ -5,6 +5,17 @@
 //  Created by Nadia Putri Natali Lubis on 26/08/26.
 //
 
+import Foundation
+
+/// ============================================================================
+/// 👥 PROFILE & FRIENDSHIP MOCK MODELS
+/// ============================================================================
+///
+/// 💡 TEORI & ANALOGI PYTHON / COMPUTER SCIENCE:
+/// - Menyediakan fixture data dummy (mock data) untuk mempermudah render pratinjau
+///   di SwiftUI Canvas (`#Preview`) tanpa ketergantungan koneksi jaringan ke CloudKit.
+/// ============================================================================
+
 enum FriendshipStatus {
     case accepted
     case invited
@@ -18,7 +29,7 @@ struct SampleData: Identifiable {
     var status: FriendshipStatus = .accepted
 }
 
-// Sample Data
+// Sample Data Dummy untuk Mocking UI
 var sampleData: [SampleData] = [
     SampleData(id: 1, avatar: "person.crop.circle.fill", displayName: "Pandu Royyan", icloud: "panduroyyan@icloud.com", status: .invited),
     SampleData(id: 2, avatar: "person.crop.circle.fill", displayName: "Awan Mendung", icloud: "awanmendung@icloud.com"),
@@ -26,12 +37,12 @@ var sampleData: [SampleData] = [
     SampleData(id: 4, avatar: "person.crop.circle.fill", displayName: "Chusen Kamal", icloud: "chusenkamal@icloud.com")
 ]
 
-// Computed variable filtering for invited members
+// Filter daftar user yang statusnya masih berupa undangan (invited)
 var invitedPersons: [SampleData] {
     sampleData.filter { $0.status == .invited }
 }
 
-// Computed variable filtering for accepted members
+// Filter daftar teman aktif (accepted)
 var activeFriends: [SampleData] {
     sampleData.filter { $0.status == .accepted }
 }

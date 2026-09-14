@@ -3,6 +3,18 @@ import WatchConnectivity
 import ComposableArchitecture
 import Combine
 
+/// ============================================================================
+/// ⌚ WATCH CONNECTIVITY DEPENDENCY CLIENT
+/// ============================================================================
+///
+/// 💡 TEORI & ANALOGI PYTHON / COMPUTER SCIENCE:
+/// - Framework `WatchConnectivity` klasik mengandalkan callback delegate UIKit (`WCSessionDelegate`).
+/// - File ini menerapkan **Modern Stream Adapter**:
+///   Mengubah model callback kuno berbasis delegate menjadi model modern Swift Concurrency
+///   yaitu `AsyncStream`.
+/// - Mirip dengan membungkus callback WebSocket atau Socket IO menjadi async iterator di Python
+///   (`async for msg in stream:`).
+/// ============================================================================
 @DependencyClient
 public struct WatchConnectivityClient: Sendable {
     public var isSupported: @Sendable () -> Bool = { false }
@@ -41,6 +53,7 @@ extension WatchConnectivityClient: DependencyKey {
     )
 
     public static func live() -> Self {
+        // Delegate internal untuk menangkap event dari radio Bluetooth WCSession
         final class Delegate: NSObject, WCSessionDelegate, Sendable {
             let stateContinuation: AsyncStream<WatchDirectionState>.Continuation
             let messageContinuation: AsyncStream<WatchActionMessage>.Continuation
@@ -63,10 +76,12 @@ extension WatchConnectivityClient: DependencyKey {
             #if os(iOS)
             func sessionDidBecomeInactive(_ session: WCSession) { }
             func sessionDidDeactivate(_ session: WCSession) {
+                // Jika user berganti Apple Watch, sesi diaktifkan ulang
                 session.activate()
             }
             #endif
 
+            // Menerima update status teranyar yang disinkronkan di latar belakang
             func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String : Any]) {
                 if let data = applicationContext["stateData"] as? Data,
                    let state = try? JSONDecoder().decode(WatchDirectionState.self, from: data) {
@@ -74,6 +89,7 @@ extension WatchConnectivityClient: DependencyKey {
                 }
             }
 
+            // Menerima pesan instan / real-time (misal: tombol SOS ditekan di jam tangan)
             func session(_ session: WCSession, didReceiveMessage message: [String : Any]) {
                 if let data = message["messageData"] as? Data,
                    let watchAction = try? JSONDecoder().decode(WatchActionMessage.self, from: data) {
@@ -82,6 +98,7 @@ extension WatchConnectivityClient: DependencyKey {
             }
         }
 
+        // Inisialisasi saluran AsyncStream dengan pola producer-consumer
         let (stateStream, stateContinuation) = AsyncStream<WatchDirectionState>.makeStream()
         let (messageStream, messageContinuation) = AsyncStream<WatchActionMessage>.makeStream()
 
@@ -92,8 +109,6 @@ extension WatchConnectivityClient: DependencyKey {
             activateSession: {
                 guard WCSession.isSupported() else { return }
                 let session = WCSession.default
-                // Only set delegate if it's not already set to avoid replacing it unexpectedly,
-                // but for a singleton client approach, this is fine.
                 session.delegate = delegate
                 session.activate()
             },
@@ -104,8 +119,10 @@ extension WatchConnectivityClient: DependencyKey {
                     session.activate()
                 }
 
+                // Serialisasi data ke format JSON binary
                 let data = try JSONEncoder().encode(state)
                 do {
+                    // Mengirim kamus data ke Apple Watch secara hemat daya
                     try session.updateApplicationContext(["stateData": data])
                 } catch {
                     print("WCSession updateApplicationContext error: \(error)")

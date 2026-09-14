@@ -7,8 +7,21 @@
 
 import AppIntents
 
+/// ============================================================================
+/// 🎙️ VOICE SHORTCUT REGISTRATION (AppShortcutsProvider)
+/// ============================================================================
+///
+/// 💡 TEORI & ANALOGI PYTHON / COMPUTER SCIENCE:
+/// - Dalam Natural Language Processing (NLP) dan Speech Recognition,
+///   sistem memerlukan pola gramatikal / *utterance templates* untuk mengenali
+///   intensi pengguna ke fungsi yang tepat.
+/// - `AppShortcutsProvider` secara otomatis mendaftarkan frasa suara default ke Siri
+///   segera setelah aplikasi diinstal, tanpa mengharuskan pengguna membuka app Shortcuts.
+/// ============================================================================
 struct AstarAppShortcutsProvider: AppShortcutsProvider {
+  /// Daftar shortcut suara yang diekspos ke iOS:
   static var appShortcuts: [AppShortcut] {
+    // 1. Shortcut: Navigasi Cepat Pulang ke Rumah
     AppShortcut(
       intent: AlwaysHomeIntent(),
       phrases: [
@@ -20,6 +33,7 @@ struct AstarAppShortcutsProvider: AppShortcutsProvider {
       systemImageName: "house.fill"
     )
 
+    // 2. Shortcut: Navigasi Cepat ke Kantor (Autograph Tower)
     AppShortcut(
       intent: NavigateOfficeIntent(),
       phrases: [
@@ -32,6 +46,7 @@ struct AstarAppShortcutsProvider: AppShortcutsProvider {
       systemImageName: "building.2.fill"
     )
 
+    // 3. Shortcut: Navigasi Cepat ke Agora Mall
     AppShortcut(
       intent: NavigateAgoraMallIntent(),
       phrases: [

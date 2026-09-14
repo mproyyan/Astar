@@ -2,6 +2,18 @@ import ComposableArchitecture
 import CoreLocation
 import MapKit
 
+/// ============================================================================
+/// 🔍 MAP SEARCH SHEET REDUCER (MapSearchSheetFeature)
+/// ============================================================================
+///
+/// 💡 TEORI & ANALOGI PYTHON / COMPUTER SCIENCE:
+/// - Mengimplementasikan teknik **Debouncing Algorithm**:
+///   Ketika user mengetik dengan cepat di keyboard ("M" -> "Mo" -> "Mon" -> "Monas"),
+///   kita tidak ingin memicu 4 request HTTP/MapKit terpisah.
+/// - Operator `.cancellable(id: "searchDebounce", cancelInFlight: true)` secara otomatis
+///   membatalkan coroutine pencarian sebelumnya jika ada karakter baru yang masuk sebelum
+///   jeda waktu 300ms tercapai.
+/// ============================================================================
 @Reducer
 struct MapSearchSheetFeature {
   @ObservableState
@@ -44,6 +56,7 @@ struct MapSearchSheetFeature {
         state.isLoading = true
         let userLocation = state.userLocation
 
+        // Jalankan asynchronous task dengan jeda debounce 300 milidetik:
         return .run { send in
           try await clock.sleep(for: .milliseconds(300))
           let results = await placeSearch.searchPlaces(query: cleanQuery, userLocation: userLocation)
@@ -66,7 +79,7 @@ struct MapSearchSheetFeature {
         )
 
       case .selectPlace:
-        // Handled by parent
+        // Aksi pemilihan tempat didelegasikan untuk ditangani oleh parent reducer (MainMapFeature)
         return .none
 
       case .delegate:
