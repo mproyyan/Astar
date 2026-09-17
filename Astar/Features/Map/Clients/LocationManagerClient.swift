@@ -1,3 +1,26 @@
+/// ============================================================================
+/// 📍 HARDWARE SENSOR ABSTRACTION & ACTOR ISOLATION (LocationManagerClient)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Hardware Abstraction Layer (HAL)**:
+///   Wraps Apple's imperative, callback-heavy `CLLocationManager` behind a modern,
+///   clean async/await interface (`AsyncStream`), shielding features from low-level OS quirks.
+/// - **Actor Concurrency Model & Thread Confinement**:
+///   `LocationManagerActor` enforces `@MainActor` thread-affinity. In computer systems, GPS
+///   hardware delegate interrupts must be safely marshaled to the UI thread to prevent race
+///   conditions and shared memory corruption.
+/// - **Continuation-based Stream Bridge**:
+///   Translates legacy delegate callbacks (`didUpdateLocations`) into an asynchronous stream
+///   (`AsyncStream.Continuation.yield`), allowing consumers to consume GPS updates using standard
+///   `for await coordinate in client.locationUpdates()` loops (just like Python's `async for`).
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a water meter outside your house. Instead of you running out every second to read the
+///   dials (busy polling), the meter has a digital wire (HAL) that beeps an internal buzzer
+///   whenever fresh water flows (reactive stream). The actor is the master switchboard inside the
+///   house ensuring only one person reads or turns off the valve at a time.
+/// ============================================================================
 import Foundation
 import CoreLocation
 import ComposableArchitecture

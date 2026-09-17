@@ -1,3 +1,27 @@
+/// ============================================================================
+/// 🛰️ DISTRIBUTED REAL-TIME TELEMETRY CLIENT (TrackingClient)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Event-Driven Pub/Sub & Reactive Streams**:
+///   Uses Swift's `AsyncStream` and Apple Push Notification service (APNs) silent pushes
+///   to implement an asynchronous observer pattern. Changes saved on CloudKit trigger
+///   push notifications that wake the companion's device without constant heavy polling.
+/// - **Hybrid Polling & Push (Dual Sync Architecture)**:
+///   Combines an immediate APNs event-listener with a fallback background polling timer
+///   (e.g., 10s interval) to guarantee eventual consistency even if push packets are dropped
+///   or delayed by mobile cellular carrier networks.
+/// - **Optimistic Concurrency & Record Modification**:
+///   `CKModifyRecordsOperation` with `.changedKeys` policy updates only dirty attributes
+///   (e.g., coordinates, heartbeat ping timestamps) rather than overwriting whole rows,
+///   preventing write conflicts across distributed clients.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Imagine an air traffic controller radar tracking a flight. The aircraft's transponder
+///   pings its GPS coordinates periodically (push location update). If the beacon is lost in a
+///   cloud or tunnel, the radar controller polls the tower periodically (fallback poll)
+///   to ensure the plane's flight route and safety checkpoints are always accounted for.
+/// ============================================================================
 import CloudKit
 import ComposableArchitecture
 import Foundation

@@ -1,3 +1,14 @@
+/// ============================================================================
+/// 🔘 USER PROFILE NAVIGATION BUTTON (ProfileButton)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Floating Action Button (FAB) & Entry Point**:
+///   Provides an accessible, glass-styled circular button for opening settings and user identity.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a hotel room master control panel button labeled "Concierge / Account Services".
+/// ============================================================================
 //
 //  ProfileButton.swift
 //  Astar

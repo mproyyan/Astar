@@ -1,3 +1,16 @@
+/// ============================================================================
+/// 🛸 FLOATING OVERLAY COORDINATOR (FloatingDynamicIslandOverlay)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Z-Index Layering & Non-Intrusive Overlays**:
+///   Positions floating controls above MapKit viewport while letting unhandled touch events pass
+///   through to underlying map gesture recognizers.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a floating picture-in-picture video window on your desktop monitor that stays pinned
+///   to the corner while you work on documents underneath.
+/// ============================================================================
 //
 //  FloatingDynamicIslandOverlay.swift
 //  Astar

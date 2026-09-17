@@ -1,3 +1,16 @@
+/// ============================================================================
+/// 🚶 ACTIVE NAVIGATION PROGRESS CARD (DirectionProgress)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Active Telemetry Broadcast Dashboard**:
+///   Shows live trip metrics (elapsed time, distance remaining, ETA) while publishing location
+///   beacons to companions, plus controls to finish or abort the journey.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a ship's bridge navigation helm displaying current cruising speed, nautical miles to
+///   port, and radio contact status with harbor escort vessels.
+/// ============================================================================
 //
 //  DirectionProgress.swift
 //  Astar

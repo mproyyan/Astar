@@ -1,3 +1,18 @@
+/// ============================================================================
+/// 👥 TRUSTED PERSON DIRECTORY VIEW (TrustedPersonView)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Partitioned Collection Rendering**:
+///   Segregates a single relational dataset into two logical partitions: Active Connections
+///   (mutual edges) and Pending Requests (half-edges waiting for handshake acceptance).
+/// - **Optimistic & Skeleton Loading States**:
+///   Shows skeleton placeholders while network queries are in flight to prevent layout shifts.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of an VIP club guest list split into two clipboards: "Confirmed Guests" who have already
+///   passed through the velvet rope, and "Invited Guests" who are currently waiting at the gate.
+/// ============================================================================
 //
 //  TrustedPersonView.swift
 //  Astar

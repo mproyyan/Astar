@@ -1,3 +1,14 @@
+/// ============================================================================
+/// 👤 WALKER PROFILE BANNER (WalkerProfileHeader)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Identity Header Component**:
+///   Renders user photo, display name, and quick dismissal action buttons for guardian sheets.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of the header banner on an officer's security identification pass.
+/// ============================================================================
 //
 //  WalkerProfileHeader.swift
 //  Astar

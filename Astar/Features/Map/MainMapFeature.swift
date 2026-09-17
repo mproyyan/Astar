@@ -1,3 +1,25 @@
+/// ============================================================================
+/// 🗺️ MAP ENGINE REDUCER & GEODETIC TRACKING ORCHESTRATOR (MainMapFeature)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Complex State Machine & State Explosion Mitigation**:
+///   Coordinates multi-agent states: the user's local GPS position, active navigation route,
+///   interactive bottom sheets, Dynamic Island live widgets, and real-time remote walker telemetry.
+/// - **Milestone Detection & Spatial Geofencing**:
+///   Calculates point-to-point proximity to determine if the walker has arrived at intermediate
+///   landmarks (Journey Log) or crossed the destination threshold, transitioning states from
+///   active navigation to arrival completion.
+/// - **Reactive Dependency Chaining**:
+///   Consumes `LocationManagerClient` streams and pipes location updates into CloudKit telemetry
+///   effects while updating MapKit viewport camera polylines synchronously on the main thread.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a mission control console during a space shuttle rendezvous. It monitors the
+///   craft's real-time telemetry (GPS coordinates), projects the planned orbital trajectory
+///   (polyLine), updates telemetry logs at every milestone checkpoint, and alerts ground crew
+///   (companions) the moment touchdown is confirmed.
+/// ============================================================================
 import Combine
 import ComposableArchitecture
 import CoreLocation

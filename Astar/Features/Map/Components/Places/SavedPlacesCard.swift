@@ -1,3 +1,14 @@
+/// ============================================================================
+/// 🏷️ SAVED PLACES CARD CONTAINER (SavedPlacesCard)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Composite UI Container Pattern**:
+///   Aggregates favorite destinations into a unified visual card on the map drawer.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a desktop quick-access shortcut dock containing your top 3 daily applications.
+/// ============================================================================
 //
 //  SavedPlacesCard.swift
 //  Astar

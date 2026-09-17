@@ -1,3 +1,16 @@
+/// ============================================================================
+/// 📜 AUDIT TRAIL TIMELINE VIEW (DirectionJourneyLog)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Chronological Event Stream Rendering**:
+///   Renders an ordered list of milestone checkpoints reached during the journey, proving continuous
+///   progress along the route.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a package delivery courier tracking timeline: "Departed Hub 10:00 AM", "Arrived at
+///   Sorting Facility 10:15 AM", "Out for Delivery 10:30 AM".
+/// ============================================================================
 //
 //  DirectionJourneyLog.swift
 //  Astar

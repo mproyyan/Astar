@@ -1,3 +1,14 @@
+/// ============================================================================
+/// 🗂️ COMPACT JOURNEY LOG CARD CONTAINER (DirectionJourneyLogCard)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Card Container Pattern & Visual Encapsulation**:
+///   Wraps the timeline log in a frosted glass card container for easy embedding within the drawer.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a pocket flight logbook bound in leather that fits neatly into a pilot's breast pocket.
+/// ============================================================================
 //
 //  DirectionJourneyLogCard.swift
 //  Astar

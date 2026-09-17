@@ -1,3 +1,20 @@
+/// ============================================================================
+/// 📑 POLYMORPHIC BOTTOM SHEET CONTAINER (MapSheet)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Polymorphic View Dispatch / Algebraic Sum-Type View**:
+///   Switches dynamically between `.main`, `.search`, and `.direction` content modes based on
+///   the current active enum case of `MapSheetFeature.State`.
+/// - **Detents & Dynamic Viewport Partitioning**:
+///   Leverages presentation detents to smoothly resize the interactive drawer (fractional / medium / large)
+///   without obscuring background map gesture handlers.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a Swiss Army knife or multi-tool drawer. Depending on whether you're searching for
+///   a destination (magnifying glass), viewing home favorites (quick shortcuts), or navigating
+///   (compass dashboard), the exact tool you need slides up smoothly into your hand.
+/// ============================================================================
 import ComposableArchitecture
 import MapKit
 import SwiftUI

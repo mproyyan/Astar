@@ -1,3 +1,24 @@
+/// ============================================================================
+/// 🧭 APPLICATION COORDINATOR & ROOT STACK ROUTER (MainFeature)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Hierarchical Finite State Machine (HFSM)**:
+///   Acts as the central orchestrator containing child state machines (`MainMapFeature`,
+///   `LoginFeature`, and a `StackState` navigation path).
+/// - **Navigation Stack Automaton (Pushdown Automaton)**:
+///   Manages linear and modal navigation (`profile`, `trustedPerson`, `savedPlaces`) via a LIFO
+///   stack (`StackState<Path.State>`), guaranteeing deterministic back-navigation and state unwinding.
+/// - **Global Event Bus & Invitation Dispatching**:
+///   Catches system-wide APNs push notification responses (e.g. accepted walk companion invites)
+///   and transitions the map view into live tracking mode without tight coupling between screens.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of an airport terminal central display system. It coordinates security check-in
+///   (Login), the flight runway radar (MainMap), and boarding gates (Navigation Stacks). When an
+///   emergency broadcast or priority passenger announcement arrives, the master terminal routes
+///   the instruction to the exact gate without halting general airport traffic.
+/// ============================================================================
 import CloudKit
 import Combine
 import ComposableArchitecture

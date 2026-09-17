@@ -1,3 +1,16 @@
+/// ============================================================================
+/// 📩 INCOMING TRUSTED PERSON REQUEST VIEW (RequestTrustedPersonView)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Two-Phase Handshake Resolution Interface**:
+///   Provides binary decision buttons (Accept / Decline) for pending social graph edge requests,
+///   triggering transactional mutations on the distributed database.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a friend request letter delivered by a courier. You can either sign the receipt
+///   (Accept) to establish mutual correspondence, or refuse delivery (Decline) to send the courier back.
+/// ============================================================================
 //
 //  RequestTrustedPersonView.swift
 //  Astar

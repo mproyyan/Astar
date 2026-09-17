@@ -1,3 +1,20 @@
+/// ============================================================================
+/// 📦 GUARDIAN DOMAIN DATA MODELS (WalkerModels)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Data Transfer Objects (DTO) & Domain Entities**:
+///   Defines immutable value representations of historical trips (`WalkerHistoryTrip`),
+///   telemetry data points, and mock fixtures.
+/// - **Type Safety & Algebraic Invariants**:
+///   Using strongly-typed properties (`UUID`, `Date`, `CLLocationCoordinate2D`) prevents invalid
+///   spatial states (such as negative durations or malformed coordinates) from corrupting the UI.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a captain's nautical logbook. Each voyage entry has a certified timestamp, departure
+///   harbor, destination port, and duration. Once written in ink, past entries cannot be altered,
+///   providing an immutable audit trail for safety regulators.
+/// ============================================================================
 //
 //  WalkerModels.swift
 //  Astar

@@ -1,3 +1,19 @@
+/// ============================================================================
+/// 🏝️ HEADS-UP DISPLAY / DYNAMIC ISLAND WIDGET (DynamicIslandGoogleMapsView)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Heads-Up Display (HUD) & Glanceable UI Pattern**:
+///   Condenses critical real-time telemetric data (ETA, distance remaining, walker avatar) into a
+///   compact floating pill at the top of the viewport.
+/// - **Visual Hierarchy & Low-Cognitive-Load Rendering**:
+///   Provides high-contrast icons and numbers so users walking down busy city streets can check
+///   status in less than 500ms without breaking their stride.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of the digital speedometer and fuel gauge projected onto the car windshield (HUD) so
+///   the driver never has to look down away from the road ahead.
+/// ============================================================================
 //
 //  DynamicIslandGoogleMapsView.swift
 //  Astar

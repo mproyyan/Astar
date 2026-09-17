@@ -1,3 +1,14 @@
+/// ============================================================================
+/// 📋 SEARCH RESULTS CARD CONTAINER (SearchResultsCard)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Result Set Projection View**:
+///   Wraps the list of matched query locations into a scrollable card structure.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a search results ledger sheet listing top matches for quick inspection.
+/// ============================================================================
 //
 //  SearchResultsCard.swift
 //  Astar

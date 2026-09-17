@@ -1,3 +1,16 @@
+/// ============================================================================
+/// 💤 WALKER IDLE STATUS CARD (WalkerCardIdle)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Quiescent / Standby State View**:
+///   Renders the interface when the tracked person is not actively engaged in a walk session,
+///   displaying battery health, last known location, and historical trips.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a parked vehicle dashboard: engine is off, but fuel level, parking location, and
+///   trip odometer remain clearly visible.
+/// ============================================================================
 //
 //  WalkerCardIdle.swift
 //  Astar

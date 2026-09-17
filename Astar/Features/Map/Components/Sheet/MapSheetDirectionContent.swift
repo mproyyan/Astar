@@ -1,3 +1,16 @@
+/// ============================================================================
+/// 🧭 DIRECTION CONTENT DRAWER (MapSheetDirectionContent)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **State-Driven Flow Control**:
+///   Renders either the pre-trip route calculation card, the live navigation progress card, or the
+///   detailed journey log list depending on the direction feature's internal mode.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of an airline passenger boarding pass screen that automatically flips from "Gate & Flight Info"
+///   to "In-Flight Progress Bar" once the plane takes off.
+/// ============================================================================
 import ComposableArchitecture
 import CoreLocation
 import MapKit

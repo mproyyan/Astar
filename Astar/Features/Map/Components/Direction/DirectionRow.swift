@@ -1,3 +1,14 @@
+/// ============================================================================
+/// 🏁 WAYPOINT ROW (DirectionRow)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Endpoint Waypoint Primitive**:
+///   Renders the departure origin or destination point of interest with standardized icons and styling.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of the start and finish markers placed at opposite ends of a 100-meter dash track.
+/// ============================================================================
 //
 //  DirectionRow.swift
 //  Astar

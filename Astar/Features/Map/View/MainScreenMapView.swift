@@ -1,3 +1,20 @@
+/// ============================================================================
+/// 🗺️ ROOT MAP CANVAS VIEW & MAPKIT BRIDGE (MainScreenMapView)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Declarative-to-Imperative Canvas Bridge (`MapKit` in SwiftUI)**:
+///   Binds SwiftUI's declarative view hierarchy to Apple's vector map renderer, synchronizing
+///   camera viewports, dynamic route polylines, and interactive annotation pins with reducer state.
+/// - **Spatial Overlay Rendering**:
+///   Overlays multiple geodetic layers (base satellite/streets, walking path polyline, live walker
+///   position dot, Dynamic Island HUD) in z-order without blocking touch gestures.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a transparent glass war room table. The bottom layer is the topographical terrain map,
+///   on top of which translucent plastic sheets draw planned march routes, troop markers, and
+///   floating status dashboards that can be updated in real time without redrawing the whole table.
+/// ============================================================================
 import Combine
 import ComposableArchitecture
 import CoreLocation

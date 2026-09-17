@@ -1,3 +1,21 @@
+/// ============================================================================
+/// 📜 AUDIT TRAIL & JOURNEY MILESTONE MODELS (DirectionJourneyLogModels)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Event Sourcing & Append-Only Log Pattern**:
+///   `JourneyLogEntry` represents an immutable milestone along a journey. Rather than only storing
+///   the current coordinate, every checkpoint is appended to a sequential log, enabling complete
+///   reconstruction of the user's path across time.
+/// - **Categorical Enum Invariants (`JourneyLogEntryType`)**:
+///   Uses an algebraic sum type (`departure`, `checkpoint`, `destination`, `pause`) to constrain
+///   milestone lifecycle states without ambiguous string flags.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a passport stamped at every customs checkpoint. Rather than just asking "where are
+///   you now?", the stamped pages form a chronological record of every country and border crossed,
+///   proving your exact route from start to finish.
+/// ============================================================================
 //
 //  DirectionJourneyLogModels.swift
 //  Astar

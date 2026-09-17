@@ -1,3 +1,19 @@
+/// ============================================================================
+/// ➕ ADD TRUSTED PERSON SEARCH VIEW (AddTrustedPersonView)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Debounced Search Query Input**:
+///   Captures user keystrokes for user lookup, propagating text changes to the reducer
+///   where debouncing prevents flooding backend database servers on every character typed.
+/// - **Modal Form Interaction & Sheet Dismissal**:
+///   Presented as an overlay sheet with safe navigation unwinding upon successful invite delivery.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of an office receptionist searching the internal employee phone directory. Typing the
+///   first few letters filters the directory in real time so you can tap "Invite" without typing
+///   the full 30-character corporate email address.
+/// ============================================================================
 import SwiftUI
 import ComposableArchitecture
 import Foundation

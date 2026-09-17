@@ -1,3 +1,14 @@
+/// ============================================================================
+/// 🔍 ACTIVE SEARCH BAR & INPUT CONTROLLER (ActiveSearchBarView)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Interactive Input Binding & Focus State Management**:
+///   Binds directly to SwiftUI `@FocusState` to raise the virtual keyboard as soon as search mode opens.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a magnifying glass with an integrated notepad that opens its pen cap as soon as you pick it up.
+/// ============================================================================
 //
 //  ActiveSearchBarView.swift
 //  Astar

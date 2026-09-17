@@ -1,3 +1,15 @@
+/// ============================================================================
+/// 📜 HISTORICAL TRIP DETAIL CARD (WalkerCardHistoryDetail)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Historical Record Inspection & Provenance**:
+///   Renders immutable past journey metrics (duration, distance, start/end timestamps, checkpoint log)
+///   for safety audits and reviews.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of an archived flight log printout examined by an airline safety inspector after landing.
+/// ============================================================================
 //
 //  WalkerCardHistoryDetail.swift
 //  Astar

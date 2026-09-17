@@ -1,3 +1,16 @@
+/// ============================================================================
+/// 🧭 ROUTE SUMMARY & NAVIGATION PROMPT CARD (DirectionCard)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Route Pre-Flight State Presentation**:
+///   Displays origin, destination, estimated travel time, distance, and the primary "Start Navigation"
+///   action button. Encapsulates cancelation and invocation callbacks.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a train timetable display showing the departure station, terminus, and scheduled
+///   departure time right before you step through the turnstile and board the train.
+/// ============================================================================
 //
 //  DirectionCard.swift
 //  Astar

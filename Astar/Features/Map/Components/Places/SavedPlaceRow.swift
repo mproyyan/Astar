@@ -1,3 +1,14 @@
+/// ============================================================================
+/// 📍 SAVED PLACE ROW COMPONENT (SavedPlaceRow)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **List Item Component & Tap Interaction Handler**:
+///   Renders place icon, title, subtitle, and calculated distance with touch target optimizations.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a bookmark in a travel guide with a small sticker indicating the distance to the monument.
+/// ============================================================================
 //
 //  SavedPlaceRow.swift
 //  Astar

@@ -1,3 +1,15 @@
+/// ============================================================================
+/// 📌 JOURNEY LOG TIMELINE ROW (DirectionJourneyLogRow)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Visual Graph Node & Edge Rendering**:
+///   Renders a single checkpoint node with vertical dashed timeline connectors linking past and
+///   future milestones in the path.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a bead strung onto a thread in an abacus or necklace, marking a distinct counted step.
+/// ============================================================================
 //
 //  DirectionJourneyLogRow.swift
 //  Astar

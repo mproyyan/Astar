@@ -1,3 +1,19 @@
+/// ============================================================================
+/// 🔖 SAVED PLACES VIEW (SavedPlacesView)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Declarative Reactive Presentation Layer**:
+///   Binds directly to TCA's `StoreOf<SavedPlacesFeature>`. Renders state snapshots and emits
+///   user interactions as pure domain actions without retaining mutable state.
+/// - **List Virtualization & View Recycling**:
+///   Uses SwiftUI's `List` container which lazily evaluates off-screen elements, maintaining
+///   smooth 60/120 FPS performance even with hundreds of stored places.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a Rolodex or bookmarks folder. Flipping through cards only exposes the card in
+///   front of your eyes, keeping the rest neatly tucked in the drawer until you scroll to them.
+/// ============================================================================
 //
 //  SavedPlacesView.swift
 //  Astar

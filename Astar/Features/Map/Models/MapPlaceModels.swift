@@ -1,3 +1,20 @@
+/// ============================================================================
+/// 📍 GEOSPATIAL PLACE & LOCATION ENTITY MODELS (MapPlaceModels)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Spatial Entity Representation**:
+///   `SavedPlace` encapsulates geographic coordinates, textual metadata (name, subtitle, category),
+///   and display heuristics for points of interest.
+/// - **Normalization & Serialization (`Codable`)**:
+///   Conforms to `Codable` and `Identifiable` for zero-overhead JSON persistence to disk storage
+///   and O(1) identity resolution in SwiftUI dynamic lists.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a physical pin on a corkboard wall map with an attached label card: it marks the
+///   precise GPS pinhole, has an address tag, and can be filed away into a folder (Saved Places)
+///   for quick retrieval whenever you plan your next trip.
+/// ============================================================================
 //
 //  MapPlaceModels.swift
 //  Astar

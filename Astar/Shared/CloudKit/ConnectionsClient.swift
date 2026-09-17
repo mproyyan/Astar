@@ -1,3 +1,24 @@
+/// ============================================================================
+/// 🤝 CLOUDKIT GRAPH CONNECTIONS CLIENT (ConnectionsClient)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Social Graph & Relational Mapping**: CloudKit acts as a distributed graph database.
+///   A connection represents an edge in an undirected/directed social graph between two nodes
+///   (users): `Node(UserA) <--- Edge(Connection: status) ---> Node(UserB)`.
+/// - **Dual-Lookup / Disjunctive Query (OR Query)**:
+///   Because an edge between A and B can be stored with A as `member1` or B as `member1`,
+///   querying requires checking both orientations: `(member1 == me OR member2 == me)`.
+/// - **Dependency Injection Pattern**:
+///   Using TCA's `@DependencyClient`, this struct decouples database I/O from presentation logic,
+///   allowing test suites to run isolated mock graphs without network latency or CloudKit quotas.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of two people exchanging business cards. Either Alice hands a card to Bob or Bob
+///   hands one to Alice (the Edge). When the police/receptionist checks if Alice and Bob are
+///   connected, they look through Alice's card collection AND Bob's card collection. Once both
+///   agree ("mutual"), they can track each other's journey.
+/// ============================================================================
 import CloudKit
 import ComposableArchitecture
 import Foundation

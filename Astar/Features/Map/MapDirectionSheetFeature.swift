@@ -1,3 +1,24 @@
+/// ============================================================================
+/// 🧭 NAVIGATION SHEET & ROUTE ESTIMATION REDUCER (MapDirectionSheetFeature)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Sub-State Machine Decomposition**:
+///   Manages three distinct navigation UI modes: `.directions` (route preview & travel estimates),
+///   `.progress` (active turn-by-turn tracking & spectator list), and `.journeyLog` (audit log of
+///   milestones reached along the path).
+/// - **Asynchronous Route Computation & Fallback Heuristics**:
+///   Calls MapKit's routing server. If the device is offline or the server fails, it falls back to
+///   Euclidean/Haversine distance calculation and straight-line polylines to prevent application lockup.
+/// - **Child-to-Parent Delegation Pattern**:
+///   Emits `.delegate` actions (`navigationStarted`, `routeChanged`, `navigationEnded`) so the
+///   parent map feature can adapt camera views without violating strict encapsulation.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a taxi meter and dashboard console. Before leaving, it calculates estimated fare and
+///   route. Once in motion, it switches to active fare tracking and displays intermediate landmarks.
+///   When the trip completes, it produces a detailed itemized receipt (Journey Log) of every stop.
+/// ============================================================================
 import ComposableArchitecture
 import CloudKit
 import CoreLocation

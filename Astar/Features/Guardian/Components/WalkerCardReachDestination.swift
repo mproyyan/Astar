@@ -1,3 +1,15 @@
+/// ============================================================================
+/// 🏁 DESTINATION REACHED SUCCESS CARD (WalkerCardReachDestination)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Terminal State Acknowledgment View**:
+///   Renders the journey completion certificate when the remote walker safely arrives inside
+///   the destination geofence.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of an airport arrivals terminal board flashing "Flight Arrived Safely at Gate 4".
+/// ============================================================================
 //
 //  WalkerCardReachDestination.swift
 //  Astar

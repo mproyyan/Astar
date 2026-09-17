@@ -1,3 +1,14 @@
+/// ============================================================================
+/// 🔎 STATIC SEARCH BAR TRIGGER (SearchBarView)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Tappable Placeholder Primitive**:
+///   Mimics an input bar to provide an intuitive hit target for transitioning into active search mode.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a false search drawer handle that smoothly glides open into a full keyboard when touched.
+/// ============================================================================
 //
 //  SearchBarView.swift
 //  Astar

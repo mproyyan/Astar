@@ -1,3 +1,14 @@
+/// ============================================================================
+/// 🔎 SEARCH DRAWER CONTENT (MapSheetSearchContent)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Real-Time Predictive Filtering View**:
+///   Presents autocomplete and local point-of-interest suggestions as query strings evolve.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a dictionary index tab that jumps directly to the matching letter section as you flip through.
+/// ============================================================================
 import ComposableArchitecture
 import CoreLocation
 import SwiftUI

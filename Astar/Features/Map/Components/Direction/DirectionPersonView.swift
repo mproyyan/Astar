@@ -1,3 +1,14 @@
+/// ============================================================================
+/// 👤 SPECTATOR COMPANION AVATAR ROW (DirectionPersonView)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Participant Entity Display**:
+///   Renders a companion's profile picture, name, and real-time watching status (e.g. "Watching", "Idle").
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a spectator badge at a stadium showing the fan's photo and entry clearance level.
+/// ============================================================================
 //
 //  DirectionPersonView.swift
 //  Astar

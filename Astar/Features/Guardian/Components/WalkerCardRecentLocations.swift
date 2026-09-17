@@ -1,3 +1,14 @@
+/// ============================================================================
+/// 📍 RECENT LOCATIONS LIST CARD (WalkerCardRecentLocations)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Spatial History Aggregation**:
+///   Summarizes common waypoints visited by the walker to give guardians contextual safety awareness.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a list of frequent ports of call in a ship's maritime registry.
+/// ============================================================================
 //
 //  WalkerCardRecentLocations.swift
 //  Astar

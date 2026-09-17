@@ -1,3 +1,14 @@
+/// ============================================================================
+/// 🗂️ SAVED PLACES SECTION HEADER & LIST (SavedSection)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Section Modularization**:
+///   Separates the saved places collection from the people collection on the main bottom sheet.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a divider tab in a physical binder separating the "Contacts" section from "Addresses".
+/// ============================================================================
 //
 //  SavedSection.swift
 //  Astar

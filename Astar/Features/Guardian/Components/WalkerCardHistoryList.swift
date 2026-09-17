@@ -1,3 +1,14 @@
+/// ============================================================================
+/// 📚 TRIP HISTORY LIST VIEW (WalkerCardHistoryList)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Time-Series Historical Collection**:
+///   Renders chronologically sorted past journeys taken by a specific walker.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a travel passport filled with chronological entry/exit visa stamps from past journeys.
+/// ============================================================================
 //
 //  WalkerCardHistoryList.swift
 //  Astar

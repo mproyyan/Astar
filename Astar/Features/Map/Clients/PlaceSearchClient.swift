@@ -1,3 +1,24 @@
+/// ============================================================================
+/// 🔍 GEOSPATIAL SEARCH & DEDUPLICATION ENGINE (PlaceSearchClient)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Geographical Bounding Box & Spatial Filtering**:
+///   Restricts search queries using `MKCoordinateRegion` around the user's current coordinates,
+///   limiting the search space and computing Haversine/Euclidean distance penalties.
+/// - **Multi-Source Ranking & Fuzzy Matching**:
+///   Fuses results from Apple's `MKLocalSearch` and pre-indexed local points of interest (POI),
+///   ranking them using string similarity (prefix match, token intersection) and spatial proximity.
+/// - **Set Deduplication (O(1) Hash Set)**:
+///   Maintains a `seenKeys = Set<String>()` to eliminate duplicate points of interest returned by
+///   overlapping category queries before yielding to the UI.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of asking a local concierge for the nearest bakery. The concierge first checks their
+///   mental list of famous bakeries within 2 km (spatial indexing). If two guidebooks list the same
+///   bakery under slightly different names ("Paul French Bakery" vs "Paul Bakery"), the concierge
+///   recognizes it's the exact same storefront and only tells you once.
+/// ============================================================================
 import Foundation
 import CoreLocation
 import MapKit

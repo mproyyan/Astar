@@ -1,3 +1,21 @@
+/// ============================================================================
+/// 🚶 GUARDIAN COMPANION SPECTATOR REDUCER (MapWalkerSheetFeature)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Remote Telemetry Consumer & Observer Role**:
+///   Unlike the walker (who produces coordinates), this feature acts as a consumer/spectator.
+///   It listens to the walker's active `WalkSession` and renders their live status, route history,
+///   and journey checkpoints.
+/// - **Hierarchical Navigation & Drill-Down State**:
+///   Supports modal drill-downs into historical trips (`WalkerHistoryTrip`) and real-time journey
+///   logs, using immutable structs to render past paths safely.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a marathon spectator tracking an athlete's runner bib number on a mobile app.
+///   The runner transmits split times and GPS pulses, while the spectator watches progress,
+///   inspects historical race times, and cheers when the athlete reaches the finish line.
+/// ============================================================================
 import ComposableArchitecture
 import CoreLocation
 import Foundation

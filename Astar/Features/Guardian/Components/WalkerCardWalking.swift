@@ -1,3 +1,14 @@
+/// ============================================================================
+/// 🚶 ACTIVE LIVE TRACKING CARD (WalkerCardWalking)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Live Telemetry Stream Presentation**:
+///   Shows live walking pace, remaining distance, ETA, and emergency "Call Walker" or "Join Session" controls.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a maritime safety radio console with a direct beacon frequency to an escort ship.
+/// ============================================================================
 //
 //  WalkerCardWalking.swift
 //  Astar

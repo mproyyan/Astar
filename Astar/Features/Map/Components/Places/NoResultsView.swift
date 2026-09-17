@@ -1,3 +1,16 @@
+/// ============================================================================
+/// 📭 EMPTY STATE PLACEHOLDER (NoResultsView)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Empty State Handling & User Feedback**:
+///   Prevents awkward blank screens when spatial search queries return zero records, guiding the
+///   user with helpful fallback advice.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a library shelf card saying "No books found under this category; please check the
+///   general index desk".
+/// ============================================================================
 //
 //  NoResultsView.swift
 //  Astar

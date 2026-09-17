@@ -1,3 +1,14 @@
+/// ============================================================================
+/// 📊 TELEMETRY STATUS SECTION (WalkerStatusSection)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Status Metric Tiles**:
+///   Renders key metrics (battery percentage, signal health, motion state) in clean glanceable blocks.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of the telemetry gauges on a spacecraft cockpit panel (battery voltage, signal strength).
+/// ============================================================================
 //
 //  WalkerStatusSection.swift
 //  Astar

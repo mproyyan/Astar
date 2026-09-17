@@ -1,3 +1,15 @@
+/// ============================================================================
+/// 👤 INDIVIDUAL PERSON BADGE COMPONENT (PersonView)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Atomic Presentation Unit**:
+///   Renders an individual user's profile avatar, contact name, and status badge with accessibility
+///   identifiers for automated UI test runners.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a visitor ID lanyard card showing the person's photo, name, and access clearance.
+/// ============================================================================
 //
 //  PersonView.swift
 //  Astar

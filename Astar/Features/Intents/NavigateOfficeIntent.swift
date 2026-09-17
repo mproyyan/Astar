@@ -1,3 +1,20 @@
+/// ============================================================================
+/// ⚡️ APP INTENT - OFFICE SHORTCUT (NavigateOfficeIntent)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Static Command Pattern & OS Integration**:
+///   Encapsulates an operation as an executable object (`perform() async throws -> some IntentResult`)
+///   registered in the iOS System Capability Table.
+/// - **Declarative Metadata & System Reflection**:
+///   Static metadata (`title`, `description`, `openAppWhenRun`) is compiled into an OS-level
+///   metadata dictionary allowing Spotlight search to index app capabilities without loading the
+///   entire executable into RAM.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of an emergency express elevator key. You don't have to navigate each floor lobby;
+///   inserting the key sends the elevator straight to your office floor with a single command.
+/// ============================================================================
 //
 //  NavigateOfficeIntent.swift
 //  Astar

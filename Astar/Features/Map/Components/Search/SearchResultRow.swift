@@ -1,3 +1,14 @@
+/// ============================================================================
+/// 📌 GEOSPATIAL SEARCH RESULT ROW (SearchResultRow)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Search Hit Presentation**:
+///   Displays matched landmark names, highlighted text fragments, and distance offsets.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of an encyclopedia entry snippet displayed under your search keyword in an index.
+/// ============================================================================
 //
 //  SearchResultRow.swift
 //  Astar

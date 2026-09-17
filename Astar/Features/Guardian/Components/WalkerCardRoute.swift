@@ -1,3 +1,14 @@
+/// ============================================================================
+/// 🗺️ ACTIVE TRIP ROUTE OVERVIEW CARD (WalkerCardRoute)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **In-Flight Telemetry Projection**:
+///   Shows origin, live progress, and destination details for the active walk session being monitored.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of the in-flight entertainment seatback screen showing your airplane's path over mountains and cities.
+/// ============================================================================
 //
 //  WalkerCardRoute.swift
 //  Astar

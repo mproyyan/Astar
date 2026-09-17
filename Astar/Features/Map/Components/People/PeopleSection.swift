@@ -1,3 +1,16 @@
+/// ============================================================================
+/// 👥 COMPANIONS HORIZONTAL CAROUSEL (PeopleSection)
+/// ============================================================================
+///
+/// 💡 COMPUTER SCIENCE CONCEPTS:
+/// - **Horizontal Virtualized Collection**:
+///   Uses `ScrollView(.horizontal)` with lazy item instantiation to scroll through trusted contacts
+///   without inflating views for contacts located off-screen.
+///
+/// 🌍 REAL-LIFE ANALOGY:
+///   Think of a speed-dial wheel or photo strip on a refrigerator: you can quickly slide your
+///   finger along the strip to tap your closest family member.
+/// ============================================================================
 //
 //  PeopleSection.swift
 //  Astar
